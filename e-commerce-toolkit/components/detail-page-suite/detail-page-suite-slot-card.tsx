@@ -42,8 +42,8 @@ type Props = {
   onOpenPromptEdit?: () => void;
   onActiveImageIndexChange?: (index: number) => void;
   imageGenError?: string;
-  /** 爆款：始终展示模块文案占位 */
-  slotCopyMode?: "hit";
+  /** 套图工作台：展示模块文案与排版状态 */
+  slotCopyMode?: "workbench";
 };
 
 export function DetailPageSuiteSlotCard({
@@ -287,7 +287,7 @@ export function DetailPageSuiteSlotCard({
             <span className="shrink-0 text-[10px] text-[#ff3b30]">出图失败</span>
           ) : null}
         </div>
-        {slotCopyMode === "hit" ? (
+        {slotCopyMode === "workbench" ? (
           <p
             className="line-clamp-3 text-[10px] leading-relaxed text-[#424245]"
             title={

@@ -1,5 +1,7 @@
 import type { EcomImageRatio } from "@/lib/product-design-types";
 
+type EcomCopyOverlay = import("@private/ecom-copy-overlay").EcomCopyOverlay;
+
 export const PRODUCT_IMAGE_SET_MAX_PRODUCT_REFS = 6;
 
 export type ProductImageSetReference = {
@@ -30,6 +32,8 @@ export type ProductImageSetSlot = {
   status?: "pending" | "generating" | "ready" | "failed";
   failMessage?: string;
   promptEdited?: boolean;
+  slotCopy?: string;
+  copyOverlay?: EcomCopyOverlay;
 };
 
 export type ProductImageSetStructureCounts = {

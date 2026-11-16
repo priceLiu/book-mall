@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import type { EcomImageRatio } from "@/lib/ecom/ecom-platform-spec";
+import type { EcomCopyOverlay } from "@private/ecom-copy-overlay";
 import {
   ECOM_COUNTRY_OPTIONS,
   ECOM_LANGUAGE_OPTIONS,
@@ -44,6 +45,8 @@ export type ProductImageSetSlot = {
   status?: "pending" | "generating" | "ready" | "failed";
   failMessage?: string;
   promptEdited?: boolean;
+  slotCopy?: string;
+  copyOverlay?: EcomCopyOverlay;
 };
 
 export type ProductImageSetOutput = {

@@ -3,10 +3,23 @@ import type { EcomCopyOverlay } from "@private/ecom-copy-overlay";
 import { prisma } from "@/lib/prisma";
 
 import {
+  getDetailPageSuiteAplusProject,
   getDetailPageSuiteHitProject,
+  getDetailPageSuiteProject,
+  getDetailPageSuiteReplicaProject,
+  updateDetailPageSuiteAplusProject,
   updateDetailPageSuiteHitProject,
+  updateDetailPageSuiteProject,
+  updateDetailPageSuiteReplicaProject,
 } from "./project-service";
-import { ECOM_DETAIL_PAGE_SUITE_HIT_MODULE, type DetailPageSuiteSlot } from "./types";
+import {
+  ECOM_AI_DETAIL_PAGE_MODULE,
+  ECOM_DETAIL_PAGE_SUITE_HIT_MODULE,
+  ECOM_DETAIL_PAGE_SUITE_MODULE,
+  ECOM_DETAIL_PAGE_SUITE_REPLICA_MODULE,
+  type DetailPageSuiteProject,
+  type DetailPageSuiteSlot,
+} from "./types";
 
 function appendComposedImageVersion(
   slot: DetailPageSuiteSlot,
@@ -43,6 +56,46 @@ function appendComposedImageVersion(
   };
 }
 
+type SuiteProjectAccess = {
+  get: (userId: string, projectId: string) => Promise<DetailPageSuiteProject | null>;
+  update: (
+    userId: string,
+    projectId: string,
+    patch: Parameters<typeof updateDetailPageSuiteProject>[2],
+  ) => Promise<DetailPageSuiteProject | null>;
+  assetModule: string;
+};
+
+function resolveSuiteProjectAccess(projectModule?: string): SuiteProjectAccess {
+  const moduleKey = projectModule?.trim() || ECOM_DETAIL_PAGE_SUITE_MODULE;
+  if (moduleKey === ECOM_DETAIL_PAGE_SUITE_HIT_MODULE) {
+    return {
+      get: getDetailPageSuiteHitProject,
+      update: updateDetailPageSuiteHitProject,
+      assetModule: ECOM_DETAIL_PAGE_SUITE_HIT_MODULE,
+    };
+  }
+  if (moduleKey === ECOM_AI_DETAIL_PAGE_MODULE) {
+    return {
+      get: getDetailPageSuiteAplusProject,
+      update: updateDetailPageSuiteAplusProject,
+      assetModule: ECOM_AI_DETAIL_PAGE_MODULE,
+    };
+  }
+  if (moduleKey === ECOM_DETAIL_PAGE_SUITE_REPLICA_MODULE) {
+    return {
+      get: getDetailPageSuiteReplicaProject,
+      update: updateDetailPageSuiteReplicaProject,
+      assetModule: ECOM_DETAIL_PAGE_SUITE_REPLICA_MODULE,
+    };
+  }
+  return {
+    get: getDetailPageSuiteProject,
+    update: updateDetailPageSuiteProject,
+    assetModule: ECOM_DETAIL_PAGE_SUITE_MODULE,
+  };
+}
+
 export async function composeDetailPageSuiteHitSlotCopy(opts: {
   userId: string;
   projectId: string;
@@ -52,8 +105,27 @@ export async function composeDetailPageSuiteHitSlotCopy(opts: {
   overlay: EcomCopyOverlay;
   slotCopy?: string;
   persistOverlay?: boolean;
-}): Promise<{ url: string; project: NonNullable<Awaited<ReturnType<typeof getDetailPageSuiteHitProject>>> }> {
-  const project = await getDetailPageSuiteHitProject(opts.userId, opts.projectId);
+}) {
+  return composeDetailPageSuiteSlotCopy({
+    ...opts,
+    projectModule: ECOM_DETAIL_PAGE_SUITE_HIT_MODULE,
+  });
+}
+
+/** 底图 + 排版 JSON → 写入点位历史并更新项目（详情页套图全系列共用） */
+export async function composeDetailPageSuiteSlotCopy(opts: {
+  userId: string;
+  projectId: string;
+  moduleId: string;
+  slotKey: string;
+  baseImageUrl: string;
+  overlay: EcomCopyOverlay;
+  slotCopy?: string;
+  persistOverlay?: boolean;
+  projectModule?: string;
+}): Promise<{ url: string; project: DetailPageSuiteProject }> {
+  const access = resolveSuiteProjectAccess(opts.projectModule);
+  const project = await access.get(opts.userId, opts.projectId);
   if (!project) throw new Error("项目不存在");
 
   const mod = project.suite.modules.find((m) => m.module_id === opts.moduleId);
@@ -73,7 +145,7 @@ export async function composeDetailPageSuiteHitSlotCopy(opts: {
   const asset = await prisma.ecomAsset.create({
     data: {
       userId: opts.userId,
-      module: ECOM_DETAIL_PAGE_SUITE_HIT_MODULE,
+      module: access.assetModule,
       kind: "image",
       title: slotTitle,
       prompt: mod.slots[slotIndex]!.positive_prompt,
@@ -81,7 +153,7 @@ export async function composeDetailPageSuiteHitSlotCopy(opts: {
       thumbnailUrl: url,
       meta: {
         projectId: opts.projectId,
-        source: ECOM_DETAIL_PAGE_SUITE_HIT_MODULE,
+        source: access.assetModule,
         moduleId: opts.moduleId,
         slotKey: opts.slotKey,
         composedCopyOverlay: true,
@@ -107,7 +179,7 @@ export async function composeDetailPageSuiteHitSlotCopy(opts: {
     return { ...m, slots };
   });
 
-  const updated = await updateDetailPageSuiteHitProject(opts.userId, opts.projectId, {
+  const updated = await access.update(opts.userId, opts.projectId, {
     suite: { ...project.suite, modules },
   });
   if (!updated) throw new Error("保存失败");

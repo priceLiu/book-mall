@@ -9,6 +9,7 @@ import {
   canAddCustomSuiteSlot,
   isDetailPageSuiteSizeChartModuleId,
 } from "@/lib/detail-page-suite-add-custom-slot";
+import { resolveDetailPageSuiteSlotHistory } from "@/lib/detail-page-suite-slot-images";
 import {
   isDetailPageSuiteSpecChartDataLabel,
   isDetailPageSuiteSpecChartModuleId,
@@ -835,6 +836,7 @@ function ModuleBlock({
           {gridSlots.map((slot) => {
             const slotComposite = composeSuiteSlotKey(mod.module_id, slot.item_key);
             const hasPrompt = isSuiteSlotSelectable(slot);
+            const hasImage = resolveDetailPageSuiteSlotHistory(slot).length > 0;
             const slotGenBusy = activeGen.has(slotComposite);
             const slotPromptBusy =
               activePromptSlots.has(slotComposite) || modulePromptBusy;
@@ -874,7 +876,7 @@ function ModuleBlock({
                 busyLabel={busyLabel}
                 onPreviewImage={onPreviewSlotImage}
                 onOpenPromptEdit={
-                  onOpenPromptEdit && (hasPrompt || isHit) && !slotBusy
+                  onOpenPromptEdit && (hasPrompt || hasImage) && !slotBusy
                     ? () =>
                         onOpenPromptEdit(
                           mod.module_id,
@@ -887,7 +889,7 @@ function ModuleBlock({
                         )
                     : undefined
                 }
-                slotCopyMode={isHit ? "hit" : undefined}
+                slotCopyMode="workbench"
                 onActiveImageIndexChange={
                   onActiveImageIndexChange
                     ? (index) => onActiveImageIndexChange(mod.module_id, slot.item_key, index)

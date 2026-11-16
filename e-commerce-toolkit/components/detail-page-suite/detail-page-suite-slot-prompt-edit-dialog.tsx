@@ -19,12 +19,9 @@ import {
 import { detailPageAspectClass } from "@/lib/detail-page-suite-platform-ratio";
 import type { EcomDetailPageRatio } from "@/lib/detail-page-suite-platform-ratio";
 import type { EcomCopyOverlay } from "@private/ecom-copy-overlay";
+import type { DetailPageSuiteSlotPromptSaveExtras } from "@/lib/detail-page-suite-slot-prompt-edit-types";
 
-export type DetailPageSuiteSlotPromptSaveExtras = {
-  slotCopy?: string;
-  copyOverlay?: EcomCopyOverlay;
-  burnCopyInImage?: boolean;
-};
+export type { DetailPageSuiteSlotPromptSaveExtras };
 
 type Props = {
   open: boolean;
@@ -91,14 +88,15 @@ export function DetailPageSuiteSlotPromptEditDialog({
   onUploadPromptRef,
   slotCopy = "",
   slotCopyAi = "",
-  showSlotCopyField = false,
+  showSlotCopyField = true,
   baseImageUrl = null,
   copyOverlay = null,
   exportWidthPx = 750,
   displayRatio = "3:4",
 }: Props) {
   const isAdd = mode === "add";
-  const layoutMode = showSlotCopyField && !isAdd;
+  const layoutMode =
+    !isAdd && showSlotCopyField !== false && Boolean(baseImageUrl?.trim());
   const [draft, setDraft] = useState(prompt);
 
   useEffect(() => {

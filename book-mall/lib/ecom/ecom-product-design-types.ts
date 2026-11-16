@@ -218,6 +218,8 @@ export const productDesignSchema = z.object({
         genPrompt: z.string().optional(),
         /** 用户手改过 genPrompt：重新拆解时不覆盖 */
         promptEdited: z.boolean().optional(),
+        slot_copy: z.string().optional(),
+        copy_overlay: z.record(z.unknown()).optional(),
       }),
     )
     .default([]),
@@ -248,6 +250,8 @@ export const productDesignSchema = z.object({
         genPrompt: z.string().optional(),
         /** 用户手改过 genPrompt：重新拆解时不覆盖 */
         promptEdited: z.boolean().optional(),
+        slot_copy: z.string().optional(),
+        copy_overlay: z.record(z.unknown()).optional(),
       }),
     )
     .default([]),

@@ -1,16 +1,12 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import Image from "next/image";
-import { Download, Eye, FileText, Loader2, RefreshCw, Sparkles } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { EcomMediaGeneratingBusy } from "@/components/media/ecom-media-generating-busy";
-import {
-  ECOM_MEDIA_TILE_ACTION_ICON_CLASS,
-  ECOM_SLOT_HOVER_ACTION_BTN_CLASS,
-  ECOM_SLOT_HOVER_ACTIONS_ROW_CLASS,
-  ECOM_SLOT_HOVER_OVERLAY_CLASS,
-} from "@/components/media/ecom-media-library-tile";
+import { EcomSlotImageHoverActions } from "@/components/media/ecom-slot-image-hover-actions";
 import {
   ProductDesignGalleryPreviewDialog,
   type ProductDesignGalleryPreviewItem,
@@ -18,11 +14,14 @@ import {
 import { ProductDesignPromptDialog } from "@/components/product-design/product-design-prompt-dialog";
 import { EcomButtonPrimary } from "@/components/ui/ecom-button";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
+import { buildProductImageSetPromptMentionRefs } from "@/lib/ecom-copy-layout-reference-images";
 import {
   detailPageAspectClass,
   detailPageCardWidth,
   type EcomDetailPageRatio,
 } from "@/lib/detail-page-suite-platform-ratio";
+import type { DetailPageSuiteSlotPromptSaveExtras } from "@/components/detail-page-suite/detail-page-suite-slot-prompt-edit-dialog";
+import { productDesignGenSlotExportWidth } from "@/lib/product-design-gen-slot-layout";
 import { groupProductImageSetSlotsByStructure } from "@/lib/product-image-set-slot-sections";
 import type {
   ProductImageSetProject,
@@ -30,6 +29,14 @@ import type {
   ProductImageSetSlotKind,
 } from "@/lib/product-image-set-types";
 import { cn } from "@/lib/utils";
+
+const ProductDesignGenSlotEditDialog = dynamic(
+  () =>
+    import("@/components/product-design/product-design-gen-slot-edit-dialog").then(
+      (m) => m.ProductDesignGenSlotEditDialog,
+    ),
+  { ssr: false },
+);
 
 const KIND_LABEL: Record<ProductImageSetSlotKind, string> = {
   white_bg: "白底图",
@@ -79,7 +86,6 @@ export function ProductImageSetSlotWorkspace({
   const [rows, setRows] = useState<ProductImageSetSlot[]>(() => project.output.slots);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [promptSlotId, setPromptSlotId] = useState<string | null>(null);
-  const [promptReadOnly, setPromptReadOnly] = useState(false);
   const [galleryPreview, setGalleryPreview] = useState<{
     items: ProductDesignGalleryPreviewItem[];
     initialIndex: number;
@@ -113,6 +119,10 @@ export function ProductImageSetSlotWorkspace({
   const sections = useMemo(() => groupProductImageSetSlotsByStructure(rows), [rows]);
   const doneCount = rows.filter((r) => r.imageUrl?.trim()).length;
   const promptRow = promptSlotId ? rows.find((r) => r.id === promptSlotId) : null;
+  const promptMentionRefs = useMemo(
+    () => buildProductImageSetPromptMentionRefs(project.references),
+    [project.references],
+  );
 
   const previewItems = useMemo((): ProductDesignGalleryPreviewItem[] => {
     return rows
@@ -256,12 +266,33 @@ export function ProductImageSetSlotWorkspace({
   };
 
   const commitPrompt = (id: string, prompt: string) => {
-    if (promptReadOnly) return;
     const next = rowsRef.current.map((row) =>
       row.id === id ? { ...row, prompt, promptEdited: true } : row,
     );
     setRows(next);
     void persist(next);
+  };
+
+  const commitSlotLayout = async (
+    id: string,
+    prompt: string,
+    extras?: DetailPageSuiteSlotPromptSaveExtras,
+    composedImageUrl?: string,
+  ) => {
+    const next = rowsRef.current.map((row) =>
+      row.id === id
+        ? {
+            ...row,
+            prompt,
+            promptEdited: true,
+            slotCopy: extras?.slotCopy ?? row.slotCopy,
+            copyOverlay: extras?.copyOverlay ?? row.copyOverlay,
+            ...(composedImageUrl ? { imageUrl: composedImageUrl } : {}),
+          }
+        : row,
+    );
+    setRows(next);
+    await persist(next, true);
   };
 
   const openPreview = (row: ProductImageSetSlot) => {
@@ -274,12 +305,6 @@ export function ProductImageSetSlotWorkspace({
   };
 
   const openEditPrompt = (id: string) => {
-    setPromptReadOnly(false);
-    setPromptSlotId(id);
-  };
-
-  const openViewPrompt = (id: string) => {
-    setPromptReadOnly(true);
     setPromptSlotId(id);
   };
 
@@ -375,7 +400,6 @@ export function ProductImageSetSlotWorkspace({
                     workspaceFrozen={workspaceFrozen}
                     onToggleSelect={() => toggleSelect(row.id)}
                     onEditPrompt={() => openEditPrompt(row.id)}
-                    onViewPrompt={() => openViewPrompt(row.id)}
                     onPreview={() => openPreview(row)}
                     onDownload={() => {
                       if (!row.imageUrl) return;
@@ -400,30 +424,53 @@ export function ProductImageSetSlotWorkspace({
         </p>
       ) : null}
 
-      {promptRow ? (
-        <ProductDesignPromptDialog
-          open={promptSlotId != null}
-          onOpenChange={(open) => {
-            if (!open) {
+      {promptRow && promptSlotId != null ? (
+        promptRow.imageUrl?.trim() ? (
+          <ProductDesignGenSlotEditDialog
+            open
+            onOpenChange={(open) => {
+              if (!open) setPromptSlotId(null);
+            }}
+            title={`套图 · ${KIND_LABEL[promptRow.kind]}`}
+            subtitle={`${promptRow.title} #${promptRow.index}`}
+            prompt={promptRow.prompt}
+            baseImageUrl={promptRow.imageUrl ?? null}
+            slotCopy={promptRow.slotCopy ?? promptRow.title}
+            copyOverlay={promptRow.copyOverlay ?? null}
+            ratio={ratio}
+            exportWidthPx={productDesignGenSlotExportWidth(ratio)}
+            referenceImages={promptMentionRefs}
+            disabled={workspaceFrozen || isSlotGenerating(promptRow.id)}
+            onRegenerateImage={async (prompt) => {
+              await commitSlotLayout(promptRow.id, prompt);
+              await onGenerateSlots([promptRow.id], { regenerate: true });
+            }}
+            onSave={async (prompt, extras) => {
+              await commitSlotLayout(promptRow.id, prompt, extras);
               setPromptSlotId(null);
-              setPromptReadOnly(false);
-            }
-          }}
-          value={promptRow.prompt}
-          onCommit={(prompt) => {
-            commitPrompt(promptRow.id, prompt);
-            setPromptSlotId(null);
-            setPromptReadOnly(false);
-          }}
-          disabled={promptReadOnly || workspaceFrozen || isSlotGenerating(promptRow.id)}
-          title={
-            promptReadOnly
-              ? `查看 Prompt · ${promptRow.title}`
-              : `编辑 Prompt · ${promptRow.title}`
-          }
-          subtitle={KIND_LABEL[promptRow.kind]}
-          referenceImages={[]}
-        />
+            }}
+            onConfirmCompose={async (prompt, extras, url) => {
+              await commitSlotLayout(promptRow.id, prompt, extras, url);
+              setPromptSlotId(null);
+            }}
+          />
+        ) : (
+          <ProductDesignPromptDialog
+            open
+            onOpenChange={(open) => {
+              if (!open) setPromptSlotId(null);
+            }}
+            value={promptRow.prompt}
+            onCommit={(prompt) => {
+              commitPrompt(promptRow.id, prompt);
+              setPromptSlotId(null);
+            }}
+            disabled={workspaceFrozen || isSlotGenerating(promptRow.id)}
+            title={`编辑 Prompt · ${promptRow.title}`}
+            subtitle={KIND_LABEL[promptRow.kind]}
+            referenceImages={promptMentionRefs}
+          />
+        )
       ) : null}
 
       <ProductDesignGalleryPreviewDialog
@@ -449,7 +496,6 @@ function SlotCard({
   workspaceFrozen,
   onToggleSelect,
   onEditPrompt,
-  onViewPrompt,
   onPreview,
   onDownload,
   onGenerate,
@@ -463,7 +509,6 @@ function SlotCard({
   workspaceFrozen: boolean;
   onToggleSelect: () => void;
   onEditPrompt: () => void;
-  onViewPrompt: () => void;
   onPreview: () => void;
   onDownload: () => void;
   onGenerate: (regenerate?: boolean) => void;
@@ -534,79 +579,21 @@ function SlotCard({
               sizes="(max-width: 1024px) 33vw, 280px"
               unoptimized
             />
-            <div aria-hidden className={ECOM_SLOT_HOVER_OVERLAY_CLASS} />
-            <div className={ECOM_SLOT_HOVER_ACTIONS_ROW_CLASS}>
-              <button
-                type="button"
-                title="预览"
-                disabled={actionDisabled}
-                className={cn(ECOM_SLOT_HOVER_ACTION_BTN_CLASS, "pointer-events-auto")}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onPreview();
-                }}
-              >
-                <Eye className={ECOM_MEDIA_TILE_ACTION_ICON_CLASS} />
-              </button>
-              <button
-                type="button"
-                title="重新生成"
-                disabled={actionDisabled}
-                className={cn(ECOM_SLOT_HOVER_ACTION_BTN_CLASS, "pointer-events-auto")}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onGenerate(true);
-                }}
-              >
-                <RefreshCw className={ECOM_MEDIA_TILE_ACTION_ICON_CLASS} />
-              </button>
-              <button
-                type="button"
-                title="下载"
-                disabled={actionDisabled}
-                className={cn(ECOM_SLOT_HOVER_ACTION_BTN_CLASS, "pointer-events-auto")}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDownload();
-                }}
-              >
-                <Download className={ECOM_MEDIA_TILE_ACTION_ICON_CLASS} />
-              </button>
-              <button
-                type="button"
-                title="查看 Prompt"
-                disabled={workspaceFrozen}
-                className={cn(ECOM_SLOT_HOVER_ACTION_BTN_CLASS, "pointer-events-auto")}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onViewPrompt();
-                }}
-              >
-                <FileText className={ECOM_MEDIA_TILE_ACTION_ICON_CLASS} />
-              </button>
-            </div>
+            <EcomSlotImageHoverActions
+              disabled={actionDisabled}
+              onPreview={onPreview}
+              onRegenerate={() => onGenerate(true)}
+              onDownload={onDownload}
+              onEditPrompt={onEditPrompt}
+            />
           </>
         ) : (
-          <div className="flex h-full min-h-[8rem] flex-wrap items-center justify-center gap-1.5 px-1">
-            <button
-              type="button"
-              title="编辑 Prompt"
-              disabled={actionDisabled}
-              className={ECOM_SLOT_HOVER_ACTION_BTN_CLASS}
-              onClick={onEditPrompt}
-            >
-              <FileText className={ECOM_MEDIA_TILE_ACTION_ICON_CLASS} />
-            </button>
-            <button
-              type="button"
-              title="生成"
-              disabled={actionDisabled}
-              className={ECOM_SLOT_HOVER_ACTION_BTN_CLASS}
-              onClick={() => onGenerate(false)}
-            >
-              <Sparkles className={ECOM_MEDIA_TILE_ACTION_ICON_CLASS} />
-            </button>
-          </div>
+          <EcomSlotImageHoverActions
+            layout="inline"
+            disabled={actionDisabled}
+            onEditPrompt={onEditPrompt}
+            onQuickGenerate={() => onGenerate(false)}
+          />
         )}
       </div>
 

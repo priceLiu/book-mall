@@ -10,6 +10,7 @@ import {
   type DetailPageSuiteSlotImagePreviewPayload,
 } from "@/components/detail-page-suite/detail-page-suite-content-panel";
 import { DetailPageSuiteSizeChartEditDialog } from "@/components/detail-page-suite/detail-page-suite-size-chart-edit-dialog";
+import { DetailPageSuiteSlotLayoutEditBindings } from "@/components/detail-page-suite/detail-page-suite-slot-layout-edit-bindings";
 import { DetailPageSuiteSlotPromptEditDialog } from "@/components/detail-page-suite/detail-page-suite-slot-prompt-edit-dialog";
 import {
   BackgroundGenerationProvider,
@@ -57,6 +58,16 @@ import {
 } from "@/lib/detail-page-suite-prompt-selection";
 import { runEcomNewProjectWithSavePrompt } from "@/lib/ecom-new-project-save-prompt";
 import type { DetailPageSuiteProject } from "@/lib/detail-page-suite-types";
+import {
+  buildDetailPageSuiteSlotPromptEditState,
+  patchSuiteModulesSlotPrompt,
+  type DetailPageSuiteSlotPromptEditState,
+} from "@/lib/detail-page-suite-slot-layout-edit";
+import {
+  resolveDetailPageSuiteActiveImageIndex,
+  resolveDetailPageSuiteSlotHistory,
+} from "@/lib/detail-page-suite-slot-images";
+import { composeSuiteSlotKey } from "@/lib/detail-page-suite-slot-selection";
 import type { StoryboardGatewayModel } from "@/lib/storyboard-types";
 import {
   assignDetailPageSuiteReplicaSegmentModule,
@@ -248,12 +259,8 @@ function DetailPageSuiteReplicaStudioInner() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [slotImagePreview, setSlotImagePreview] =
     useState<DetailPageSuiteSlotImagePreviewPayload | null>(null);
-  const [promptEdit, setPromptEdit] = useState<{
-    moduleId: string;
-    slotKey: string;
-    label: string;
-    prompt: string;
-  } | null>(null);
+  const [promptEdit, setPromptEdit] = useState<DetailPageSuiteSlotPromptEditState | null>(null);
+  const [slotComposeBusy, setSlotComposeBusy] = useState(false);
   const [addSlotDialog, setAddSlotDialog] = useState<{ moduleId: string } | null>(null);
   const [addSlotSaving, setAddSlotSaving] = useState(false);
   const [sellpointDraft, setSellpointDraft] = useState("");
@@ -1411,12 +1418,32 @@ function DetailPageSuiteReplicaStudioInner() {
             onRemoveRef={() => {}}
             onPreview={(url) => setPreviewUrl(url)}
             onPreviewSlotImage={setSlotImagePreview}
-            onOpenPromptEdit={(moduleId, slotKey, prompt, label) => {
+            onOpenPromptEdit={(
+              moduleId,
+              slotKey,
+              prompt,
+              label,
+              slotCopy,
+              slotCopyAi,
+              burnCopyInImage,
+            ) => {
               if (isDetailPageSuiteSizeChartDataLabel(label)) {
                 setSizeChartEdit({ moduleId, slotKey, label });
                 return;
               }
-              setPromptEdit({ moduleId, slotKey, prompt, label });
+              if (!project) return;
+              setPromptEdit(
+                buildDetailPageSuiteSlotPromptEditState(
+                  project,
+                  moduleId,
+                  slotKey,
+                  prompt,
+                  label,
+                  slotCopy,
+                  slotCopyAi,
+                  burnCopyInImage,
+                ),
+              );
             }}
             onToggleModule={() => {}}
             onChangeCount={() => {}}
@@ -1558,33 +1585,68 @@ function DetailPageSuiteReplicaStudioInner() {
         />
       ) : null}
 
-      <DetailPageSuiteSlotPromptEditDialog
-        open={Boolean(promptEdit)}
-        title={promptEdit?.label ?? "编辑提示词"}
-        prompt={promptEdit?.prompt ?? ""}
-        onOpenChange={(open) => {
-          if (!open) setPromptEdit(null);
-        }}
-        onSave={async (prompt) => {
-          if (!promptEdit || !project) return;
-          const modules = project.suite.modules.map((m) => {
-            if (m.module_id !== promptEdit.moduleId) return m;
-            return {
-              ...m,
-              slots: m.slots.map((s) =>
-                s.item_key === promptEdit.slotKey
-                  ? { ...s, positive_prompt: prompt, promptEdited: true }
-                  : s,
-              ),
-            };
-          });
-          const updated = await updateDetailPageSuiteReplicaProject(project.id, {
-            suite: { ...project.suite, modules },
-          });
-          setProject(updated);
-          setPromptEdit(null);
-        }}
-      />
+      {promptEdit && project ? (
+        <DetailPageSuiteSlotLayoutEditBindings
+          projectModule="detail-page-suite-replica"
+          project={project}
+          promptEdit={promptEdit}
+          open
+          composing={slotComposeBusy}
+          onOpenChange={(open) => {
+            if (!open) setPromptEdit(null);
+          }}
+          onProjectChange={setProject}
+          updateProject={async (id, patch) => updateDetailPageSuiteReplicaProject(id, patch)}
+          toast={toast}
+          alert={alert}
+          onRegenerateImage={async (prompt) => {
+            const modules = patchSuiteModulesSlotPrompt(
+              project.suite.modules,
+              promptEdit,
+              prompt,
+            );
+            const saved = await updateDetailPageSuiteReplicaProject(project.id, {
+              suite: { ...project.suite, modules },
+            });
+            setProject(saved);
+            const key = composeSuiteSlotKey(promptEdit.moduleId, promptEdit.slotKey);
+            setActiveGenSlotKeys((prev) => new Set([...prev, key]));
+            try {
+              const result = await generateDetailPageSuiteReplicaImages(saved.id, {
+                moduleId: promptEdit.moduleId,
+                slotKeys: [key],
+                modelKey: imageModelKey,
+              });
+              setProject(result.project);
+              const mod = result.project.suite.modules.find(
+                (m) => m.module_id === promptEdit.moduleId,
+              );
+              const slot = mod?.slots.find((s) => s.item_key === promptEdit.slotKey);
+              const history = slot ? resolveDetailPageSuiteSlotHistory(slot) : [];
+              const activeIdx = slot ? resolveDetailPageSuiteActiveImageIndex(slot) : 0;
+              const url = history[activeIdx]?.url?.trim();
+              if (url) {
+                setPromptEdit((prev) => (prev ? { ...prev, baseImageUrl: url } : prev));
+              }
+              toast({ variant: "success", title: "已按最新提示词重新生图" });
+            } catch (e) {
+              await alert({
+                title: "重新生图失败",
+                message: formatEcomImageGenUserMessage(
+                  e instanceof Error ? e.message : "出图失败",
+                ),
+                variant: "error",
+              });
+            } finally {
+              setActiveGenSlotKeys((prev) => {
+                const next = new Set(prev);
+                next.delete(key);
+                return next;
+              });
+            }
+          }}
+        />
+      ) : null}
 
       {sizeChartEdit && project ? (
         <DetailPageSuiteSizeChartEditDialog

@@ -27,10 +27,9 @@ import {
 import { writeEcomLastProjectId } from "@/lib/ecom-last-project";
 import type { EcomProjectListItem } from "@/lib/ecom-project-list-types";
 import { EcomMediaGeneratingBusy } from "@/components/media/ecom-media-generating-busy";
+import { EcomSlotImageHoverActions } from "@/components/media/ecom-slot-image-hover-actions";
 import {
-  ECOM_MEDIA_TILE_ACTION_ICON_CLASS,
-  ECOM_SLOT_HOVER_ACTION_BTN_CLASS,
-  ECOM_SLOT_HOVER_ACTIONS_ROW_CLASS,
+  ECOM_SLOT_HOVER_ACTIONS_GRID_CLASS,
   ECOM_SLOT_HOVER_OVERLAY_CLASS,
 } from "@/components/media/ecom-media-library-tile";
 import { ProductDesignModelRefUploader } from "@/components/product-design/product-design-model-ref-uploader";
@@ -2450,64 +2449,15 @@ function ImageCardHoverActions({
   onRegenerate?: () => void;
   regenerateDisabled?: boolean;
 }) {
-  const btnClass = cn(ECOM_SLOT_HOVER_ACTION_BTN_CLASS, "pointer-events-none group-hover/image:pointer-events-auto");
-
   return (
-    <>
-      {onPreview ? (
-        <button
-          type="button"
-          title="预览"
-          className={btnClass}
-          onClick={(e) => {
-            e.stopPropagation();
-            onPreview();
-          }}
-        >
-          <Eye className={ECOM_MEDIA_TILE_ACTION_ICON_CLASS} />
-        </button>
-      ) : null}
-      {onRegenerate ? (
-        <button
-          type="button"
-          title="重新生成"
-          disabled={regenerateDisabled}
-          className={cn(btnClass, "disabled:cursor-not-allowed disabled:opacity-50")}
-          onClick={(e) => {
-            e.stopPropagation();
-            onRegenerate();
-          }}
-        >
-          <RefreshCw className={ECOM_MEDIA_TILE_ACTION_ICON_CLASS} />
-        </button>
-      ) : null}
-      {onDownload ? (
-        <button
-          type="button"
-          title="下载"
-          className={btnClass}
-          onClick={(e) => {
-            e.stopPropagation();
-            onDownload();
-          }}
-        >
-          <Download className={ECOM_MEDIA_TILE_ACTION_ICON_CLASS} />
-        </button>
-      ) : null}
-      {onViewPrompt ? (
-        <button
-          type="button"
-          title="查看 Prompt"
-          className={btnClass}
-          onClick={(e) => {
-            e.stopPropagation();
-            onViewPrompt();
-          }}
-        >
-          <FileText className={ECOM_MEDIA_TILE_ACTION_ICON_CLASS} />
-        </button>
-      ) : null}
-    </>
+    <EcomSlotImageHoverActions
+      layout="embed"
+      onPreview={onPreview}
+      onRegenerate={onRegenerate}
+      onDownload={onDownload}
+      onEditPrompt={onViewPrompt}
+      disabled={regenerateDisabled}
+    />
   );
 }
 
@@ -2567,7 +2517,7 @@ function ProductDesignCardImage({
       {src && !generating && hoverActions ? (
         <>
           <div aria-hidden className={ECOM_SLOT_HOVER_OVERLAY_CLASS} />
-          <div className={ECOM_SLOT_HOVER_ACTIONS_ROW_CLASS}>{hoverActions}</div>
+          <div className={ECOM_SLOT_HOVER_ACTIONS_GRID_CLASS}>{hoverActions}</div>
         </>
       ) : null}
       {badge}

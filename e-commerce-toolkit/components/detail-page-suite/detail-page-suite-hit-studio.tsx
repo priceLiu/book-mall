@@ -28,6 +28,7 @@ import { EcomLoginPrompt } from "@/components/auth/ecom-login-prompt";
 import { useAssetLibrary } from "@/docker-shared/global-asset-library";
 import { openEcomModelLibraryPick } from "@/lib/ecom-asset-library-pick";
 import { isEcomUnauthorizedError } from "@/lib/ecom-auth";
+import { buildDetailPageSuiteCopyLayoutReferenceImages } from "@/lib/ecom-copy-layout-reference-images";
 import {
   addCustomPromptSlotToModule,
   addSizeChartDataSlotToModule,
@@ -1579,12 +1580,7 @@ function DetailPageSuiteHitStudioInner() {
       <DetailPageSuiteSlotPromptEditDialog
         open={Boolean(promptEdit)}
         title={promptEdit?.label ?? "编辑"}
-        referenceImages={(project?.references ?? [])
-          .filter((r) => (r.role === "product" || r.role === "model") && r.ossUrl?.trim())
-          .map((r) => ({
-            url: r.ossUrl.trim(),
-            label: r.label?.trim() || (r.role === "product" ? "商品" : "模特"),
-          }))}
+        referenceImages={buildDetailPageSuiteCopyLayoutReferenceImages(project?.references)}
         prompt={promptEdit?.prompt ?? ""}
         slotCopy={promptEdit?.slotCopy ?? ""}
         slotCopyAi={promptEdit?.slotCopyAi ?? ""}

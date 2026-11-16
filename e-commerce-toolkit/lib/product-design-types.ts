@@ -1,5 +1,7 @@
 export type EcomImageRatio = "1:1" | "3:4" | "4:5" | "9:16" | "16:9";
 
+type EcomCopyOverlay = import("@private/ecom-copy-overlay").EcomCopyOverlay;
+
 export type EcomPlatformSpec = {
   code: string;
   label: string;
@@ -70,6 +72,8 @@ export type ProductDesignMainImage = {
   genPrompt?: string;
   /** 用户手改过 genPrompt：重新拆解时不覆盖 */
   promptEdited?: boolean;
+  slot_copy?: string;
+  copy_overlay?: EcomCopyOverlay;
 };
 
 export type ProductDesignDetailPage = {
@@ -86,6 +90,8 @@ export type ProductDesignDetailPage = {
   genPrompt?: string;
   /** 用户手改过 genPrompt：重新拆解时不覆盖 */
   promptEdited?: boolean;
+  slot_copy?: string;
+  copy_overlay?: EcomCopyOverlay;
 };
 
 export type ProductDesign = {

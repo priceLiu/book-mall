@@ -1,0 +1,54 @@
+import { ecomJson } from "@/lib/ecom/ecom-gateway-log-capture";
+import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
+import { composeDetailPageSuiteSlotCopy } from "@/lib/ecom/detail-page-suite/slot-copy-compose-service";
+import type { DetailPageSuiteCopyOverlay } from "@/lib/ecom/detail-page-suite/slot-copy-overlay-types";
+import { verifyToolsBearer } from "@/lib/sso-tools-bearer";
+
+export async function handleDetailPageSuiteComposeSlotPost(
+  req: Request,
+  projectId: string,
+  projectModule: string,
+) {
+  const auth = verifyToolsBearer(req);
+  if (!auth.ok) return ecomJson({ error: "未登录" }, { status: 401 });
+  try {
+    await assertEcomToolkitGatewayAccess(auth.userId);
+  } catch (e) {
+    return ecomJson({ error: e instanceof Error ? e.message : "无权限" }, { status: 403 });
+  }
+  let body: Record<string, unknown>;
+  try {
+    body = (await req.json()) as Record<string, unknown>;
+  } catch {
+    return ecomJson({ error: "invalid_json" }, { status: 400 });
+  }
+  const moduleId = String(body.moduleId ?? "").trim();
+  const slotKey = String(body.slotKey ?? "").trim();
+  const baseImageUrl = String(body.baseImageUrl ?? "").trim();
+  if (!moduleId || !slotKey || !baseImageUrl) {
+    return ecomJson({ error: "缺少 moduleId / slotKey / baseImageUrl" }, { status: 400 });
+  }
+  const overlay = body.overlay as DetailPageSuiteCopyOverlay;
+  if (!overlay || overlay.version !== 1) {
+    return ecomJson({ error: "overlay 无效" }, { status: 400 });
+  }
+  const slotCopy = typeof body.slotCopy === "string" ? body.slotCopy : undefined;
+  try {
+    const result = await composeDetailPageSuiteSlotCopy({
+      userId: auth.userId,
+      projectId,
+      moduleId,
+      slotKey,
+      baseImageUrl,
+      overlay,
+      slotCopy,
+      projectModule,
+    });
+    return ecomJson({ url: result.url, project: result.project });
+  } catch (e) {
+    return ecomJson(
+      { error: e instanceof Error ? e.message : "合成失败" },
+      { status: 400 },
+    );
+  }
+}

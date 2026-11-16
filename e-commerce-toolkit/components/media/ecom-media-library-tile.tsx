@@ -45,10 +45,21 @@ export const ECOM_STORYBOARD_HOVER_ACTION_BTN_CLASS =
   "inline-flex aspect-square w-[clamp(1.75rem,14%,2.25rem)] max-w-9 shrink-0 items-center justify-center rounded-full bg-white/95 text-[#1d1d1f] shadow transition hover:bg-white";
 
 export const ECOM_SLOT_HOVER_OVERLAY_CLASS =
-  "pointer-events-none absolute inset-0 z-10 bg-black/45 opacity-0 transition-opacity duration-150 group-hover/image:opacity-100";
+  "pointer-events-none absolute inset-0 z-10 bg-black/45 opacity-0 transition-opacity duration-150 [@media(hover:hover)]:group-hover/image:opacity-100 [@media(hover:hover)]:group-focus-within/image:opacity-100 [@media(hover:none)]:opacity-100";
 
-export const ECOM_SLOT_HOVER_ACTIONS_ROW_CLASS =
-  "pointer-events-none absolute inset-0 z-20 flex max-w-full flex-wrap items-center justify-center gap-1.5 overflow-hidden px-1 opacity-0 transition-opacity duration-150 group-hover/image:opacity-100 sm:gap-2";
+/**
+ * 成图槽悬停 · 2 列宫格（主图 / 套图 / 详情点位统一）。
+ * 触控端无 hover 时常显半透明遮罩与按钮（见 [@media(hover:none)]）。
+ */
+export const ECOM_SLOT_HOVER_ACTIONS_GRID_CLASS =
+  "pointer-events-none absolute inset-0 z-20 mx-auto grid w-full max-w-[min(100%,7rem)] place-content-center gap-x-2 gap-y-1.5 px-2 py-2 opacity-0 transition-opacity duration-150 [grid-template-columns:repeat(2,minmax(0,auto))] sm:max-w-[min(100%,7.5rem)] sm:gap-y-2 [@media(hover:hover)]:group-hover/image:pointer-events-auto [@media(hover:hover)]:group-hover/image:opacity-100 [@media(hover:hover)]:group-focus-within/image:opacity-100 [@media(hover:none)]:pointer-events-auto [@media(hover:none)]:opacity-100";
+
+/** @deprecated 使用 ECOM_SLOT_HOVER_ACTIONS_GRID_CLASS */
+export const ECOM_SLOT_HOVER_ACTIONS_ROW_CLASS = ECOM_SLOT_HOVER_ACTIONS_GRID_CLASS;
+
+/** 无成图占位区 · 同款 2 列宫格（常显） */
+export const ECOM_SLOT_HOVER_ACTIONS_INLINE_GRID_CLASS =
+  "grid w-full max-w-[min(100%,7rem)] place-content-center gap-x-2 gap-y-1.5 px-2 py-2 [grid-template-columns:repeat(2,minmax(0,auto))]";
 
 type Props = {
   kind: "image" | "video";

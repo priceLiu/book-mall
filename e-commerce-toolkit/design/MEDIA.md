@@ -13,6 +13,8 @@
 | 场景 | 唯一组件 | 路径 |
 |------|----------|------|
 | **资产库 / 模块结果网格** | `EcomMediaLibraryTile` | `components/media/ecom-media-library-tile.tsx` |
+| **成图槽悬停宫格**（主图 / 套图 / 详情点位） | `EcomSlotImageHoverActions` | `components/media/ecom-slot-image-hover-actions.tsx` |
+| 悬停宫格 class | `ECOM_SLOT_HOVER_ACTIONS_GRID_CLASS` | `ecom-media-library-tile.tsx` export |
 | 网格容器 class | `ECOM_LIBRARY_MEDIA_GRID_CLASS` | 同上 export |
 | **单张图片放大预览** | `EcomImagePreviewDialog` | `components/media/ecom-image-preview-dialog.tsx` |
 | **预览状态 Hook / Host** | `useEcomImagePreview` · `EcomImagePreviewHost` | `components/media/ecom-image-preview-host.tsx` |

@@ -10,6 +10,7 @@ import {
   type DetailPageSuiteSlotImagePreviewPayload,
 } from "@/components/detail-page-suite/detail-page-suite-content-panel";
 import { DetailPageSuiteSizeChartEditDialog } from "@/components/detail-page-suite/detail-page-suite-size-chart-edit-dialog";
+import { DetailPageSuiteSlotLayoutEditBindings } from "@/components/detail-page-suite/detail-page-suite-slot-layout-edit-bindings";
 import { DetailPageSuiteSlotPromptEditDialog } from "@/components/detail-page-suite/detail-page-suite-slot-prompt-edit-dialog";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { EcomWorkspaceLayout } from "@/components/layout/ecom-workspace-layout";
@@ -24,6 +25,16 @@ import {
   canAddCustomSuiteSlot,
   isDetailPageSuiteSizeChartModuleId,
 } from "@/lib/detail-page-suite-add-custom-slot";
+import {
+  buildDetailPageSuiteSlotPromptEditState,
+  patchSuiteModulesSlotPrompt,
+  type DetailPageSuiteSlotPromptEditState,
+} from "@/lib/detail-page-suite-slot-layout-edit";
+import {
+  resolveDetailPageSuiteActiveImageIndex,
+  resolveDetailPageSuiteSlotHistory,
+} from "@/lib/detail-page-suite-slot-images";
+import { composeSuiteSlotKey } from "@/lib/detail-page-suite-slot-selection";
 import {
   resolveModuleDisplaySlots,
   syncModuleSlotsFromSelection,
@@ -126,14 +137,9 @@ export function AiDetailPageStudio() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [slotImagePreview, setSlotImagePreview] =
     useState<DetailPageSuiteSlotImagePreviewPayload | null>(null);
-  const [promptEdit, setPromptEdit] = useState<{
-    moduleId: string;
-    slotKey: string;
-    prompt: string;
-    label: string;
-    promptRefUrls: string[];
-  } | null>(null);
+  const [promptEdit, setPromptEdit] = useState<DetailPageSuiteSlotPromptEditState | null>(null);
   const [promptRewriteBusy, setPromptRewriteBusy] = useState(false);
+  const [slotComposeBusy, setSlotComposeBusy] = useState(false);
   const [promptRefUploadBusy, setPromptRefUploadBusy] = useState(false);
   const [tableDataEdit, setTableDataEdit] = useState<{
     kind: "size" | "spec";
@@ -676,13 +682,15 @@ export function AiDetailPageStudio() {
               }
               const mod = project.suite.modules.find((m) => m.module_id === moduleId);
               const slot = mod?.slots.find((s) => s.item_key === slotKey);
-              setPromptEdit({
-                moduleId,
-                slotKey,
-                prompt,
-                label,
-                promptRefUrls: slot?.promptRefUrls ?? [],
-              });
+              setPromptEdit(
+                buildDetailPageSuiteSlotPromptEditState(
+                  project,
+                  moduleId,
+                  slotKey,
+                  prompt,
+                  label,
+                ),
+              );
             }}
             onToggleModule={() => {}}
             onChangeCount={() => {}}
@@ -905,36 +913,22 @@ export function AiDetailPageStudio() {
         />
       ) : null}
 
-      {promptEdit ? (
-        <DetailPageSuiteSlotPromptEditDialog
+      {promptEdit && project ? (
+        <DetailPageSuiteSlotLayoutEditBindings
+          projectModule="ai-detail-page"
+          project={project}
+          promptEdit={promptEdit}
           open
+          displayRatio={displayRatio}
+          composing={slotComposeBusy}
+          rewriteBusy={promptRewriteBusy}
           onOpenChange={(open) => {
             if (!open) setPromptEdit(null);
           }}
-          title={promptEdit.label}
-          prompt={promptEdit.prompt}
-          displayRatio={displayRatio}
-          onSave={async (nextPrompt) => {
-            const { moduleId, slotKey } = promptEdit;
-            const modules = project.suite.modules.map((m) => {
-              if (m.module_id !== moduleId) return m;
-              return {
-                ...m,
-                slots: m.slots.map((s) =>
-                  s.item_key === slotKey
-                    ? { ...s, positive_prompt: nextPrompt, promptEdited: true }
-                    : s,
-                ),
-              };
-            });
-            const updated = await updateAiDetailPageProject(project.id, {
-              suite: { ...project.suite, modules },
-            });
-            setProject(updated);
-            setPromptEdit(null);
-          }}
-          rewriteBusy={promptRewriteBusy}
-          promptRefUrls={promptEdit.promptRefUrls}
+          onProjectChange={setProject}
+          updateProject={async (id, patch) => updateAiDetailPageProject(id, patch)}
+          toast={toast}
+          alert={alert}
           promptRefUploadBusy={promptRefUploadBusy}
           onUploadPromptRef={(file) => {
             void (async () => {
@@ -949,10 +943,15 @@ export function AiDetailPageStudio() {
                 setProject(updated);
                 const mod = updated.suite.modules.find((m) => m.module_id === promptEdit.moduleId);
                 const slot = mod?.slots.find((s) => s.item_key === promptEdit.slotKey);
-                setPromptEdit({
-                  ...promptEdit,
-                  promptRefUrls: slot?.promptRefUrls ?? [],
-                });
+                setPromptEdit(
+                  buildDetailPageSuiteSlotPromptEditState(
+                    updated,
+                    promptEdit.moduleId,
+                    promptEdit.slotKey,
+                    slot?.positive_prompt ?? promptEdit.prompt,
+                    promptEdit.label,
+                  ),
+                );
               } catch (e) {
                 await alert({
                   title: "上传参考图失败",
@@ -978,16 +977,72 @@ export function AiDetailPageStudio() {
                 const mod = updated.suite.modules.find((m) => m.module_id === promptEdit.moduleId);
                 const slot = mod?.slots.find((s) => s.item_key === promptEdit.slotKey);
                 if (slot) {
-                  setPromptEdit({
-                    ...promptEdit,
-                    prompt: slot.positive_prompt,
-                    promptRefUrls: slot.promptRefUrls ?? [],
-                  });
+                  setPromptEdit(
+                    buildDetailPageSuiteSlotPromptEditState(
+                      updated,
+                      promptEdit.moduleId,
+                      promptEdit.slotKey,
+                      slot.positive_prompt,
+                      promptEdit.label,
+                    ),
+                  );
                 }
               } finally {
                 setPromptRewriteBusy(false);
               }
             })();
+          }}
+          onRegenerateImage={async (prompt) => {
+            const modules = patchSuiteModulesSlotPrompt(
+              project.suite.modules,
+              promptEdit,
+              prompt,
+            );
+            const saved = await updateAiDetailPageProject(project.id, {
+              suite: { ...project.suite, modules },
+            });
+            setProject(saved);
+            const key = composeSuiteSlotKey(promptEdit.moduleId, promptEdit.slotKey);
+            setActiveGenSlotKeys((prev) => new Set([...prev, key]));
+            try {
+              const result = await generateAiDetailPageImages(saved.id, {
+                moduleId: promptEdit.moduleId,
+                slotKeys: [key],
+                modelKey: imageModelKey,
+              });
+              setProject(result.project);
+              const mod = result.project.suite.modules.find(
+                (m) => m.module_id === promptEdit.moduleId,
+              );
+              const slot = mod?.slots.find((s) => s.item_key === promptEdit.slotKey);
+              const history = slot ? resolveDetailPageSuiteSlotHistory(slot) : [];
+              const activeIdx = slot ? resolveDetailPageSuiteActiveImageIndex(slot) : 0;
+              const url = history[activeIdx]?.url?.trim();
+              if (url) {
+                setPromptEdit((prev) => (prev ? { ...prev, baseImageUrl: url } : prev));
+              }
+              if (result.failures?.length) {
+                await alert({
+                  title: "重新生图失败",
+                  message: result.failures.slice(0, 5).join("\n"),
+                  variant: "error",
+                });
+              } else {
+                toast({ variant: "success", title: "已按最新提示词重新生图" });
+              }
+            } catch (e) {
+              await alert({
+                title: "重新生图失败",
+                message: e instanceof Error ? e.message : "出图失败",
+                variant: "error",
+              });
+            } finally {
+              setActiveGenSlotKeys((prev) => {
+                const next = new Set(prev);
+                next.delete(key);
+                return next;
+              });
+            }
           }}
         />
       ) : null}

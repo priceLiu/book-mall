@@ -181,19 +181,7 @@ export async function resetDetailPageSuiteHitTemplate(projectId: string) {
   return postHitJson(`projects/${projectId}/hit/template`, { reset: true });
 }
 
-/** 通用烧字合成（详情页 / 画布共用） */
-export async function composeEcomCopyOverlay(body: {
-  baseImageUrl: string;
-  overlay: DetailPageSuiteCopyOverlay;
-  syncText?: string;
-  exportWidthPx?: number;
-}) {
-  return ecomBookFetch("api/sso/tools/ecom/copy-overlay/compose", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  }) as Promise<{ url: string; overlay: DetailPageSuiteCopyOverlay }>;
-}
+export { composeEcomCopyOverlay } from "@/lib/ecom-copy-overlay-compose-api";
 
 export async function composeDetailPageSuiteHitSlot(
   projectId: string,

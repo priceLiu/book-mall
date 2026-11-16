@@ -13,6 +13,7 @@ import {
   DetailPageSuiteContentPanel,
   type DetailPageSuiteSlotImagePreviewPayload,
 } from "@/components/detail-page-suite/detail-page-suite-content-panel";
+import { DetailPageSuiteSlotLayoutEditBindings } from "@/components/detail-page-suite/detail-page-suite-slot-layout-edit-bindings";
 import { DetailPageSuiteSlotPromptEditDialog } from "@/components/detail-page-suite/detail-page-suite-slot-prompt-edit-dialog";
 import {
   addCustomPromptSlotToModule,
@@ -93,6 +94,15 @@ import {
   mergeDetailPageSuiteSlotPromptFromProject,
 } from "@/lib/detail-page-suite-project-merge";
 import { composeDetailPageSuiteVisiblePrompt } from "@/lib/detail-page-suite-prompt-compose";
+import {
+  buildDetailPageSuiteSlotPromptEditState,
+  patchSuiteModulesSlotPrompt,
+  type DetailPageSuiteSlotPromptEditState,
+} from "@/lib/detail-page-suite-slot-layout-edit";
+import {
+  resolveDetailPageSuiteActiveImageIndex,
+  resolveDetailPageSuiteSlotHistory,
+} from "@/lib/detail-page-suite-slot-images";
 import {
   isDetailPageSuiteSizeChartDataLabel,
   partitionDetailPageSuiteImageGenKeys,
@@ -244,13 +254,9 @@ function DetailPageSuiteStudioInner() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [slotImagePreview, setSlotImagePreview] =
     useState<DetailPageSuiteSlotImagePreviewPayload | null>(null);
-  const [promptEdit, setPromptEdit] = useState<{
-    moduleId: string;
-    slotKey: string;
-    label: string;
-    prompt: string;
-  } | null>(null);
+  const [promptEdit, setPromptEdit] = useState<DetailPageSuiteSlotPromptEditState | null>(null);
   const [promptEditSaving, setPromptEditSaving] = useState(false);
+  const [slotComposeBusy, setSlotComposeBusy] = useState(false);
   const [sizeChartEdit, setSizeChartEdit] = useState<{
     moduleId: string;
     slotKey: string;
@@ -1532,23 +1538,32 @@ function DetailPageSuiteStudioInner() {
             }}
             onPreview={setPreviewUrl}
             onPreviewSlotImage={setSlotImagePreview}
-            onOpenPromptEdit={(moduleId, slotKey, promptText, label) => {
+            onOpenPromptEdit={(
+              moduleId,
+              slotKey,
+              promptText,
+              label,
+              slotCopy,
+              slotCopyAi,
+              burnCopyInImage,
+            ) => {
               if (isDetailPageSuiteSizeChartDataLabel(label)) {
                 setSizeChartEdit({ moduleId, slotKey, label });
                 return;
               }
               const brief = project.brief ?? {};
-              setPromptEdit({
-                moduleId,
-                slotKey,
-                label,
-                prompt: composeDetailPageSuiteVisiblePrompt(
-                  promptText,
-                  brief,
-                  label,
+              setPromptEdit(
+                buildDetailPageSuiteSlotPromptEditState(
+                  project,
                   moduleId,
+                  slotKey,
+                  composeDetailPageSuiteVisiblePrompt(promptText, brief, label, moduleId),
+                  label,
+                  slotCopy,
+                  slotCopyAi,
+                  burnCopyInImage,
                 ),
-              });
+              );
             }}
             onToggleModule={(moduleId, enable) => {
               const modules = project.suite.modules.map((m) =>
@@ -1773,47 +1788,27 @@ function DetailPageSuiteStudioInner() {
       ) : null}
 
       {promptEdit && project ? (
-        <DetailPageSuiteSlotPromptEditDialog
+        <DetailPageSuiteSlotLayoutEditBindings
+          projectModule="detail-page-suite"
+          project={project}
+          promptEdit={promptEdit}
           open
-          title={promptEdit.label}
           shootingRequirement={promptEdit.label}
-          prompt={promptEdit.prompt}
           saving={promptEditSaving}
+          composing={slotComposeBusy}
           rewriteBusy={activeRewriteSlotKeys.has(
             composeSuiteSlotKey(promptEdit.moduleId, promptEdit.slotKey),
           )}
           onOpenChange={(open) => {
             if (!open) setPromptEdit(null);
           }}
-          onSave={async (promptText) => {
-            setPromptEditSaving(true);
-            try {
-              const current = projectRef.current ?? project;
-              const snapshots = readDetailPageSuitePromptSnapshots(current.meta);
-              const modules = current.suite.modules.map((m) => {
-                if (m.module_id !== promptEdit.moduleId) return m;
-                return {
-                  ...m,
-                  slots: materializeModuleSlots(
-                    {
-                      ...m,
-                      slots: resolveModuleDisplaySlots(m).map((s) =>
-                        s.item_key === promptEdit.slotKey
-                          ? { ...s, positive_prompt: promptText, promptEdited: true }
-                          : s,
-                      ),
-                    },
-                    snapshots,
-                  ),
-                };
-              });
-              await persist({ suite: { ...project.suite, modules } });
-              setPromptEdit(null);
-              toast({ variant: "success", title: "提示词已保存" });
-            } finally {
-              setPromptEditSaving(false);
-            }
+          onProjectChange={setProject}
+          updateProject={async (id, patch) => {
+            const updated = await updateDetailPageSuiteProject(id, patch);
+            return updated;
           }}
+          toast={toast}
+          alert={alert}
           onRewrite={() => {
             const { moduleId, slotKey } = promptEdit;
             void (async () => {
@@ -1831,18 +1826,19 @@ function DetailPageSuiteStudioInner() {
                   ? resolveModuleDisplaySlots(mod).find((s) => s.item_key === slotKey)
                   : undefined;
                 if (slot?.positive_prompt) {
-                  setPromptEdit((prev) =>
-                    prev
-                      ? {
-                          ...prev,
-                          prompt: composeDetailPageSuiteVisiblePrompt(
-                            slot.positive_prompt,
-                            next.brief ?? {},
-                            slot.item_label,
-                            moduleId,
-                          ),
-                        }
-                      : prev,
+                  setPromptEdit(
+                    buildDetailPageSuiteSlotPromptEditState(
+                      next,
+                      moduleId,
+                      slotKey,
+                      composeDetailPageSuiteVisiblePrompt(
+                        slot.positive_prompt,
+                        next.brief ?? {},
+                        slot.item_label,
+                        moduleId,
+                      ),
+                      slot.item_label,
+                    ),
                   );
                 }
                 toast({ variant: "success", title: "本条已重写" });
@@ -1856,6 +1852,49 @@ function DetailPageSuiteStudioInner() {
                 endRewriteSlot(composite);
               }
             })();
+          }}
+          onRegenerateImage={async (prompt) => {
+            const modules = patchSuiteModulesSlotPrompt(
+              project.suite.modules,
+              promptEdit,
+              prompt,
+            );
+            await persist({ suite: { ...project.suite, modules } });
+            const key = composeSuiteSlotKey(promptEdit.moduleId, promptEdit.slotKey);
+            setActiveGenSlotKeys((prev) => new Set([...prev, key]));
+            try {
+              const result = await generateDetailPageSuiteImages(project.id, {
+                moduleId: promptEdit.moduleId,
+                slotKeys: [key],
+                modelKey: imageModelKey,
+              });
+              setProject(result.project);
+              const mod = result.project.suite.modules.find(
+                (m) => m.module_id === promptEdit.moduleId,
+              );
+              const slot = mod?.slots.find((s) => s.item_key === promptEdit.slotKey);
+              const history = slot ? resolveDetailPageSuiteSlotHistory(slot) : [];
+              const activeIdx = slot ? resolveDetailPageSuiteActiveImageIndex(slot) : 0;
+              const url = history[activeIdx]?.url?.trim();
+              if (url) {
+                setPromptEdit((prev) => (prev ? { ...prev, baseImageUrl: url } : prev));
+              }
+              toast({ variant: "success", title: "已按最新提示词重新生图" });
+            } catch (e) {
+              await alert({
+                title: "重新生图失败",
+                message: formatEcomImageGenUserMessage(
+                  e instanceof Error ? e.message : "出图失败",
+                ),
+                variant: "error",
+              });
+            } finally {
+              setActiveGenSlotKeys((prev) => {
+                const next = new Set(prev);
+                next.delete(key);
+                return next;
+              });
+            }
           }}
         />
       ) : null}
