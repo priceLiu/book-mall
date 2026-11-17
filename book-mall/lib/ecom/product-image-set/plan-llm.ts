@@ -14,6 +14,7 @@ import {
   assertProductImageSetPlanPromptQuality,
   parseProductImageSetPlanItems,
 } from "./plan-parse";
+import { primarySelectedTrendingStyleId } from "./trending-style-selection";
 import {
   ECOM_PRODUCT_IMAGE_SET_PLAN_ACTION,
   ECOM_PRODUCT_IMAGE_SET_TOOL_KEY,
@@ -78,12 +79,16 @@ function platformLabel(code: string | undefined): string {
 async function buildStyleContext(project: ProductImageSetProject): Promise<string> {
   const lines: string[] = [];
   if (project.settings.trendingStyleEnabled) {
-    const presets = await resolveStylePresetsLive(project.settings.selectedTrendingStyleIds);
-    if (presets.length > 0) {
-      lines.push(
-        "爆款视觉风格（整组调性）：",
-        ...presets.map((p) => `- ${p.title}：${p.visualPrompt ?? p.subtitle ?? ""}`),
-      );
+    const styleId = primarySelectedTrendingStyleId(project.settings.selectedTrendingStyleIds);
+    if (styleId) {
+      const presets = await resolveStylePresetsLive([styleId]);
+      const preset = presets[0];
+      if (preset) {
+        lines.push(
+          "爆款视觉风格（整组调性，仅此一种）：",
+          `- ${preset.title}：${preset.visualPrompt ?? preset.subtitle ?? ""}`,
+        );
+      }
     }
   }
   return lines.join("\n");

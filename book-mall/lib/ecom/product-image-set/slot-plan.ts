@@ -3,6 +3,7 @@ import {
   resolveStylePresets,
   type EcomStylePresetVertical,
 } from "@/lib/ecom/ecom-style-preset";
+import { primarySelectedTrendingStyleId } from "./trending-style-selection";
 import type {
   ProductImageSetProject,
   ProductImageSetSettings,
@@ -39,9 +40,12 @@ function platformLabel(code: string | undefined): string {
 
 function buildStyleBlock(settings: ProductImageSetSettings): string {
   if (!settings.trendingStyleEnabled) return "";
-  const presets = resolveStylePresets(settings.selectedTrendingStyleIds);
-  if (presets.length === 0) return "";
-  return presets.map((p) => p.visualPrompt ?? p.title).join("；");
+  const styleId = primarySelectedTrendingStyleId(settings.selectedTrendingStyleIds);
+  if (!styleId) return "";
+  const presets = resolveStylePresets([styleId]);
+  const preset = presets[0];
+  if (!preset) return "";
+  return preset.visualPrompt ?? preset.title;
 }
 
 export function buildProductImageSetSlots(project: ProductImageSetProject): ProductImageSetSlot[] {

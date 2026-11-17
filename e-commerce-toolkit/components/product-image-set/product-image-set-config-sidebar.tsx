@@ -35,6 +35,10 @@ import {
   normalizeEcomLanguageValue,
   normalizeEcomPlatformValue,
 } from "@/lib/ecom-generation-settings/constants";
+import {
+  normalizeProductImageSetTrendingStyleIds,
+  pickTrendingStyleIdsForCards,
+} from "@/lib/product-image-set-trending-style";
 import { RATIO_OPTIONS, totalStructureCount } from "@/lib/product-image-set-types";
 import type { StoryboardGatewayModel } from "@/lib/storyboard-types";
 import { cn } from "@/lib/utils";
@@ -132,11 +136,15 @@ export function ProductImageSetConfigSidebar({
         seed: nextSeed,
       });
       setTrendingCards(res.presets);
+      const selectedTrendingStyleIds = pickTrendingStyleIdsForCards(
+        project.settings.selectedTrendingStyleIds,
+        res.presets,
+      );
       await persist({
-        settings: { trendingStyleSeed: nextSeed },
+        settings: { trendingStyleSeed: nextSeed, selectedTrendingStyleIds },
       });
     },
-    [vertical, persist],
+    [vertical, persist, project.settings.selectedTrendingStyleIds],
   );
 
   useEffect(() => {
@@ -383,27 +391,32 @@ export function ProductImageSetConfigSidebar({
             </label>
             {project.settings.trendingStyleEnabled ? (
               <>
+                <p className="mb-2 text-[10px] text-[#86868b]">
+                  选择 1 种爆款视觉调性，将写入本组套图 Prompt（规划与生图）。
+                </p>
                 <div className="mb-2 grid grid-cols-2 gap-2">
                   {trendingCards.map((card) => {
-                    const selected = project.settings.selectedTrendingStyleIds.includes(
-                      card.id,
-                    );
+                    const selected =
+                      normalizeProductImageSetTrendingStyleIds(
+                        project.settings.selectedTrendingStyleIds,
+                      )[0] === card.id;
                     return (
                       <button
                         key={card.id}
                         type="button"
                         disabled={disabled || Boolean(busy)}
+                        aria-pressed={selected}
                         className={cn(
                           "rounded-lg border px-2 py-2 text-left text-[10px]",
-                          selected ? "border-[#1d1d1f] bg-[#fafafa]" : "border-[#e8e8ed]",
+                          selected
+                            ? "border-[#1d1d1f] bg-[#fafafa] ring-2 ring-[#0071e3]/25"
+                            : "border-[#e8e8ed]",
                         )}
                         onClick={() => {
-                          const ids = selected
-                            ? project.settings.selectedTrendingStyleIds.filter(
-                                (x) => x !== card.id,
-                              )
-                            : [...project.settings.selectedTrendingStyleIds, card.id];
-                          void persist({ settings: { selectedTrendingStyleIds: ids } });
+                          if (selected) return;
+                          void persist({
+                            settings: { selectedTrendingStyleIds: [card.id] },
+                          });
                         }}
                       >
                         <p className="font-semibold text-[#1d1d1f]">{card.title}</p>

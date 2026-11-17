@@ -5,6 +5,7 @@ import {
   type ProductImageSetReference,
   type ProductImageSetSettings,
 } from "./types";
+import { normalizeSelectedTrendingStyleIds } from "./trending-style-selection";
 
 export function parseSettings(raw: unknown): ProductImageSetSettings {
   if (!raw || typeof raw !== "object") return { ...DEFAULT_PRODUCT_IMAGE_SET_SETTINGS };
@@ -27,7 +28,9 @@ export function parseSettings(raw: unknown): ProductImageSetSettings {
       ? (o.userLayoutRefs as ProductImageSetSettings["userLayoutRefs"])
       : base.userLayoutRefs,
     selectedTrendingStyleIds: Array.isArray(o.selectedTrendingStyleIds)
-      ? o.selectedTrendingStyleIds.filter((x): x is string => typeof x === "string")
+      ? normalizeSelectedTrendingStyleIds(
+          o.selectedTrendingStyleIds.filter((x): x is string => typeof x === "string"),
+        )
       : base.selectedTrendingStyleIds,
   };
 }
