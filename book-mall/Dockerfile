@@ -64,6 +64,7 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
+COPY --from=builder --chown=nextjs:nodejs /app/content/ai-legal ./content/ai-legal
 # 与 deps 阶段 lockfile 解析版本一致；不经过 npm registry
 COPY --from=prisma-cli --chown=nextjs:nodejs /opt/prisma-cli/node_modules/prisma ./node_modules/prisma
 COPY --from=prisma-cli --chown=nextjs:nodejs /opt/prisma-cli/node_modules/@prisma ./node_modules/@prisma

@@ -1,20 +1,25 @@
 "use client";
 
 import { type FormEvent, useEffect, useState } from "react";
-import { signIn } from "next-auth/react";
+import { signIn, useSession } from "next-auth/react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
-import { AuthAnimatedScreen } from "@/components/auth/auth-animated-screen";
+import { AuthHomeV2FormHeader } from "@/components/auth/auth-home-v2-form-header";
+import { AuthHomeV2Screen } from "@/components/auth/auth-home-v2-screen";
 import {
-  AnimatedAuthFields,
-  AuthSubmitButton,
-  BoxReveal,
-} from "@/components/auth/animated-auth-ui";
+  AuthHomeV2Fields,
+  AuthHomeV2SubmitButton,
+} from "@/components/auth/auth-home-v2-fields";
 import { SmsCodeField } from "@/components/auth/sms-code-field";
 import { LoginLegacyGuide } from "@/components/auth/login-legacy-guide";
+import {
+  AiLegalConsentCheckboxes,
+  type AiLegalConsentChecks,
+  isAiLegalConsentChecksComplete,
+} from "@/components/legal/ai-legal-consent-checkboxes";
+import { syncAiLegalConsentAfterAuth } from "@/lib/auth/after-auth-legal-consent";
 import { navigateAfterAuth } from "@/lib/post-auth-navigate";
-import { cn } from "@/lib/utils";
 
 function safeNextPath(raw: string | null): string {
   if (!raw) return "/account";
@@ -54,6 +59,12 @@ export function LoginForm() {
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const { update: updateSession } = useSession();
+  const [legalChecks, setLegalChecks] = useState<AiLegalConsentChecks>({
+    userAgreement: false,
+    appPermissions: false,
+    privacyPolicy: false,
+  });
 
   useEffect(() => {
     redirectProductionHttpToHttps();
@@ -62,6 +73,10 @@ export function LoginForm() {
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
+    if (!isAiLegalConsentChecksComplete(legalChecks)) {
+      setError("请分别勾选三份法律文档后再登录");
+      return;
+    }
     setLoading(true);
     try {
       // 先检查手机号状态，给出明确提示
@@ -109,6 +124,11 @@ export function LoginForm() {
         setError("登录请求失败，请清除本站 Cookie 后重试或稍后再试");
         return;
       }
+      const legal = await syncAiLegalConsentAfterAuth(updateSession);
+      if (!legal.ok) {
+        setError(legal.error ?? "登录成功，但法律文档确认失败，请重试");
+        return;
+      }
       navigateAfterAuth(next);
       return;
     } catch {
@@ -119,45 +139,38 @@ export function LoginForm() {
   }
 
   return (
-    <AuthAnimatedScreen brandingText="智选 AI MALL">
-      <section className="mx-auto flex w-full max-w-md flex-col gap-4">
-        <BoxReveal boxColor="hsl(var(--primary))" duration={0.3}>
-          <h2 className="text-3xl font-bold text-neutral-800 dark:text-neutral-100">
-            欢迎回来
-          </h2>
-        </BoxReveal>
+    <AuthHomeV2Screen>
+      <AuthHomeV2FormHeader
+        title="欢迎回来"
+        lead={
+          <>
+            还没有账号？ <Link href="/register">注册</Link>
+          </>
+        }
+      />
 
-        <BoxReveal boxColor="hsl(var(--primary))" duration={0.3} className="pb-2">
-          <p className="max-w-sm text-sm text-neutral-600 dark:text-neutral-300">
-            使用手机号登录智选 AI Mall
-          </p>
-        </BoxReveal>
+      <div className="auth-v2-tabs" role="tablist">
+        {(
+          [
+            ["password", "密码登录"],
+            ["otp", "验证码登录"],
+          ] as const
+        ).map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            role="tab"
+            aria-selected={tab === key}
+            className="auth-v2-tab"
+            onClick={() => setTab(key)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
 
-        <div className="flex gap-2 rounded-lg bg-neutral-100 p-1 dark:bg-neutral-800">
-          {(
-            [
-              ["password", "密码登录"],
-              ["otp", "验证码登录"],
-            ] as const
-          ).map(([key, label]) => (
-            <button
-              key={key}
-              type="button"
-              className={cn(
-                "flex-1 rounded-md py-2 text-sm font-medium transition-colors",
-                tab === key
-                  ? "bg-white text-neutral-900 shadow dark:bg-neutral-900 dark:text-neutral-100"
-                  : "text-neutral-600 dark:text-neutral-400",
-              )}
-              onClick={() => setTab(key)}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-
-        <form onSubmit={onSubmit} className="space-y-4">
-          <AnimatedAuthFields
+      <form onSubmit={onSubmit} className="auth-v2-form">
+        <AuthHomeV2Fields
             fields={[
               {
                 name: "phone",
@@ -195,38 +208,34 @@ export function LoginForm() {
             />
           ) : null}
 
+          <AiLegalConsentCheckboxes
+            value={legalChecks}
+            onChange={setLegalChecks}
+            disabled={loading}
+            showOtpHint={tab === "otp"}
+          />
+
           {error ? (
             <p className="text-sm text-red-500" role="alert">
               {error}
             </p>
           ) : null}
 
-          <AuthSubmitButton disabled={loading} loading={loading}>
-            登录 &rarr;
-          </AuthSubmitButton>
-        </form>
+        <AuthHomeV2SubmitButton
+          disabled={loading || !isAiLegalConsentChecksComplete(legalChecks)}
+          loading={loading}
+        >
+          登录
+        </AuthHomeV2SubmitButton>
+      </form>
 
-        <BoxReveal boxColor="hsl(var(--primary))" duration={0.3}>
-          <p className="mt-2 text-center text-sm text-neutral-600 dark:text-neutral-300">
-            <Link
-              href="/forgot-password"
-              className="font-medium text-blue-600 outline-none hover:underline dark:text-blue-400"
-            >
-              忘记密码？
-            </Link>
-            {" · "}
-            还没有账号？{" "}
-            <Link
-              href="/register"
-              className="font-medium text-blue-600 outline-none hover:underline dark:text-blue-400"
-            >
-              注册
-            </Link>
-          </p>
-        </BoxReveal>
+      <p className="mt-6 text-center text-sm text-[var(--muted)]">
+        <Link href="/forgot-password" className="text-[var(--accent)] hover:underline">
+          忘记密码？
+        </Link>
+      </p>
 
-        <LoginLegacyGuide />
-      </section>
-    </AuthAnimatedScreen>
+      <LoginLegacyGuide />
+    </AuthHomeV2Screen>
   );
 }

@@ -14,6 +14,10 @@ import { prisma } from "@/lib/prisma";
 import { getInviteByToken } from "@/lib/tenant/tenant-invite-service";
 import { resolveReferrerByCode } from "@/lib/referral/referral-service";
 import { grantWelcomeGift } from "@/lib/billing/welcome-gift";
+import {
+  aiLegalConsentBodySchema,
+  buildAiLegalConsentForRegistration,
+} from "@/lib/auth/ai-legal-consent";
 import { issueAutoLoginToken } from "@/lib/auth/auto-login-token";
 import { lockReferralAttribution } from "@/lib/share/share-reward-service";
 import { tryApiDbUnavailableResponse } from "@/lib/http/api-db-error";
@@ -142,6 +146,7 @@ export async function POST(request: Request) {
         },
       });
       await tx.wallet.create({ data: { userId: user.id } });
+          ...legalConsent,
       return user.id;
     });
 

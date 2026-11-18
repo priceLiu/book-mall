@@ -56,8 +56,8 @@ export default function LoginPage({ searchParams }: LoginPageProps) {
   if (httpsTarget) redirect(httpsTarget);
 
   return (
-    <>
-      <div className="mx-auto flex w-full max-w-md flex-col gap-4 px-4 pt-4">
+    <div className="auth-v2-login-page">
+      <div className="auth-v2-session-banner-wrap">
         <LoginSessionBanner />
       </div>
       <Suspense
@@ -67,6 +67,6 @@ export default function LoginPage({ searchParams }: LoginPageProps) {
       >
         <LoginForm />
       </Suspense>
-    </>
+    </div>
   );
 }

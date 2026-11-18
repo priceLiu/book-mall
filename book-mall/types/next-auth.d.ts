@@ -12,6 +12,7 @@ declare module "next-auth" {
       primaryTenantId?: string | null;
       phone?: string | null;
       phoneVerified?: boolean;
+      aiLegalConsentComplete?: boolean;
     };
   }
 }
@@ -25,6 +26,7 @@ declare module "next-auth/jwt" {
     primaryTenantId?: string | null;
     phone?: string | null;
     phoneVerified?: boolean;
+    aiLegalConsentComplete?: boolean;
     sv?: number;
     svAt?: number;
   }

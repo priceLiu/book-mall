@@ -1,15 +1,14 @@
 "use client";
 
 import { type FormEvent, useState, useTransition } from "react";
-import { signIn } from "next-auth/react";
+import { signIn, useSession } from "next-auth/react";
 import Link from "next/link";
 
-import { AuthAnimatedScreen } from "@/components/auth/auth-animated-screen";
+import { AuthHomeV2Screen } from "@/components/auth/auth-home-v2-screen";
 import {
-  AnimatedAuthFields,
-  AuthSubmitButton,
-  BoxReveal,
-} from "@/components/auth/animated-auth-ui";
+  AuthHomeV2Fields,
+  AuthHomeV2SubmitButton,
+} from "@/components/auth/auth-home-v2-fields";
 import { maskPhone } from "@/lib/auth/phone";
 import { navigateAfterAuth } from "@/lib/post-auth-navigate";
 
@@ -43,35 +42,26 @@ export function TeamInviteClient({
   if (inviteStatus !== "PENDING") {
     return (
       <AuthAnimatedScreen variant="register" brandingText="智选 AI MALL">
+  const { update: updateSession } = useSession();
+  const [legalChecks, setLegalChecks] = useState<AiLegalConsentChecks>({
+    userAgreement: false,
+    appPermissions: false,
+    privacyPolicy: false,
+  });
         <section className="mx-auto flex w-full max-w-md flex-col gap-4">
           <BoxReveal boxColor="hsl(var(--primary))" duration={0.3}>
             <h2 className="text-3xl font-bold text-neutral-800 dark:text-neutral-100">
               邀请已失效
             </h2>
-          </BoxReveal>
-          <BoxReveal boxColor="hsl(var(--primary))" duration={0.3} className="pb-2">
-            <p className="max-w-sm text-sm text-neutral-600 dark:text-neutral-300">
-              该邀请已过期、被撤销或已被接受。
-            </p>
-          </BoxReveal>
-          <BoxReveal boxColor="hsl(var(--primary))" duration={0.3}>
-            <p className="text-center text-sm text-neutral-600 dark:text-neutral-300">
-              <Link
-                href="/login"
-                className="font-medium text-blue-600 outline-none hover:underline dark:text-blue-400"
-              >
-                前往登录
-              </Link>
-            </p>
-          </BoxReveal>
-        </section>
-      </AuthAnimatedScreen>
-    );
-  }
-
-  async function acceptAfterAuth() {
-    const res = await fetch("/api/team/invite/accept", {
-      method: "POST",
+      <AuthHomeV2Screen>
+        <h1 className="auth-v2-headline">邀请已失效</h1>
+        <p className="auth-v2-lead">该邀请已过期、被撤销或已被接受。</p>
+        <p className="text-center text-sm">
+          <Link href="/login" className="text-[var(--accent)] hover:underline">
+            前往登录
+          </Link>
+        </p>
+      </AuthHomeV2Screen>
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ token }),
       cache: "no-store",
@@ -103,6 +93,10 @@ export function TeamInviteClient({
         if (hasStaleSession) {
           await fetch("/api/auth/clear-session-cookies", {
             method: "POST",
+    if (!isLoggedIn && !isAiLegalConsentChecksComplete(legalChecks)) {
+      setError("请分别勾选三份法律文档后再继续");
+      return;
+    }
             credentials: "include",
             cache: "no-store",
           }).catch(() => undefined);
@@ -142,6 +136,11 @@ export function TeamInviteClient({
             error?: unknown;
             detail?: string;
           };
+              legalConsent: {
+                userAgreement: true,
+                appPermissions: true,
+                privacyPolicy: true,
+              },
           if (!reg.ok) {
             let msg: string;
             if (typeof regData.error === "string") msg = regData.error;
@@ -172,6 +171,14 @@ export function TeamInviteClient({
       }
     });
   }
+        if (!isLoggedIn) {
+          const legal = await syncAiLegalConsentAfterAuth(updateSession);
+          if (!legal.ok) {
+            setError(legal.error ?? "法律文档确认失败，请重试");
+            return;
+          }
+        }
+
 
   return (
     <AuthAnimatedScreen variant="register" brandingText="智选 AI MALL">
@@ -180,20 +187,14 @@ export function TeamInviteClient({
           <h2 className="text-3xl font-bold text-neutral-800 dark:text-neutral-100">
             {isLoggedIn ? "加入团队" : userExists ? "验证并加入" : "注册并加入团队"}
           </h2>
-        </BoxReveal>
-
-        <BoxReveal boxColor="hsl(var(--primary))" duration={0.3} className="pb-2">
-          <p className="max-w-sm text-sm text-neutral-600 dark:text-neutral-300">
-            你受邀加入团队「{tenantName}」。请确认手机号 {maskPhone(invitePhone)}
-            {userExists ? "，验证后将自动加入。" : "，设置密码后即可加入。"}
-          </p>
-        </BoxReveal>
-
-        {!codeReady ? (
-          <p className="text-sm text-amber-600 dark:text-amber-400" role="alert">
-            链接缺少验证码。请打开短信中的完整邀请链接，或联系邀请人重新发送。
-          </p>
-        ) : null}
+    <AuthHomeV2Screen>
+      <h1 className="auth-v2-headline">
+        {isLoggedIn ? "加入团队" : userExists ? "验证并加入" : "注册并加入团队"}
+      </h1>
+      <p className="auth-v2-lead">
+        你受邀加入团队「{tenantName}」。手机号 {maskPhone(invitePhone)}
+        {userExists ? "，验证后将自动加入。" : "，设置密码后即可加入。"}
+      </p>
 
         {hasStaleSession ? (
           <div
@@ -210,9 +211,9 @@ export function TeamInviteClient({
               fields={[
                 ...(userExists
                   ? []
-                  : [
-                      {
-                        name: "name",
+      <form onSubmit={onSubmit} className="space-y-4">
+        {!isLoggedIn ? (
+          <AuthHomeV2Fields
                         label: "昵称",
                         type: "text" as const,
                         placeholder: "选填",
@@ -256,29 +257,41 @@ export function TeamInviteClient({
             </p>
           ) : null}
 
-          <AuthSubmitButton disabled={!codeReady} loading={pending}>
-            {isLoggedIn
-              ? "接受邀请 →"
-              : userExists
-                ? "验证并加入 →"
-                : "注册并加入 →"}
-          </AuthSubmitButton>
-        </form>
+          {!isLoggedIn ? (
+            <AiLegalConsentCheckboxes
+              value={legalChecks}
+              onChange={setLegalChecks}
+              disabled={pending}
+            />
+          ) : null}
 
-        {!isLoggedIn ? (
-          <BoxReveal boxColor="hsl(var(--primary))" duration={0.3}>
-            <p className="mt-2 text-center text-sm text-neutral-600 dark:text-neutral-300">
-              暂不加入？{" "}
-              <Link
-                href="/login"
-                className="font-medium text-blue-600 outline-none hover:underline dark:text-blue-400"
-              >
-                返回登录
-              </Link>
+          {error ? (
+            <p className="text-sm text-red-500" role="alert">
+              {error}
             </p>
-          </BoxReveal>
-        ) : null}
-      </section>
-    </AuthAnimatedScreen>
-  );
-}
+          ) : null}
+
+        <AuthHomeV2SubmitButton
+          disabled={
+            !codeReady ||
+            (!isLoggedIn && !isAiLegalConsentChecksComplete(legalChecks))
+          }
+          loading={pending}
+        >
+          {isLoggedIn
+            ? "接受邀请"
+            : userExists
+              ? "验证并加入"
+              : "注册并加入"}
+        </AuthHomeV2SubmitButton>
+      </form>
+
+      {!isLoggedIn ? (
+        <p className="mt-6 text-center text-sm text-[var(--muted)]">
+          暂不加入？{" "}
+          <Link href="/login" className="text-[var(--accent)] hover:underline">
+            返回登录
+          </Link>
+        </p>
+      ) : null}
+    </AuthHomeV2Screen>

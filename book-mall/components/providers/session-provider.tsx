@@ -2,6 +2,7 @@
 
 import { SessionProvider } from "next-auth/react";
 import type { ReactNode } from "react";
+import { AiLegalConsentGate } from "@/components/auth/ai-legal-consent-gate";
 import { SessionKickedWatcher } from "@/components/auth/session-kicked-watcher";
 
 const SESSION_RECHECK_SEC = Number(
@@ -18,6 +19,7 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
       }
     >
       <SessionKickedWatcher />
+      <AiLegalConsentGate />
       {children}
     </SessionProvider>
   );

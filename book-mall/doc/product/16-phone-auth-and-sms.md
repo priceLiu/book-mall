@@ -61,8 +61,21 @@ Google 登录已下线；邮箱字段保留供历史订单/管理展示，**不�
 ### POST `/api/auth/register`
 
 ```json
-{ "phone", "code", "password", "name?", "billingPersona" }
+{
+  "phone",
+  "code",
+  "password",
+  "name?",
+  "billingPersona",
+  "legalConsent": {
+    "userAgreement": true,
+    "appPermissions": true,
+    "privacyPolicy": true
+  }
+}
 ```
+
+注册须勾选三份法律文档；同意时间写入 `User.ai*AcceptedAt`。登录/补签见 `POST /api/auth/legal-consent` 与 `/legal/*` 静态页。
 
 ### POST `/api/auth/bind-phone`
 

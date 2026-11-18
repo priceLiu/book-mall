@@ -1,18 +1,24 @@
 "use client";
 
 import { type FormEvent, useState } from "react";
-import { signIn } from "next-auth/react";
+import { signIn, useSession } from "next-auth/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { BillingPersona } from "@prisma/client";
 
-import { AuthAnimatedScreen } from "@/components/auth/auth-animated-screen";
+import { AuthHomeV2FormHeader } from "@/components/auth/auth-home-v2-form-header";
+import { AuthHomeV2Screen } from "@/components/auth/auth-home-v2-screen";
 import {
-  AnimatedAuthFields,
-  AuthSubmitButton,
-  BoxReveal,
-} from "@/components/auth/animated-auth-ui";
+  AuthHomeV2Fields,
+  AuthHomeV2SubmitButton,
+} from "@/components/auth/auth-home-v2-fields";
 import { SmsCodeField } from "@/components/auth/sms-code-field";
+import {
+  AiLegalConsentCheckboxes,
+  type AiLegalConsentChecks,
+  isAiLegalConsentChecksComplete,
+} from "@/components/legal/ai-legal-consent-checkboxes";
+import { syncAiLegalConsentAfterAuth } from "@/lib/auth/after-auth-legal-consent";
 import { navigateAfterAuth } from "@/lib/post-auth-navigate";
 
 export function RegisterForm({
@@ -23,6 +29,7 @@ export function RegisterForm({
   initialReferralCode?: string;
 } = {}) {
   const router = useRouter();
+  const { update: updateSession } = useSession();
   const [showPassword, setShowPassword] = useState(false);
   const [phone, setPhone] = useState("");
   const [code, setCode] = useState("");
@@ -32,10 +39,19 @@ export function RegisterForm({
   const billingPersona: BillingPersona = "PLATFORM_CREDIT";
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [legalChecks, setLegalChecks] = useState<AiLegalConsentChecks>({
+    userAgreement: false,
+    appPermissions: false,
+    privacyPolicy: false,
+  });
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
+    if (!isAiLegalConsentChecksComplete(legalChecks)) {
+      setError("请分别勾选三份法律文档后再注册");
+      return;
+    }
     setLoading(true);
     try {
       const res = await fetch("/api/auth/register", {
@@ -48,6 +64,11 @@ export function RegisterForm({
           name: name || undefined,
           billingPersona,
           ...(referralCode ? { referralCode } : {}),
+          legalConsent: {
+            userAgreement: true,
+            appPermissions: true,
+            privacyPolicy: true,
+          },
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -77,6 +98,11 @@ export function RegisterForm({
         router.push("/login?registered=1");
         return;
       }
+      const legal = await syncAiLegalConsentAfterAuth(updateSession);
+      if (!legal.ok) {
+        setError(legal.error ?? "注册成功，但法律文档确认失败，请重新登录后补签");
+        return;
+      }
       navigateAfterAuth("/account");
       return;
     } finally {
@@ -85,28 +111,24 @@ export function RegisterForm({
   }
 
   return (
-    <AuthAnimatedScreen variant="register" brandingText="智选 AI MALL">
-      <section className="mx-auto flex w-full max-w-md flex-col gap-4">
-        <BoxReveal boxColor="hsl(var(--primary))" duration={0.3}>
-          <h2 className="text-3xl font-bold text-neutral-800 dark:text-neutral-100">
-            创建账号
-          </h2>
-        </BoxReveal>
+    <AuthHomeV2Screen formTheme="dark">
+      <AuthHomeV2FormHeader
+        title="创建账号"
+        lead={
+          <>
+            已有账号？ <Link href="/login">登录</Link>
+          </>
+        }
+      />
 
-        <BoxReveal boxColor="hsl(var(--primary))" duration={0.3} className="pb-2">
-          <p className="max-w-sm text-sm text-neutral-600 dark:text-neutral-300">
-            使用手机号注册；订阅会员由平台代付 AI 费用，按积分扣费。
-          </p>
-        </BoxReveal>
+      {welcomeGift && welcomeGift.generalCredits > 0 ? (
+        <div className="auth-v2-welcome-gift rounded-xl px-3 py-2 text-sm leading-snug">
+          注册即送 {welcomeGift.generalCredits.toLocaleString()} 积分（30 天内有效）。
+        </div>
+      ) : null}
 
-        {welcomeGift && welcomeGift.generalCredits > 0 ? (
-          <div className="rounded-lg border border-primary/30 bg-primary/10 px-3 py-2 text-sm text-primary">
-            注册即送 {welcomeGift.generalCredits.toLocaleString()} 积分（30 天内有效）。
-          </div>
-        ) : null}
-
-        <form onSubmit={onSubmit} className="space-y-4">
-          <AnimatedAuthFields
+      <form onSubmit={onSubmit} className="auth-v2-form">
+        <AuthHomeV2Fields
             fields={[
               {
                 name: "name",
@@ -155,29 +177,26 @@ export function RegisterForm({
             disabled={loading}
           />
 
+          <AiLegalConsentCheckboxes
+            value={legalChecks}
+            onChange={setLegalChecks}
+            disabled={loading}
+            className="auth-v2-legal-consent"
+          />
+
           {error ? (
             <p className="text-sm text-red-500 whitespace-pre-line" role="alert">
               {error}
             </p>
           ) : null}
 
-          <AuthSubmitButton disabled={loading} loading={loading}>
-            创建账号 &rarr;
-          </AuthSubmitButton>
-        </form>
-
-        <BoxReveal boxColor="hsl(var(--primary))" duration={0.3}>
-          <p className="mt-2 text-center text-sm text-neutral-600 dark:text-neutral-300">
-            已有账号？{" "}
-            <Link
-              href="/login"
-              className="font-medium text-blue-600 outline-none hover:underline dark:text-blue-400"
-            >
-              登录
-            </Link>
-          </p>
-        </BoxReveal>
-      </section>
-    </AuthAnimatedScreen>
+        <AuthHomeV2SubmitButton
+          disabled={loading || !isAiLegalConsentChecksComplete(legalChecks)}
+          loading={loading}
+        >
+          创建账号
+        </AuthHomeV2SubmitButton>
+      </form>
+    </AuthHomeV2Screen>
   );
 }

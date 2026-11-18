@@ -73,6 +73,10 @@ model User {
   /// 大陆手机号，归一化 11 位（1xxxxxxxxx）
   phone           String?   @unique
   phoneVerifiedAt DateTime?
+  /// 智选AI 法律文档同意时间（勾选时刻，视作已阅）
+  aiUserAgreementAcceptedAt    DateTime?
+  aiAppPermissionsAcceptedAt   DateTime?
+  aiPrivacyPolicyAcceptedAt    DateTime?
   image           String?
   /// 邮箱密码注册时使用；OAuth 用户可为空
   passwordHash    String?

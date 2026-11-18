@@ -2,6 +2,7 @@ import { CookieConsentBanner } from "@/components/layout/cookie-consent-banner";
 import { SiteHomeNav } from "@/components/layout/site-home/site-home-nav";
 import { SiteHomeV2Chrome } from "@/components/site-home-v2/site-home-v2-chrome";
 import {
+  isAuthFullscreenRoute,
   isHomeV2Route,
   isLegacyHome,
   isPricingRoute,
@@ -21,7 +22,7 @@ export function SiteLayoutShell({
   isLoggedIn: boolean;
   children: React.ReactNode;
 }) {
-  if (isHomeV2Route(pathname) || isPricingRoute(pathname)) {
+  if (isHomeV2Route(pathname) || isPricingRoute(pathname) || isAuthFullscreenRoute(pathname)) {
     return <>{children}</>;
   }
 

@@ -12,6 +12,19 @@ export function isLegacyHome(pathname: string): boolean {
   return pathname === "/";
 }
 
+/** 登录/注册全屏分屏，不再套营销顶栏 */
+export function isAuthFullscreenRoute(pathname: string): boolean {
+  return (
+    pathname === "/login" ||
+    pathname === "/register" ||
+    pathname.startsWith("/r/") ||
+    pathname.startsWith("/invite/") ||
+    pathname === "/forgot-password" ||
+    pathname.startsWith("/legacy/") ||
+    pathname.startsWith("/legal/")
+  );
+}
+
 export function prefersSiteHomeBody(pathname: string): boolean {
   return (
     pathname.startsWith("/products") ||

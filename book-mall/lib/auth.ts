@@ -14,6 +14,7 @@ import {
   isSingleSessionEnforced,
   isTokenSessionValid,
 } from "@/lib/auth-session-version";
+import { isAiLegalConsentComplete } from "@/lib/auth/ai-legal-consent";
 import { SESSION_KICK_COOKIE } from "@/lib/session-kick-cookie";
 
 /** 生产跨子域（book / f / tool）共享会话；本地不设 domain，保持 host-only Cookie。 */
@@ -107,9 +108,15 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async jwt({ token, user, trigger, session }) {
       if (trigger === "update" && session && typeof session === "object") {
-        const patch = session as { name?: string | null };
+        const patch = session as {
+          name?: string | null;
+          aiLegalConsentComplete?: boolean;
+        };
         if ("name" in patch) {
           token.name = patch.name ?? undefined;
+        }
+        if (patch.aiLegalConsentComplete === true) {
+          token.aiLegalConsentComplete = true;
         }
         return token;
       }
@@ -122,11 +129,19 @@ export const authOptions: NextAuthOptions = {
         try {
           const u = await prisma.user.findUnique({
             where: { id: user.id },
-            select: { primaryTenantId: true, phone: true, phoneVerifiedAt: true },
+            select: {
+              primaryTenantId: true,
+              phone: true,
+              phoneVerifiedAt: true,
+              aiUserAgreementAcceptedAt: true,
+              aiAppPermissionsAcceptedAt: true,
+              aiPrivacyPolicyAcceptedAt: true,
+            },
           });
           token.primaryTenantId = u?.primaryTenantId ?? null;
           token.phone = u?.phone ?? null;
           token.phoneVerified = Boolean(u?.phoneVerifiedAt);
+          token.aiLegalConsentComplete = u ? isAiLegalConsentComplete(u) : false;
         } catch {
           token.primaryTenantId = null;
         }
@@ -175,6 +190,7 @@ export const authOptions: NextAuthOptions = {
           (token.primaryTenantId as string | null | undefined) ?? null;
         session.user.phone = (token.phone as string | null | undefined) ?? null;
         session.user.phoneVerified = Boolean(token.phoneVerified);
+        session.user.aiLegalConsentComplete = Boolean(token.aiLegalConsentComplete);
       }
       return session;
     },

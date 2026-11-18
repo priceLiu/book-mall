@@ -5,13 +5,18 @@ import { signIn } from "next-auth/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
-import { AuthAnimatedScreen } from "@/components/auth/auth-animated-screen";
+import { AuthHomeV2Screen } from "@/components/auth/auth-home-v2-screen";
 import {
-  AnimatedAuthFields,
-  AuthSubmitButton,
-  BoxReveal,
-} from "@/components/auth/animated-auth-ui";
+  AuthHomeV2Fields,
+  AuthHomeV2SubmitButton,
+} from "@/components/auth/auth-home-v2-fields";
 import { SmsCodeField } from "@/components/auth/sms-code-field";
+import {
+  AiLegalConsentCheckboxes,
+  type AiLegalConsentChecks,
+  isAiLegalConsentChecksComplete,
+} from "@/components/legal/ai-legal-consent-checkboxes";
+import { syncAiLegalConsentAfterAuth } from "@/lib/auth/after-auth-legal-consent";
 import { navigateAfterAuth } from "@/lib/post-auth-navigate";
 
 export function ReferralRegisterForm({
@@ -30,12 +35,21 @@ export function ReferralRegisterForm({
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  const [legalChecks, setLegalChecks] = useState<AiLegalConsentChecks>({
+    userAgreement: false,
+    appPermissions: false,
+    privacyPolicy: false,
+  });
+
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
     if (!name.trim()) {
       setError("请填写昵称");
       return;
+    }
+    if (!isAiLegalConsentChecksComplete(legalChecks)) {
+      setError("请分别勾选三份法律文档后再注册");
     }
     setLoading(true);
     try {
@@ -49,6 +63,11 @@ export function ReferralRegisterForm({
           referralCode: code,
           billingPersona: "PLATFORM_CREDIT",
         }),
+          legalConsent: {
+            userAgreement: true,
+            appPermissions: true,
+            privacyPolicy: true,
+          },
       });
       const data = (await res.json().catch(() => ({}))) as {
         error?: unknown;
@@ -81,6 +100,11 @@ export function ReferralRegisterForm({
         return;
       }
       navigateAfterAuth("/account");
+      const legal = await syncAiLegalConsentAfterAuth(updateSession);
+      if (!legal.ok) {
+        setError(legal.error ?? "注册成功，但法律文档确认失败，请重新登录后补签");
+        return;
+      }
       return;
     } finally {
       setLoading(false);
@@ -89,22 +113,17 @@ export function ReferralRegisterForm({
 
   return (
     <AuthAnimatedScreen variant="register" brandingText="智选 AI MALL">
-      <section className="mx-auto flex w-full max-w-md flex-col gap-4">
-        <BoxReveal boxColor="hsl(var(--primary))" duration={0.3}>
-          <h2 className="text-3xl font-bold text-neutral-800 dark:text-neutral-100">
-            邀请注册
-          </h2>
-        </BoxReveal>
-
-        <BoxReveal boxColor="hsl(var(--primary))" duration={0.3} className="pb-2">
-          <p className="max-w-sm text-sm text-neutral-600 dark:text-neutral-300">
-            {referrerName
-              ? `${referrerName} 邀请你加入 AI Mall`
-              : "你正在通过分享链接注册 AI Mall"}
-            ，填写昵称并验证手机号即可完成，无需设置密码（后续可用短信验证码登录）。
-          </p>
-        </BoxReveal>
-
+    <AuthHomeV2Screen>
+      <h1 className="auth-v2-headline">邀请注册</h1>
+      <p className="auth-v2-lead">
+        {referrerName
+          ? `${referrerName} 邀请你加入智选 AI`
+          : "你正在通过分享链接注册"}
+        。已有账号？ <Link href="/login">登录</Link>
+      </p>
+      <p className="mb-4 text-sm text-[var(--muted)]">
+        填写昵称并验证手机号即可完成，无需设置密码（后续可用短信验证码登录）。
+      </p>
         {welcomeGift && welcomeGift.generalCredits > 0 ? (
           <div className="rounded-lg border border-primary/30 bg-primary/10 px-3 py-2 text-sm text-primary">
             完成注册立得 {welcomeGift.generalCredits.toLocaleString()} 积分（30 天内有效），可直接体验生图与生视频。
@@ -112,8 +131,8 @@ export function ReferralRegisterForm({
         ) : null}
 
         <form onSubmit={onSubmit} className="space-y-4">
-          <AnimatedAuthFields
-            fields={[
+      <form onSubmit={onSubmit} className="auth-v2-form">
+        <AuthHomeV2Fields
               {
                 name: "name",
                 label: "昵称",
@@ -142,28 +161,24 @@ export function ReferralRegisterForm({
           />
 
           {error ? (
+          <AiLegalConsentCheckboxes
+            value={legalChecks}
+            onChange={setLegalChecks}
+            disabled={loading}
+          />
+
+          {error ? (
             <p className="text-sm text-red-500" role="alert">
               {error}
             </p>
           ) : null}
 
-          <AuthSubmitButton disabled={loading} loading={loading}>
-            完成注册 &rarr;
-          </AuthSubmitButton>
-        </form>
-
-        <BoxReveal boxColor="hsl(var(--primary))" duration={0.3}>
-          <p className="mt-2 text-center text-sm text-neutral-600 dark:text-neutral-300">
-            已有账号？{" "}
-            <Link
-              href="/login"
-              className="font-medium text-blue-600 outline-none hover:underline dark:text-blue-400"
-            >
-              登录
-            </Link>
-          </p>
-        </BoxReveal>
-      </section>
-    </AuthAnimatedScreen>
-  );
+        <AuthHomeV2SubmitButton
+          disabled={loading || !isAiLegalConsentChecksComplete(legalChecks)}
+          loading={loading}
+        >
+          完成注册
+        </AuthHomeV2SubmitButton>
+      </form>
+    </AuthHomeV2Screen>
 }
