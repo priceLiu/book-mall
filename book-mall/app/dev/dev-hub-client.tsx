@@ -199,6 +199,12 @@ export function DevHubClient({
           >
             图生视频并发压测 →
           </Link>
+          <Link
+            href="/dev/canvas/gen-load-test"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-200 transition hover:border-emerald-400 hover:bg-emerald-500/20"
+          >
+            画布生图/文本全链路 →
+          </Link>
         </div>
         <p className="mt-3 text-xs text-zinc-500">
           上次检测：{new Date(checkedAt).toLocaleString("zh-CN")}

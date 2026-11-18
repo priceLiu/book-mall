@@ -291,7 +291,7 @@ async function revertStuckDispatchingTask(
     .catch(() => undefined);
 }
 
-async function dispatchOneCanvasQueuedTask(
+export async function dispatchOneCanvasQueuedTask(
   task: CanvasGenerationTask & { project: { userId: string } },
 ): Promise<"dispatched" | "skipped" | "failed"> {
   let scopeKey: string | null = null;
