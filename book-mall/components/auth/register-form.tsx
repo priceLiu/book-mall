@@ -1,7 +1,7 @@
 "use client";
 
 import { type FormEvent, useState } from "react";
-import { signIn, useSession } from "next-auth/react";
+import { signIn } from "next-auth/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { BillingPersona } from "@prisma/client";
@@ -18,7 +18,6 @@ import {
   type AiLegalConsentChecks,
   isAiLegalConsentChecksComplete,
 } from "@/components/legal/ai-legal-consent-checkboxes";
-import { syncAiLegalConsentAfterAuth } from "@/lib/auth/after-auth-legal-consent";
 import { navigateAfterAuth } from "@/lib/post-auth-navigate";
 
 export function RegisterForm({
@@ -29,7 +28,6 @@ export function RegisterForm({
   initialReferralCode?: string;
 } = {}) {
   const router = useRouter();
-  const { update: updateSession } = useSession();
   const [showPassword, setShowPassword] = useState(false);
   const [phone, setPhone] = useState("");
   const [code, setCode] = useState("");
@@ -96,11 +94,6 @@ export function RegisterForm({
       });
       if (login?.error) {
         router.push("/login?registered=1");
-        return;
-      }
-      const legal = await syncAiLegalConsentAfterAuth(updateSession);
-      if (!legal.ok) {
-        setError(legal.error ?? "注册成功，但法律文档确认失败，请重新登录后补签");
         return;
       }
       navigateAfterAuth("/account");

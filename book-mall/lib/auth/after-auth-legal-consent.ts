@@ -4,7 +4,7 @@ import { submitAiLegalConsent } from "@/lib/auth/submit-ai-legal-consent-client"
 
 type SessionUpdate = (data?: { aiLegalConsentComplete?: boolean }) => Promise<Session | null>;
 
-/** 登录/注册成功后：补写缺失的法律同意时间，并刷新会话标记。 */
+/** 补签弹窗等场景：写入缺失的法律同意时间并刷新 JWT 标记（登录页不再调用）。 */
 export async function syncAiLegalConsentAfterAuth(
   update: SessionUpdate,
 ): Promise<{ ok: boolean; error?: string }> {

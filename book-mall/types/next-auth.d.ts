@@ -13,6 +13,8 @@ declare module "next-auth" {
       phone?: string | null;
       phoneVerified?: boolean;
       aiLegalConsentComplete?: boolean;
+      /** 存量补签战役是否仍在进行（系统自动维护） */
+      aiLegalBackfillActive?: boolean;
     };
   }
 }
@@ -27,6 +29,7 @@ declare module "next-auth/jwt" {
     phone?: string | null;
     phoneVerified?: boolean;
     aiLegalConsentComplete?: boolean;
+    aiLegalBackfillActive?: boolean;
     sv?: number;
     svAt?: number;
   }

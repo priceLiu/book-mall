@@ -4,7 +4,6 @@ import {
   buildAiLegalConsentUpdate,
   isAiLegalConsentComplete,
 } from "@/lib/auth/ai-legal-consent";
-
 describe("ai legal consent", () => {
   it("detects complete consent", () => {
     const now = new Date();
@@ -38,4 +37,5 @@ describe("ai legal consent", () => {
     expect(patch.aiAppPermissionsAcceptedAt).toBeInstanceOf(Date);
     expect(patch.aiPrivacyPolicyAcceptedAt).toBeInstanceOf(Date);
   });
+
 });

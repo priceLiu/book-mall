@@ -1216,6 +1216,8 @@ model PlatformConfig {
   walletHoldDefaultTtlMin    Int    @default(10)
   /// 生成耗时预警（秒）：Gateway 轮询池 / poll 升格；默认 800
   generationSlowWarnSec      Int    @default(800)
+  /// 存量用户法律文档补签战役进行中；系统在无待补签用户时自动置 false
+  aiLegalLegacyBackfillActive  Boolean @default(true)
 
   // —— 日志与保险丝（管理后台 /admin/settings 可调；0 = 关闭）——
   /// 单模型当日（CST）Gateway 调用上限；0 = 关闭保险丝

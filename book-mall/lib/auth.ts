@@ -14,6 +14,7 @@ import {
   isSingleSessionEnforced,
   isTokenSessionValid,
 } from "@/lib/auth-session-version";
+import { resolveAiLegalBackfillCampaignActive } from "@/lib/auth/ai-legal-backfill-campaign";
 import { isAiLegalConsentComplete } from "@/lib/auth/ai-legal-consent";
 import { SESSION_KICK_COOKIE } from "@/lib/session-kick-cookie";
 
@@ -111,12 +112,16 @@ export const authOptions: NextAuthOptions = {
         const patch = session as {
           name?: string | null;
           aiLegalConsentComplete?: boolean;
+          aiLegalBackfillActive?: boolean;
         };
         if ("name" in patch) {
           token.name = patch.name ?? undefined;
         }
         if (patch.aiLegalConsentComplete === true) {
           token.aiLegalConsentComplete = true;
+        }
+        if (patch.aiLegalBackfillActive === false) {
+          token.aiLegalBackfillActive = false;
         }
         return token;
       }
@@ -127,21 +132,32 @@ export const authOptions: NextAuthOptions = {
         token.name = user.name ?? undefined;
         token.picture = user.image ?? undefined;
         try {
+          const backfillActive = await resolveAiLegalBackfillCampaignActive();
+          token.aiLegalBackfillActive = backfillActive;
+          const legalSelect = backfillActive
+            ? {
+                aiUserAgreementAcceptedAt: true,
+                aiAppPermissionsAcceptedAt: true,
+                aiPrivacyPolicyAcceptedAt: true,
+              }
+            : {};
           const u = await prisma.user.findUnique({
             where: { id: user.id },
             select: {
               primaryTenantId: true,
               phone: true,
               phoneVerifiedAt: true,
-              aiUserAgreementAcceptedAt: true,
-              aiAppPermissionsAcceptedAt: true,
-              aiPrivacyPolicyAcceptedAt: true,
+              ...legalSelect,
             },
           });
           token.primaryTenantId = u?.primaryTenantId ?? null;
           token.phone = u?.phone ?? null;
           token.phoneVerified = Boolean(u?.phoneVerifiedAt);
-          token.aiLegalConsentComplete = u ? isAiLegalConsentComplete(u) : false;
+          if (!backfillActive) {
+            token.aiLegalConsentComplete = true;
+          } else {
+            token.aiLegalConsentComplete = u ? isAiLegalConsentComplete(u) : false;
+          }
         } catch {
           token.primaryTenantId = null;
         }
@@ -194,6 +210,7 @@ export const authOptions: NextAuthOptions = {
         session.user.phone = (token.phone as string | null | undefined) ?? null;
         session.user.phoneVerified = Boolean(token.phoneVerified);
         session.user.aiLegalConsentComplete = Boolean(token.aiLegalConsentComplete);
+        session.user.aiLegalBackfillActive = token.aiLegalBackfillActive !== false;
       }
       return session;
     },
