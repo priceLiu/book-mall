@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
-import { getGenLoadTestStatus, tickGenLoadTest } from "@/lib/canvas/dev/gen-load-test";
+import {
+  getGenLoadTestStatus,
+  holdDbConnections,
+  releaseHeldConnections,
+  tickGenLoadTest,
+} from "@/lib/canvas/dev/gen-load-test";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -30,9 +35,17 @@ export async function POST(request: Request) {
   if (!projectId) {
     return NextResponse.json({ ok: false, error: "缺少 projectId" }, { status: 400 });
   }
+  let body: { releaseHolds?: boolean; acquireHolds?: boolean } = {};
   try {
+    body = (await request.json()) as { releaseHolds?: boolean; acquireHolds?: boolean };
+  } catch {
+    body = {};
+  }
+  try {
+    const acquired = body.acquireHolds ? await holdDbConnections(2) : null;
+    const released = body.releaseHolds ? releaseHeldConnections() : null;
     const status = await tickGenLoadTest(projectId);
-    return NextResponse.json(status);
+    return NextResponse.json({ ...status, acquiredHolds: acquired, releasedHolds: released });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     return NextResponse.json({ ok: false, error: msg }, { status: 400 });

@@ -8,7 +8,7 @@ type Ledger = { type: string; credits: number };
 type TaskRow = {
   id: string;
   nodeId: string;
-  lane: "text" | "image";
+  lane: "text" | "image" | "video";
   kind: string;
   status: string;
   model: string;
@@ -30,6 +30,7 @@ type Status = {
   projectName: string;
   balance: number | null;
   reserved: number | null;
+  holds?: Array<{ id: string; ageMs: number }>;
   total: number;
   terminalCount: number;
   tasks: TaskRow[];
@@ -44,6 +45,9 @@ type StartResult = {
   balanceBefore?: number;
   textModel?: string;
   imageModel?: string;
+  videoModel?: string;
+  topup?: { toppedUp: boolean; credits: number };
+  holdIds?: string[];
 };
 
 export function GenLoadTestClient() {
@@ -100,9 +104,9 @@ export function GenLoadTestClient() {
       <Link href="/dev" className="text-sm text-zinc-400 hover:text-white">
         ← 开发导航
       </Link>
-      <h1 className="mt-4 text-2xl font-semibold">画布生图 / 生文本全链路</h1>
+      <h1 className="mt-4 text-2xl font-semibold">文本 / 生图 / 视频全链路</h1>
       <p className="mt-2 text-sm text-zinc-400">
-        按画布正常路径同时发起 5 条文本（ai-engine → Gateway chat）和 5 条生图（image-engine → 占槽 → 百炼文生图）。会真实扣积分。
+        同时发起 15 条：5 条画布文本、5 条电商生图、5 条一键复刻短视频。模型取当前最低成本（文本 deepseek-chat，生图 z-image-turbo，视频万相 3.0、2 秒、720P）。余额不足时按开发环境加油包入账。另外会占住 2 条数据库连接，用来确认可以释放。
       </p>
       <div className="mt-6 flex flex-wrap items-end gap-3">
         <label className="text-sm text-zinc-300">
@@ -120,7 +124,7 @@ export function GenLoadTestClient() {
           onClick={() => void start()}
           className="rounded-md bg-white px-4 py-2 text-sm font-medium text-zinc-950 disabled:opacity-50"
         >
-          {starting ? "10 条正在跑…" : "同时发起 5 文本 + 5 生图"}
+          {starting ? "15 条正在跑…" : "同时发起 15 条"}
         </button>
       </div>
       {error ? <p className="mt-4 text-sm text-red-400">{error}</p> : null}
@@ -129,7 +133,9 @@ export function GenLoadTestClient() {
           项目 {startInfo.projectName} · {startInfo.projectId}
           {startInfo.balanceBefore != null ? ` · 开始余额 ${startInfo.balanceBefore}` : ""}
           {startInfo.textModel ? ` · 文本 ${startInfo.textModel}` : ""}
-          {startInfo.imageModel ? ` · 生图 ${startInfo.imageModel}` : ""}
+          {startInfo.imageModel ? ` · 电商生图 ${startInfo.imageModel}` : ""}
+          {startInfo.videoModel ? ` · 复刻视频 ${startInfo.videoModel}` : ""}
+          {startInfo.topup?.toppedUp ? ` · 已按加油包入账 ${startInfo.topup.credits}` : ""}
         </p>
       ) : null}
       {status ? (
@@ -140,6 +146,30 @@ export function GenLoadTestClient() {
             </span>
             <span className="rounded bg-zinc-800 px-2 py-1">余额 {status.balance ?? "—"}</span>
             <span className="rounded bg-zinc-800 px-2 py-1">冻结 {status.reserved ?? "—"}</span>
+            <span className="rounded bg-zinc-800 px-2 py-1">长连接 {status.holds?.length ?? 0}</span>
+            <button
+              type="button"
+              className="rounded border border-zinc-600 px-2 py-1"
+              onClick={() => {
+                const projectId = startInfo?.projectId;
+                if (!projectId) return;
+                void fetch(
+                  `/api/dev/canvas/gen-load-test/status?projectId=${encodeURIComponent(projectId)}`,
+                  {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ releaseHolds: true }),
+                  },
+                )
+                  .then((r) => r.json())
+                  .then((data: Status) => {
+                    if (data.ok) setStatus(data);
+                  })
+                  .catch((e) => setError(e instanceof Error ? e.message : "释放失败"));
+              }}
+            >
+              释放长连接
+            </button>
           </div>
           <div className="mt-4 overflow-x-auto rounded-lg border border-zinc-800">
             <table className="w-full text-left text-sm">
@@ -155,7 +185,9 @@ export function GenLoadTestClient() {
               <tbody>
                 {status.tasks.map((task) => (
                   <tr key={task.id} className="border-t border-zinc-800">
-                    <td className="px-3 py-2">{task.lane === "text" ? "文本" : "生图"}</td>
+                    <td className="px-3 py-2">
+                      {task.lane === "text" ? "画布文本" : task.lane === "video" ? "复刻视频" : "电商生图"}
+                    </td>
                     <td className="px-3 py-2">
                       <div>{task.status}</div>
                       <div className="font-mono text-xs text-zinc-500">{task.nodeId}</div>
