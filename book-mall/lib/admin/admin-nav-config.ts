@@ -120,6 +120,7 @@ export function buildAdminNavGroups(financeWebOrigin: string | null): AdminNavGr
         { label: "Gateway 平台凭证池", href: "/admin/gateway/platform" },
         { label: "Gateway 阻塞预警", href: "/admin/gateway/health" },
         { label: "平台错误日志", href: "/admin/errors" },
+        { label: "生成健康", href: "/admin/generation-health" },
         { label: "日志与保险丝配置", href: "/admin/settings" },
         { label: "生成频率配额", href: "/admin/generation-quota" },
         { label: "工具管理", href: "/admin/tool-apps/manage" },

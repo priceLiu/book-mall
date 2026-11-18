@@ -124,6 +124,7 @@ export function recordGatewayPlatformError(opts: {
   clientPage?: string | null;
   storyTaskId?: string | null;
   userId?: string | null;
+  userFacingBucket?: string | null;
 }): void {
   const message = opts.failMessage?.trim() || opts.failCode?.trim() || "Gateway 请求失败";
   recordPlatformError({
@@ -138,6 +139,7 @@ export function recordGatewayPlatformError(opts: {
       modelKey: opts.model ?? undefined,
       clientPage: opts.clientPage ?? undefined,
       endpoint: opts.endpoint ?? undefined,
+      userFacingBucket: opts.userFacingBucket ?? undefined,
     },
   });
 }

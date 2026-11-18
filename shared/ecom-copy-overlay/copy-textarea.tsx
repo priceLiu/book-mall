@@ -42,7 +42,7 @@ export function EcomCopyOverlayMultiLineText({
           placeholder={placeholder}
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Enter") e.stopPropagation();
+            if (e.key === "Enter" || e.key === " ") e.stopPropagation();
           }}
         />
       </label>

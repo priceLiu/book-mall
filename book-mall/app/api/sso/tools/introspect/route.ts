@@ -16,7 +16,10 @@ import { getUserEcomBillingMode } from "@/lib/ecom/ecom-billing-mode";
 import { resolveToolsNavKeysForUser } from "@/lib/tool-subscription-entitlements";
 import { getActiveToolServicePeriods } from "@/lib/tool-service-fee/periods";
 import { resolveTenantContextForUser } from "@/lib/tenant/context";
-import { getCreditBalance } from "@/lib/billing/credit-account-service";
+import {
+  getAccountCreditBalances,
+  spendableCreditBalance,
+} from "@/lib/billing/credit-account-service";
 import { withApiDbGuard } from "@/lib/http/api-db-error";
 
 export const dynamic = "force-dynamic";
@@ -216,9 +219,9 @@ export const GET = withApiDbGuard(async (req) => {
   let creditBalance: number | null = null;
   if (tenantCtx) {
     const tCredit0 = performance.now();
-    creditBalance = await getCreditBalance(tenantCtx.billingOwnerRef).catch(
-      () => null,
-    );
+    creditBalance = await getAccountCreditBalances(tenantCtx.billingOwnerRef)
+      .then((snap) => spendableCreditBalance(snap))
+      .catch(() => null);
     msCredit = performance.now() - tCredit0;
   }
 

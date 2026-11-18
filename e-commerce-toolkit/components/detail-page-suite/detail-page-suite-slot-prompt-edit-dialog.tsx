@@ -58,6 +58,7 @@ type Props = {
   showSlotCopyField?: boolean;
   baseImageUrl?: string | null;
   copyOverlay?: EcomCopyOverlay | null;
+  layoutComposedPreviewUrl?: string | null;
   exportWidthPx?: number;
   displayRatio?: EcomDetailPageRatio;
 };
@@ -91,6 +92,7 @@ export function DetailPageSuiteSlotPromptEditDialog({
   showSlotCopyField = true,
   baseImageUrl = null,
   copyOverlay = null,
+  layoutComposedPreviewUrl = null,
   exportWidthPx = 750,
   displayRatio = "3:4",
 }: Props) {
@@ -159,6 +161,7 @@ export function DetailPageSuiteSlotPromptEditDialog({
         slotCopy={slotCopy}
         slotCopyAi={slotCopyAi}
         copyOverlay={copyOverlay}
+        layoutComposedPreviewUrl={layoutComposedPreviewUrl}
         exportWidthPx={exportWidthPx}
         aspectClassName={detailPageAspectClass(displayRatio)}
         saving={saving}

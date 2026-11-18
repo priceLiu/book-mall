@@ -83,7 +83,7 @@ import { useLibtvRuntimeErrorBanner } from "@/lib/canvas/use-libtv-runtime-error
 import { useSaveNodeAsAsset } from "@/lib/canvas/use-save-node-as-asset";
 import {
   useLibtvRuntimeErrorAlert,
-  libtvRuntimeErrorAlertTitle,
+  showLibtvRuntimeFailureDialog,
 } from "@/lib/canvas/libtv-runtime-error-alert";
 import {
   libtvMediaReversePromptFailureMessage,
@@ -125,7 +125,7 @@ const VIDEO_TRY_ACTIONS: VideoTryAction[] = [
 ];
 
 export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
-  const { alert } = useDialogs();
+  const { alert, confirm } = useDialogs();
   const saveAsAsset = useSaveNodeAsAsset();
   const rfNodes = useNodes();
   const { setNodes: rfSetNodes } = useReactFlow();
@@ -285,12 +285,10 @@ export function Sbv1VideoEngineNode({ id, data, selected }: NodeProps) {
     modelKey: videoModelKey,
     enabled: !isMislabeledVendorSuccessError(d.runtime?.failCode, d.runtime?.failMessage),
     onAlert: ({ message, failCode }) => {
-      void alert({
-        title: libtvRuntimeErrorAlertTitle(failCode, message, "video"),
-        message,
-        variant: "error",
-        dismissOnly: true,
-      });
+      void showLibtvRuntimeFailureDialog(
+        { alert, confirm },
+        { message, failCode, kind: "video" },
+      );
     },
   });
 

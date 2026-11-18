@@ -283,6 +283,9 @@ async function call<T>(
         continue;
       }
       markForbiddenCanvasProjectFromPath(r.status, apiPath);
+      if (r.status === 402) {
+        throw new Error(msg || "积分不足，请前往主站充值后重试。");
+      }
       throw new Error(msg ? `${r.status} ${msg}` : `${r.status} ${r.statusText}`);
     }
     if (!raw) return undefined as unknown as T;

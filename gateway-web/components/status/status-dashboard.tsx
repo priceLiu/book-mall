@@ -8,6 +8,10 @@ import { CopyLogIdButton } from "@/components/status/copy-log-id-button";
 import { RecoverStallLogButton } from "@/components/status/recover-stall-log-button";
 import { HorizontalCategoryBars } from "./horizontal-category-bars";
 import {
+  GenerationHealthPanel,
+  type GenerationHealthApiPayload,
+} from "./generation-health-panel";
+import {
   GATEWAY_FAIL_CODE_TABS,
   resolveFailCodeTab,
 } from "@/lib/gateway-fail-code-tabs";
@@ -404,6 +408,9 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
     { failCode: string; count: number }[]
   >([]);
   const [failedTotal, setFailedTotal] = useState(0);
+  const [generationHealth, setGenerationHealth] =
+    useState<GenerationHealthApiPayload | null>(null);
+  const [generationHealthLoading, setGenerationHealthLoading] = useState(false);
   const [loadedPages, setLoadedPages] = useState(1);
   const [hasMoreLogs, setHasMoreLogs] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -542,6 +549,24 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
   }, [applied, queryMode]);
 
   /** 轮询用：卡片与柱状图同一请求，避免 summary / categories 不同步。 */
+  const loadGenerationHealth = useCallback(async () => {
+    if (applied.scope === "team" && !applied.tenantId) return null;
+    setGenerationHealthLoading(true);
+    const statsQs = buildQueryString(
+      applied,
+      { parts: "generationHealth" },
+      queryMode,
+    );
+    const statsRes = await fetchJson<{ generationHealth?: GenerationHealthApiPayload }>(
+      `/api/book-mall/api/gateway/logs/stats?${statsQs}`,
+    );
+    setGenerationHealthLoading(false);
+    if (statsRes.ok && statsRes.data.generationHealth) {
+      setGenerationHealth(statsRes.data.generationHealth);
+    }
+    return statsRes;
+  }, [applied, queryMode]);
+
   const loadStatsAll = useCallback(async () => {
     if (applied.scope === "team" && !applied.tenantId) return null;
     const statsQs = buildQueryString(applied, { parts: "all" }, queryMode);
@@ -718,7 +743,7 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
       setError(null);
 
       try {
-        const statsRes = await loadStatsAll();
+        const [statsRes] = await Promise.all([loadStatsAll(), loadGenerationHealth()]);
         if (seq !== loadSeqRef.current) return;
 
         if (statsRes && !statsRes.ok) {
@@ -744,6 +769,7 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
   }, [
     applied,
     initialMeta.teams.length,
+    loadGenerationHealth,
     loadStatsAll,
   ]);
 
@@ -1246,6 +1272,11 @@ export function StatusDashboard({ initialMeta }: { initialMeta: DashboardMeta })
               label: displayLogModelKey(r),
               count: r.count,
             }))}
+          />
+
+          <GenerationHealthPanel
+            data={generationHealth}
+            loading={generationHealthLoading}
           />
         </div>
       ) : viewMode === "dashboard" && loading ? (

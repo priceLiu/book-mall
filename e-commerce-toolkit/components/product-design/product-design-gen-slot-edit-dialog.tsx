@@ -20,6 +20,7 @@ type Props = {
   slotCopy?: string;
   slotCopyAi?: string;
   copyOverlay?: EcomCopyOverlay | null;
+  layoutComposedPreviewUrl?: string | null;
   ratio: string;
   exportWidthPx?: number;
   referenceImages?: EcomPromptImageRef[];
@@ -46,6 +47,7 @@ export function ProductDesignGenSlotEditDialog({
   slotCopy = "",
   slotCopyAi = "",
   copyOverlay = null,
+  layoutComposedPreviewUrl = null,
   ratio,
   exportWidthPx = 750,
   referenceImages = [],
@@ -82,6 +84,7 @@ export function ProductDesignGenSlotEditDialog({
       showSlotCopyField
       baseImageUrl={baseImageUrl}
       copyOverlay={copyOverlay}
+      layoutComposedPreviewUrl={layoutComposedPreviewUrl}
       exportWidthPx={exportWidthPx}
       displayRatio={displayRatio}
       rewriteBusy={rewriteBusy}
@@ -91,7 +94,9 @@ export function ProductDesignGenSlotEditDialog({
       onSave={onSave}
       onPreview={async (_p, extras) => {
         const baseUrl = baseImageUrl?.trim();
-        if (!baseUrl || !extras.copyOverlay) return;
+        if (!baseUrl || !extras.copyOverlay) {
+          throw new Error("请先出无字底图并填写文案");
+        }
         const { url } = await composeEcomCopyOverlay({
           baseImageUrl: baseUrl,
           overlay: extras.copyOverlay,
@@ -104,7 +109,9 @@ export function ProductDesignGenSlotEditDialog({
         onConfirmCompose
           ? async (p, extras) => {
               const baseUrl = baseImageUrl?.trim();
-              if (!baseUrl || !extras.copyOverlay) return;
+              if (!baseUrl || !extras.copyOverlay) {
+          throw new Error("请先出无字底图并填写文案");
+        }
               const { url } = await composeEcomCopyOverlay({
                 baseImageUrl: baseUrl,
                 overlay: extras.copyOverlay,

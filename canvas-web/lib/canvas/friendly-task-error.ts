@@ -1,3 +1,9 @@
+import {
+  classifyGenerationUserFacingBucket,
+  formatGenerationUserMessage,
+  stripLeadingHttpStatusPrefix,
+} from "@private/generation-user-facing-error";
+
 /** 厂商 state 误写入 failCode/failMessage（如 success）· 非真实用户错误 */
 export function isMislabeledVendorSuccessError(
   failCode?: string | null,
@@ -307,7 +313,24 @@ export function formatCanvasTaskError(
   if (code === "USER_CANCELLED") {
     return "用户已中止生成";
   }
-  const msg = extractVendorErrorMessage(failMessage ?? "");
+  const msg = stripLeadingHttpStatusPrefix(
+    extractVendorErrorMessage(failMessage ?? ""),
+  );
+  const bucket = classifyGenerationUserFacingBucket({
+    failCode: code,
+    failMessage: msg || failMessage,
+  });
+  if (
+    bucket === "USER_CREDITS" ||
+    bucket === "PLATFORM_BILLING" ||
+    bucket === "VENDOR_QUEUE"
+  ) {
+    return formatGenerationUserMessage({
+      failCode: code,
+      failMessage: msg || failMessage,
+      modelKey,
+    });
+  }
   const blob = `${code} ${msg} ${failMessage ?? ""}`.toLowerCase();
 
   if (

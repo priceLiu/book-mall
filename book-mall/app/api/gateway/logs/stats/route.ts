@@ -11,6 +11,7 @@ import {
   computeDashboardSummaryCardsMerged,
   parseDashboardStatsParts,
 } from "@/lib/gateway/log-dashboard-projection";
+import { fetchGenerationHealthStats } from "@/lib/generation/generation-health-projection";
 import {
   buildDashboardLogWhere,
   dashboardLiveScopeKey,
@@ -48,6 +49,7 @@ export async function GET(request: NextRequest) {
     const needCategories = parts.has("categories");
     const needModels = parts.has("models");
     const needFailCodes = parts.has("failCodes");
+    const needGenerationHealth = parts.has("generationHealth");
     const needCharts = needCategories || needModels;
 
     const historyMode = isGatewayLogHistoryMode(query.mode);
@@ -111,6 +113,10 @@ export async function GET(request: NextRequest) {
         : await fetchDashboardFailCodeCounts(where);
       payload.failCodes = failStats.failCodes;
       payload.failedTotal = failStats.failedTotal;
+    }
+
+    if (needGenerationHealth) {
+      payload.generationHealth = await fetchGenerationHealthStats(where);
     }
 
     return NextResponse.json(payload);

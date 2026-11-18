@@ -22,6 +22,17 @@ const BREATH_KEYFRAMES = `
 }
 `;
 
+function parseFilmstripStepProgress(
+  label: string,
+): { done: number; total: number } | null {
+  const m = label.match(/(\d+)\s*\/\s*(\d+)/);
+  if (!m) return null;
+  const done = Number(m[1]);
+  const total = Number(m[2]);
+  if (!Number.isFinite(done) || !Number.isFinite(total) || total < 1) return null;
+  return { done: Math.min(Math.max(0, done), total), total };
+}
+
 /** 迷你剪辑台 · 仅视频轨横向呼吸（不纵向缩放） */
 export function ComposeMiniLoadingBreath({
   label = "正在生成时间线…",
@@ -32,6 +43,12 @@ export function ComposeMiniLoadingBreath({
   className?: string;
   labelClassName?: string;
 }) {
+  const step = parseFilmstripStepProgress(label);
+  const pct =
+    step && step.total > 0
+      ? Math.round((step.done / step.total) * 100)
+      : null;
+
   return (
     <div
       className={cn("relative h-full w-full overflow-hidden", className)}
@@ -47,6 +64,20 @@ export function ComposeMiniLoadingBreath({
         className="compose-video-lane-shimmer pointer-events-none absolute inset-y-2 inset-x-0 bg-gradient-to-r from-transparent via-sky-300/35 to-transparent"
         aria-hidden
       />
+
+      {pct != null ? (
+        <div
+          className="pointer-events-none absolute left-1/2 top-1/2 z-10 w-[min(72%,14rem)] -translate-x-1/2 -translate-y-1/2 space-y-2"
+          aria-hidden
+        >
+          <div className="h-1 w-full overflow-hidden rounded-full bg-white/15 shadow-inner">
+            <div
+              className="h-full rounded-full bg-sky-400/90 transition-[width] duration-300 ease-out"
+              style={{ width: `${Math.max(4, pct)}%` }}
+            />
+          </div>
+        </div>
+      ) : null}
 
       <div className="pointer-events-none absolute bottom-2 left-1/2 z-10 flex max-w-[min(92%,20rem)] -translate-x-1/2 items-center gap-2 rounded-full bg-black/60 px-3 py-1.5 shadow-md ring-1 ring-white/10">
         <Film className="size-4 shrink-0 text-yellow-300" strokeWidth={1.5} />

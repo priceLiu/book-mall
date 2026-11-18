@@ -96,6 +96,14 @@ import {
   ModelDailyLimitError,
   assertModelDailyLimitAllowed,
 } from "@/lib/gateway/model-daily-limit";
+import {
+  prismaUserFacingBucketFromFailure,
+  recordUserFacingBucketFeedback,
+} from "@/lib/generation/user-facing-error-log";
+import {
+  formatGenerationUserMessage,
+  type GenerationUserFacingBucket,
+} from "@private/generation-user-facing-error";
 
 export type { UsageFromResponse };
 
@@ -109,7 +117,13 @@ export function mapGatewayPreCreateLogError(e: unknown): { status: number; error
     return { status: 400, error: e.message };
   }
   if (e instanceof InsufficientCreditsError) {
-    return { status: 402, error: e.message };
+    return {
+      status: 402,
+      error: formatGenerationUserMessage({
+        failCode: "INSUFFICIENT_CREDITS",
+        failMessage: e.message,
+      }),
+    };
   }
   if (e instanceof VideoRiskError) {
     return { status: 429, error: e.message };
@@ -122,10 +136,22 @@ export function mapGatewayPreCreateLogError(e: unknown): { status: number; error
   }
   const billing = mapGatewayBillingFailure(e);
   if (billing.failCode === "INSUFFICIENT_CREDITS") {
-    return { status: 402, error: billing.failMessage };
+    return {
+      status: 402,
+      error: formatGenerationUserMessage({
+        failCode: billing.failCode,
+        failMessage: billing.failMessage,
+      }),
+    };
   }
   if (billing.failCode === "SYSTEM_BUSY") {
-    return { status: 503, error: billing.failMessage };
+    return {
+      status: 503,
+      error: formatGenerationUserMessage({
+        failCode: billing.failCode,
+        failMessage: billing.failMessage,
+      }),
+    };
   }
   if (e instanceof Error && e.message.trim()) {
     return { status: 500, error: e.message };
@@ -223,7 +249,7 @@ export async function createRequestLog(opts: {
   let riskPopup: string | undefined;
 
   // 团队共享积分池：余额不足则拒绝发起（用完即停）
-  await assertCreditsBeforeGenerate({
+  const creditGate = await assertCreditsBeforeGenerate({
     tenantId: opts.tenantId,
     actorBookUserId: opts.actorBookUserId,
     apiKeyId: opts.apiKeyId,
@@ -231,10 +257,14 @@ export async function createRequestLog(opts: {
     requestKind: opts.requestKind ?? route.requestKind,
     inputSummary: opts.inputSummary,
   });
+  const billingTenantId =
+    creditGate && "gatewayTenantId" in creditGate
+      ? creditGate.gatewayTenantId
+      : (opts.tenantId ?? null);
   // 视频专项风控（当前仅批量上限）
   if (isVideoReq) {
     const g = await guardVideoGenerate({
-      tenantId: opts.tenantId,
+      tenantId: billingTenantId,
       actorBookUserId: opts.actorBookUserId,
       apiKeyId: opts.apiKeyId,
       batchCount: 1,
@@ -266,7 +296,7 @@ export async function createRequestLog(opts: {
           : (opts.inputSummary ?? undefined),
       storyProjectId: opts.storyProjectId ?? undefined,
       storyTaskId: opts.storyTaskId ?? undefined,
-      tenantId: opts.tenantId ?? undefined,
+      tenantId: billingTenantId ?? undefined,
       actorBookUserId: opts.actorBookUserId ?? undefined,
       seatId: opts.seatId ?? undefined,
       billingMode,
@@ -288,6 +318,10 @@ export async function createRequestLog(opts: {
     } catch (e) {
       await releaseVideoGenerate(riskAccountId).catch(() => undefined);
       const { failCode, failMessage } = mapGatewayBillingFailure(e);
+      const userFacingBucket = prismaUserFacingBucketFromFailure({
+        failCode,
+        failMessage,
+      });
       await prisma.gatewayRequestLog
         .update({
           where: { id: log.id },
@@ -295,6 +329,7 @@ export async function createRequestLog(opts: {
             status: "FAILED",
             failCode,
             failMessage,
+            userFacingBucket,
             completedAt: new Date(),
           },
         })
@@ -416,6 +451,14 @@ export async function finalizeRequestLog(
         })
       : patch.failCode;
 
+  const userFacingBucket =
+    patch.status === "FAILED"
+      ? prismaUserFacingBucketFromFailure({
+          failCode: resolvedFailCode,
+          failMessage: patch.failMessage,
+        })
+      : undefined;
+
   await prisma.gatewayRequestLog.update({
     where: { id: logId },
     data: {
@@ -432,6 +475,7 @@ export async function finalizeRequestLog(
       resultSummary: patch.resultSummary ?? undefined,
       failMessage: patch.failMessage,
       failCode: resolvedFailCode,
+      userFacingBucket: userFacingBucket ?? undefined,
       externalTaskId: patch.externalTaskId,
       vendorRequestId: patch.vendorRequestId,
       completedAt,
@@ -513,7 +557,19 @@ export async function finalizeRequestLog(
       clientPage: log.clientPage,
       storyTaskId: log.storyTaskId,
       userId: log.userId,
+      userFacingBucket: userFacingBucket as GenerationUserFacingBucket | undefined,
     });
+    if (userFacingBucket) {
+      recordUserFacingBucketFeedback({
+        logId,
+        bucket: userFacingBucket as GenerationUserFacingBucket,
+        failCode: resolvedFailCode,
+        failMessage: patch.failMessage,
+        model: patch.model ?? log.model,
+        clientPage: log.clientPage,
+        userId: log.userId,
+      });
+    }
   }
 }
 

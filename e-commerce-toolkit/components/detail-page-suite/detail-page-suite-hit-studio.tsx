@@ -204,6 +204,7 @@ function DetailPageSuiteHitStudioInner() {
     burnCopyInImage?: boolean;
     baseImageUrl?: string | null;
     copyOverlay?: EcomCopyOverlay | null;
+    layoutComposedPreviewUrl?: string | null;
   } | null>(null);
   const [slotRewriteBusy, setSlotRewriteBusy] = useState(false);
   const [slotComposeBusy, setSlotComposeBusy] = useState(false);
@@ -1427,6 +1428,7 @@ function DetailPageSuiteHitStudioInner() {
                 burnCopyInImage,
                 baseImageUrl,
                 copyOverlay: slot?.copy_overlay ?? null,
+                layoutComposedPreviewUrl: slot?.layout_composed_preview_url ?? null,
               });
             }}
             onToggleModule={() => {}}
@@ -1587,6 +1589,7 @@ function DetailPageSuiteHitStudioInner() {
         showSlotCopyField
         baseImageUrl={promptEdit?.baseImageUrl ?? null}
         copyOverlay={promptEdit?.copyOverlay ?? null}
+        layoutComposedPreviewUrl={promptEdit?.layoutComposedPreviewUrl ?? null}
         exportWidthPx={
           project
             ? (ensureExportTargets(project.settings, project.brief?.platformCode).find((t) =>
@@ -1627,6 +1630,7 @@ function DetailPageSuiteHitStudioInner() {
                   burnCopyInImage: slot.burn_copy_in_image,
                   baseImageUrl: history[activeIdx]?.url?.trim() || promptEdit.baseImageUrl,
                   copyOverlay: slot.copy_overlay ?? null,
+                  layoutComposedPreviewUrl: slot.layout_composed_preview_url ?? null,
                 });
               }
               toast({ title: "已更新本条文案与提示词" });
@@ -1645,17 +1649,12 @@ function DetailPageSuiteHitStudioInner() {
           if (!open) setPromptEdit(null);
         }}
         onPreview={async (prompt, extras) => {
+          if (!promptEdit) throw new Error("编辑状态已失效，请关闭后重试");
+          const baseUrl = promptEdit.baseImageUrl?.trim();
+          if (!baseUrl || !extras.copyOverlay) {
+            throw new Error("请先出无字底图并填写模块文案");
+          }
           try {
-            if (!promptEdit) return;
-            const baseUrl = promptEdit.baseImageUrl?.trim();
-            if (!baseUrl || !extras.copyOverlay) {
-              await alert({
-                title: "无法预览",
-                message: "请先出无字底图并填写模块文案",
-                variant: "error",
-              });
-              return;
-            }
             const exportWidthPx =
               project
                 ? (ensureExportTargets(project.settings, project.brief?.platformCode).find((t) =>
@@ -1678,18 +1677,14 @@ function DetailPageSuiteHitStudioInner() {
               message: e instanceof Error ? e.message : "未知错误",
               variant: "error",
             });
+            throw e;
           }
         }}
         onConfirmCompose={async (prompt, extras, _ctx) => {
-          if (!promptEdit || !project) return;
+          if (!promptEdit || !project) throw new Error("编辑状态已失效，请关闭后重试");
           const baseUrl = promptEdit.baseImageUrl?.trim();
           if (!baseUrl || !extras.copyOverlay) {
-            await alert({
-              title: "无法保存",
-              message: "请先出无字底图并填写模块文案",
-              variant: "error",
-            });
-            return;
+            throw new Error("请先出无字底图并填写模块文案");
           }
           setSlotComposeBusy(true);
           try {
@@ -1707,6 +1702,8 @@ function DetailPageSuiteHitStudioInner() {
                 slot_copy: copy || undefined,
                 slot_copy_ai: copy ? s.slot_copy_ai ?? copy : s.slot_copy_ai,
                 copy_overlay: extras.copyOverlay,
+                layout_composed_preview_url:
+                  extras.layoutComposedPreviewUrl?.trim() || undefined,
                 burn_copy_in_image: false,
               };
               return { ...m, slots };
@@ -1730,6 +1727,7 @@ function DetailPageSuiteHitStudioInner() {
               message: e instanceof Error ? e.message : "未知错误",
               variant: "error",
             });
+            throw e;
           } finally {
             setSlotComposeBusy(false);
           }
@@ -1832,6 +1830,10 @@ function DetailPageSuiteHitStudioInner() {
                 slot_copy: copy || undefined,
                 slot_copy_ai: copy ? s.slot_copy_ai ?? copy : s.slot_copy_ai,
                 copy_overlay: extras.copyOverlay ?? s.copy_overlay,
+                layout_composed_preview_url:
+                  extras.layoutComposedPreviewUrl !== undefined
+                    ? extras.layoutComposedPreviewUrl?.trim() || undefined
+                    : s.layout_composed_preview_url,
                 burn_copy_in_image: false,
               };
             } else {
@@ -1843,7 +1845,21 @@ function DetailPageSuiteHitStudioInner() {
             suite: { ...project.suite, modules },
           });
           setProject(updated);
-          setPromptEdit(null);
+          setPromptEdit((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  prompt,
+                  slotCopy: extras?.slotCopy ?? prev.slotCopy,
+                  copyOverlay: extras?.copyOverlay ?? prev.copyOverlay,
+                  layoutComposedPreviewUrl:
+                    extras?.layoutComposedPreviewUrl !== undefined
+                      ? extras.layoutComposedPreviewUrl
+                      : prev.layoutComposedPreviewUrl,
+                }
+              : prev,
+          );
+          toast({ variant: "success", title: "已保存草稿" });
         }}
       />
 

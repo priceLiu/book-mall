@@ -126,6 +126,8 @@ export type DetailPageSuiteSlot = {
   slot_copy_ai?: string;
   burn_copy_in_image?: boolean;
   copy_overlay?: import("@/lib/detail-page-suite-copy-overlay").DetailPageSuiteCopyOverlay;
+  /** 排版草稿对应的合成预览 URL（与 copy_overlay 一并保存） */
+  layout_composed_preview_url?: string;
   source: "template" | "user";
   positive_prompt: string;
   negative_prompt?: string;

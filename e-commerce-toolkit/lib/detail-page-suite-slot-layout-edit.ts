@@ -26,6 +26,7 @@ export type DetailPageSuiteSlotPromptEditState = {
   burnCopyInImage?: boolean;
   baseImageUrl?: string | null;
   copyOverlay?: EcomCopyOverlay | null;
+  layoutComposedPreviewUrl?: string | null;
   promptRefUrls?: string[];
 };
 
@@ -62,6 +63,7 @@ export function buildDetailPageSuiteSlotPromptEditState(
     burnCopyInImage: burnCopyInImage ?? slot?.burn_copy_in_image,
     baseImageUrl,
     copyOverlay: slot?.copy_overlay ?? null,
+    layoutComposedPreviewUrl: slot?.layout_composed_preview_url ?? null,
     promptRefUrls: slot?.promptRefUrls ?? [],
   };
 }
@@ -90,6 +92,10 @@ export function patchSuiteModulesSlotPrompt(
         slot_copy: copy || undefined,
         slot_copy_ai: copy ? s.slot_copy_ai ?? copy : s.slot_copy_ai,
         copy_overlay: extras.copyOverlay ?? s.copy_overlay,
+        layout_composed_preview_url:
+          extras.layoutComposedPreviewUrl !== undefined
+            ? extras.layoutComposedPreviewUrl?.trim() || undefined
+            : s.layout_composed_preview_url,
         burn_copy_in_image: false,
       };
     } else {

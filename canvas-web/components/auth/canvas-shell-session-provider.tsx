@@ -19,6 +19,7 @@ import {
 } from "@/lib/map-fetch-tools-session";
 import type { ToolShellSession } from "@/lib/tool-shell-session-types";
 import { GUEST_TOOL_SHELL_SESSION } from "@/lib/tool-shell-session-types";
+import { dispatchPlatformCreditsBalanceRefresh } from "@/lib/canvas/canvas-credits-balance-events";
 import {
   getCachedToolsSession,
   readToolsSessionOkHint,
@@ -125,6 +126,20 @@ export function CanvasShellSessionProvider({ children }: { children: ReactNode }
     return () =>
       window.removeEventListener("canvas:tools-session-refreshed", onRefresh);
   }, [refreshLite]);
+
+  useEffect(() => {
+    /** 主站充值 checkout 回跳（含 bfcache 前进后退）后立即拉 introspect，避免顶栏/门禁仍用旧余额 */
+    const onPageShow = (ev: PageTransitionEvent) => {
+      void refreshFull().then(() => {
+        dispatchPlatformCreditsBalanceRefresh();
+      });
+      if (ev.persisted) {
+        window.dispatchEvent(new CustomEvent("canvas:tools-session-refreshed"));
+      }
+    };
+    window.addEventListener("pageshow", onPageShow);
+    return () => window.removeEventListener("pageshow", onPageShow);
+  }, [refreshFull]);
 
   const value = useMemo(
     () => ({

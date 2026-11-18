@@ -205,6 +205,14 @@ export async function getAccountCreditBalances(ref: AccountRef): Promise<Account
   };
 }
 
+/**
+ * 可用于新一次冻结/扣减的积分（与 writeLedger RESERVE 检查的 balanceCredits 一致）。
+ * RESERVE 已从 balance 划出并记入 reserved，勿再减 reserved（否则会重复扣减，充值后仍误报不足）。
+ */
+export function spendableCreditBalance(snap: AccountCreditBalances): number {
+  return Math.max(0, snap.balance);
+}
+
 export class InsufficientCreditsError extends Error {
   constructor(public readonly balance: number, public readonly needed: number) {
     super(`积分不足：余额 ${balance}，需要 ${needed}`);

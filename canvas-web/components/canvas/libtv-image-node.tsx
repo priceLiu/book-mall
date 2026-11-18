@@ -13,7 +13,6 @@ import {
   GENERATION_CANCEL_CONFIRM_MESSAGE,
   GENERATION_CANCEL_CONFIRM_TITLE,
 } from "@/lib/canvas/canvas-generation-cancel-messages";
-import { confirmOpenTopupCheckout } from "@/lib/platform-billing/open-topup-checkout";
 import { scheduleCanvasImageUpload } from "@/lib/canvas/canvas-image-preview-upload";
 import { useCanvasStore } from "@/lib/canvas/store";
 import { CANVAS_SEMANTIC_STATUS_CLASS } from "@/lib/canvas/canvas-chrome-semantics";
@@ -97,7 +96,7 @@ import {
 import { LibtvNodeErrorBanner } from "./libtv-node-error-banner";
 import { useLibtvRuntimeErrorBanner } from "@/lib/canvas/use-libtv-runtime-error-banner";
 import {
-  libtvRuntimeErrorAlertTitle,
+  showLibtvRuntimeFailureDialog,
   useLibtvRuntimeErrorAlert,
 } from "@/lib/canvas/libtv-runtime-error-alert";
 import { isMislabeledVendorSuccessError } from "@/lib/canvas/friendly-task-error";
@@ -454,20 +453,10 @@ export function LibtvImageNode({
         Boolean(d.pro2ControllerNodeId?.trim())
       ),
     onAlert: ({ message, failCode }) => {
-      if (
-        failCode === "INSUFFICIENT_CREDITS" ||
-        message.includes("积分不足") ||
-        message.includes("积分不够")
-      ) {
-        void confirmOpenTopupCheckout(confirm);
-        return;
-      }
-      void alert({
-        title: libtvRuntimeErrorAlertTitle(failCode, message, "image"),
-        message,
-        variant: "error",
-        dismissOnly: true,
-      });
+      void showLibtvRuntimeFailureDialog(
+        { alert, confirm },
+        { message, failCode, kind: "image" },
+      );
     },
   });
   const inpaintSession = isLibtvInpaintSessionActive(d as Record<string, unknown>)

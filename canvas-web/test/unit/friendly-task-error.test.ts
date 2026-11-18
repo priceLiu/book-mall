@@ -163,6 +163,18 @@ describe("formatCanvasTaskError", () => {
     ).toContain("平台积分不足");
   });
 
+  it("strips 402 prefix from insufficient credit task message", () => {
+    expect(
+      formatCanvasTaskError(
+        "REQUEST_FAILED",
+        "402, 积分不足：余额 405.23，需要 450",
+        "nano-banana-pro",
+      ),
+    ).toBe(
+      "积分不足：余额 405.23，需要 450。请前往主站充值后重试。",
+    );
+  });
+
   it("Kling image product-not-activated points to Bailian not KIE", () => {
     expect(
       formatCanvasTaskError(

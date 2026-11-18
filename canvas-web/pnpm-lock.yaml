@@ -17,6 +17,9 @@ importers:
       '@private/federated-portal-nav':
         specifier: file:../shared/federated-portal-nav
         version: file:../shared/federated-portal-nav(react@18.3.1)
+      '@private/generation-user-facing-error':
+        specifier: file:../shared/generation-user-facing-error
+        version: file:../shared/generation-user-facing-error
       '@private/media-render-subtitle-style':
         specifier: file:../shared/media-render-subtitle-style
         version: file:../shared/media-render-subtitle-style(react@18.3.1)
@@ -311,6 +314,9 @@ packages:
     resolution: {directory: ../shared/federated-portal-nav, type: directory}
     peerDependencies:
       react: ^18
+
+  '@private/generation-user-facing-error@file:../shared/generation-user-facing-error':
+    resolution: {directory: ../shared/generation-user-facing-error, type: directory}
 
   '@private/media-render-subtitle-style@file:../shared/media-render-subtitle-style':
     resolution: {directory: ../shared/media-render-subtitle-style, type: directory}
@@ -3064,6 +3070,8 @@ snapshots:
   '@private/federated-portal-nav@file:../shared/federated-portal-nav(react@18.3.1)':
     dependencies:
       react: 18.3.1
+
+  '@private/generation-user-facing-error@file:../shared/generation-user-facing-error': {}
 
   '@private/media-render-subtitle-style@file:../shared/media-render-subtitle-style(react@18.3.1)':
     dependencies:

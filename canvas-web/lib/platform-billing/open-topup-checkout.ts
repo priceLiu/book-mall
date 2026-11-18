@@ -37,11 +37,15 @@ export async function confirmOpenTopupCheckout(
     confirmLabel?: string;
     cancelLabel?: string;
   }) => Promise<boolean>,
+  opts?: { detailMessage?: string | null },
 ): Promise<void> {
   const href = buildCanvasTopupHref();
+  const detail = opts?.detailMessage?.trim();
   const ok = await confirm({
     title: "积分不足",
-    message: "平台积分不足，是否前往主站充值？充值完成后将自动回到当前页面。",
+    message: detail
+      ? `${detail}\n\n是否前往主站充值？充值完成后将自动回到当前页面。`
+      : "平台积分不足，是否前往主站充值？充值完成后将自动回到当前页面。",
     confirmLabel: "去充值",
     cancelLabel: "取消",
   });

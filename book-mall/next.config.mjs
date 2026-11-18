@@ -23,6 +23,7 @@ const nextConfig = {
     "@private/media-render-subtitle-style",
     "@private/platform-assistant",
     "@private/ecom-copy-overlay",
+    "@private/generation-user-facing-error",
   ],
   async redirects() {
     return [

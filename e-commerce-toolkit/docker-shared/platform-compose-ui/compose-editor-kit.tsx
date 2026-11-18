@@ -3233,6 +3233,8 @@ export function ComposeMiniTimelinePanel({
               toggleComposeAudioClipPlaybackMuted(prev, clipId),
             )
           }
+          videoLaneLoading={loading}
+          videoLaneLoadingLabel={loadingLabel}
         />
       </div>
       </div>
@@ -3407,7 +3409,7 @@ export function ComposeEditorFullscreen({
 
   const selectedVideoUrl = selected?.videoUrl?.trim() ?? "";
   const filmstripProgress = loadingLabel?.trim() ?? "";
-  const timelineReady = true;
+  const timelineReady = !loading;
 
   const pushUndoSnapshot = useCallback(() => {
     undoStackRef.current.push(cloneWorkbenchState(workbench));
@@ -3810,6 +3812,19 @@ export function ComposeEditorFullscreen({
       aria-label="卡点成片剪辑"
       onPointerDown={(e) => e.stopPropagation()}
     >
+      {!timelineReady ? (
+        <div className="pointer-events-none absolute inset-0 z-[2100] flex flex-col items-center justify-center gap-3 bg-[#0d0d0d]/88">
+          <Loader2 className="size-8 animate-spin text-white/75" />
+          <p
+            className={cn(
+              "text-sm tabular-nums",
+              brightChrome ? "text-white" : "text-yellow-300/90",
+            )}
+          >
+            {loadingLabel?.trim() || "正在加载时间线与缩略图…"}
+          </p>
+        </div>
+      ) : null}
       <header className="flex shrink-0 flex-col border-b border-white/10">
         <div className="flex items-center justify-between gap-3 px-4 py-2">
           <div className="flex min-w-0 flex-1 items-center gap-3">
@@ -4207,6 +4222,8 @@ export function ComposeEditorFullscreen({
               trimDisabled={!selected?.videoUrl || !timelineReady || !playheadInSelected}
               deleteDisabled={!selectedId || ordered.length <= 1}
               undoDisabled={undoDepth < 1}
+              videoLaneLoading={loading}
+              videoLaneLoadingLabel={loadingLabel}
             />
           </div>
         </section>

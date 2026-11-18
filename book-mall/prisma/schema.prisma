@@ -3192,6 +3192,14 @@ enum GatewayRequestStatus {
   CANCELLED
 }
 
+/// 生成失败 · 用户可见四类（a/b/c/d）
+enum GenerationUserFacingBucket {
+  USER_CREDITS
+  PLATFORM_BILLING
+  VENDOR_INPUT
+  VENDOR_QUEUE
+}
+
 enum GatewayMetricsSource {
   VENDOR
   PLATFORM
@@ -3387,6 +3395,7 @@ model GatewayRequestLog {
   resultSummary Json?
   failCode      String?
   failMessage   String? @db.Text
+  userFacingBucket GenerationUserFacingBucket?
 
   submittedAt  DateTime  @default(now())
   completedAt  DateTime?
@@ -3420,6 +3429,7 @@ model GatewayRequestLog {
   @@index([settlementKind, submittedAt])
   @@index([actorBookUserId, settlementKind])
   @@index([billingCategory, submittedAt])
+  @@index([userFacingBucket, submittedAt])
 }
 
 /// 平台错误追踪（Canvas / Gateway / Book 等；轻量运维日志，非 GatewayRequestLog 替代）
@@ -3577,6 +3587,7 @@ model GatewayRequestLogArchive {
   resultSummary Json?
   failCode      String?
   failMessage   String? @db.Text
+  userFacingBucket GenerationUserFacingBucket?
 
   submittedAt  DateTime  @default(now())
   completedAt  DateTime?

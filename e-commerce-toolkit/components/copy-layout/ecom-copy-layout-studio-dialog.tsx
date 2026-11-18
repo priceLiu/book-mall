@@ -12,8 +12,10 @@ import {
   type EcomCopyOverlay,
   type EcomCopyOverlayCanvasHandle,
 } from "@private/ecom-copy-overlay";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
+import { EcomMediaGeneratingBusy } from "@/components/media/ecom-media-generating-busy";
+import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { cn } from "@/lib/utils";
 
 /** 与右栏 360px 底栏两列按钮同宽同高：(360 - 24 - 8) / 2 */
@@ -45,6 +47,7 @@ export type EcomCopyLayoutStudioSaveExtras = {
   slotCopy?: string;
   copyOverlay?: EcomCopyOverlay;
   burnCopyInImage?: boolean;
+  layoutComposedPreviewUrl?: string | null;
 };
 
 export type EcomCopyLayoutStudioPreviewResult = {
@@ -52,6 +55,40 @@ export type EcomCopyLayoutStudioPreviewResult = {
 };
 
 type WorkbenchView = "edit" | "preview";
+
+type LayoutStudioTask = "idle" | "preview" | "draft" | "apply";
+
+const LAYOUT_TASK_LABEL: Record<Exclude<LayoutStudioTask, "idle">, string> = {
+  preview: "正在生成预览…",
+  draft: "正在保存草稿…",
+  apply: "正在合成并保存…",
+};
+
+type EditorBaseline = {
+  prompt: string;
+  overlayJson: string;
+  previewUrl: string | null;
+};
+
+function editorBaselineSnapshot(input: {
+  prompt: string;
+  overlay: EcomCopyOverlay;
+  previewUrl: string | null;
+}): EditorBaseline {
+  return {
+    prompt: input.prompt.trim(),
+    overlayJson: JSON.stringify(input.overlay),
+    previewUrl: input.previewUrl,
+  };
+}
+
+function editorBaselineDirty(current: EditorBaseline, baseline: EditorBaseline): boolean {
+  return (
+    current.prompt !== baseline.prompt ||
+    current.overlayJson !== baseline.overlayJson ||
+    current.previewUrl !== baseline.previewUrl
+  );
+}
 
 type Props = {
   open: boolean;
@@ -62,6 +99,8 @@ type Props = {
   slotCopy?: string;
   slotCopyAi?: string;
   copyOverlay?: EcomCopyOverlay | null;
+  /** 上次保存草稿时附带的合成预览，重进后可继续「保存使用」 */
+  layoutComposedPreviewUrl?: string | null;
   exportWidthPx?: number;
   aspectClassName?: string;
   saving?: boolean;
@@ -168,6 +207,7 @@ export function EcomCopyLayoutStudioDialog({
   slotCopy = "",
   slotCopyAi = "",
   copyOverlay = null,
+  layoutComposedPreviewUrl = null,
   exportWidthPx = 750,
   aspectClassName = "aspect-[3/4]",
   saving = false,
@@ -187,6 +227,7 @@ export function EcomCopyLayoutStudioDialog({
   rightColumnExtras,
   zClassName,
 }: Props) {
+  const { unsavedLayoutClose, alert } = useDialogs();
   const [promptDraft, setPromptDraft] = useState(imagePrompt);
   const [sourcePromptText, setSourcePromptText] = useState(sourcePrompt ?? imagePrompt);
   const [overlay, setOverlay] = useState<EcomCopyOverlay>(() =>
@@ -200,16 +241,19 @@ export function EcomCopyLayoutStudioDialog({
   const [selectedLayerId, setSelectedLayerId] = useState<string | null>("main");
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewStale, setPreviewStale] = useState(false);
-  const [localPreviewBusy, setLocalPreviewBusy] = useState(false);
+  const [layoutTask, setLayoutTask] = useState<LayoutStudioTask>("idle");
+  const layoutTaskLockRef = useRef(false);
   const [regenBusy, setRegenBusy] = useState(false);
   const [workbenchView, setWorkbenchView] = useState<WorkbenchView>("edit");
   const canvasRef = useRef<EcomCopyOverlayCanvasHandle>(null);
+  const savedBaselineRef = useRef<EditorBaseline | null>(null);
 
   const aiCopy = slotCopyAi.trim();
   const selectedLayer = overlay.layers.find((l) => l.id === selectedLayerId) ?? overlay.layers[0];
   const twoStepCompose = Boolean(onPreview);
-  const previewBusy = previewing || localPreviewBusy;
-  const busy = saving || composing || previewBusy || regenBusy;
+  const layoutTaskBusy = layoutTask !== "idle";
+  const busy =
+    layoutTaskBusy || saving || composing || previewing || regenBusy;
 
   const wasOpenRef = useRef(false);
   const incomingPromptRef = useRef(imagePrompt);
@@ -228,9 +272,17 @@ export function EcomCopyLayoutStudioDialog({
       baseUrlRef.current = baseImageUrl;
       setOverlay(next);
       setSelectedLayerId(next.layers[0]?.id ?? "main");
-      setPreviewUrl(null);
+      const restoredPreview = layoutComposedPreviewUrl?.trim() || null;
+      setPreviewUrl(restoredPreview);
       setPreviewStale(false);
-      setWorkbenchView("edit");
+      setWorkbenchView(restoredPreview ? "preview" : "edit");
+      setLayoutTask("idle");
+      layoutTaskLockRef.current = false;
+      savedBaselineRef.current = editorBaselineSnapshot({
+        prompt: imagePrompt,
+        overlay: next,
+        previewUrl: restoredPreview,
+      });
     } else if (open && incomingPromptRef.current !== imagePrompt) {
       incomingPromptRef.current = imagePrompt;
       setPromptDraft(imagePrompt);
@@ -241,16 +293,41 @@ export function EcomCopyLayoutStudioDialog({
       setWorkbenchView("edit");
     }
     wasOpenRef.current = open;
-  }, [open, imagePrompt, sourcePrompt, slotCopy, copyOverlay, exportWidthPx, baseImageUrl]);
+  }, [
+    open,
+    imagePrompt,
+    sourcePrompt,
+    slotCopy,
+    copyOverlay,
+    layoutComposedPreviewUrl,
+    exportWidthPx,
+    baseImageUrl,
+  ]);
 
   const saveExtras = useMemo(
     (): EcomCopyLayoutStudioSaveExtras => ({
       slotCopy: primarySlotCopyFromOverlay(overlay),
       copyOverlay: overlay,
       burnCopyInImage: false,
+      layoutComposedPreviewUrl: previewUrl,
     }),
-    [overlay],
+    [overlay, previewUrl],
   );
+
+  const markSavedBaseline = useCallback(() => {
+    savedBaselineRef.current = editorBaselineSnapshot({
+      prompt: promptDraft,
+      overlay,
+      previewUrl,
+    });
+  }, [overlay, previewUrl, promptDraft]);
+
+  const hasUnsavedEdits = useCallback(() => {
+    const baseline = savedBaselineRef.current;
+    if (!baseline) return false;
+    const current = editorBaselineSnapshot({ prompt: promptDraft, overlay, previewUrl });
+    return editorBaselineDirty(current, baseline);
+  }, [overlay, previewUrl, promptDraft]);
 
   const markPreviewStale = () => {
     if (previewUrl) setPreviewStale(true);
@@ -268,10 +345,33 @@ export function EcomCopyLayoutStudioDialog({
     return canvasRef.current?.overlayWithMeasuredLayout() ?? overlay;
   };
 
-  const handleGeneratePreview = async () => {
+  const runLayoutTask = useCallback(
+    async (phase: Exclude<LayoutStudioTask, "idle">, work: () => Promise<void>) => {
+      if (layoutTaskLockRef.current) return;
+      layoutTaskLockRef.current = true;
+      setLayoutTask(phase);
+      try {
+        await work();
+      } catch (e) {
+        const title =
+          phase === "preview" ? "预览失败" : phase === "draft" ? "保存草稿失败" : "保存使用失败";
+        await alert({
+          title,
+          message: e instanceof Error ? e.message : "请稍后重试",
+          variant: "error",
+        });
+        throw e;
+      } finally {
+        layoutTaskLockRef.current = false;
+        setLayoutTask("idle");
+      }
+    },
+    [alert],
+  );
+
+  const handleGeneratePreview = useCallback(async () => {
     if (!onPreview || !baseImageUrl) return;
-    setLocalPreviewBusy(true);
-    try {
+    await runLayoutTask("preview", async () => {
       if (workbenchView === "preview") setWorkbenchView("edit");
       const measured = await measureOverlayFromCanvas();
       const extras: EcomCopyLayoutStudioSaveExtras = {
@@ -279,16 +379,22 @@ export function EcomCopyLayoutStudioDialog({
         copyOverlay: measured,
       };
       const result = await onPreview(promptDraft.trim(), extras);
-      if (result?.previewUrl) {
-        setPreviewUrl(result.previewUrl);
-        setOverlay(measured);
-        setPreviewStale(false);
-        setWorkbenchView("preview");
+      if (!result?.previewUrl?.trim()) {
+        throw new Error("未获取到预览图，请稍后重试");
       }
-    } finally {
-      setLocalPreviewBusy(false);
-    }
-  };
+      setPreviewUrl(result.previewUrl);
+      setOverlay(measured);
+      setPreviewStale(false);
+      setWorkbenchView("preview");
+    });
+  }, [
+    baseImageUrl,
+    onPreview,
+    promptDraft,
+    runLayoutTask,
+    saveExtras,
+    workbenchView,
+  ]);
 
   const handleRegenerateImage = async () => {
     if (!onRegenerateImage) return;
@@ -302,21 +408,96 @@ export function EcomCopyLayoutStudioDialog({
     }
   };
 
-  const handleConfirmCompose = async () => {
+  const handleConfirmCompose = useCallback(async () => {
     if (!previewUrl) return;
     const handler = onConfirmCompose ?? onCompose;
     if (!handler) return;
-    const measured = await measureOverlayFromCanvas();
-    const extras: EcomCopyLayoutStudioSaveExtras = {
-      ...saveExtras,
-      copyOverlay: measured,
-    };
-    if (onConfirmCompose) {
-      await onConfirmCompose(promptDraft.trim(), extras, { previewUrl });
-    } else {
-      await onCompose!(promptDraft.trim(), extras);
+    return runLayoutTask("apply", async () => {
+      if (previewStale) {
+        throw new Error("排版已变更，请先重新生成预览");
+      }
+      const measured = await measureOverlayFromCanvas();
+      const extras: EcomCopyLayoutStudioSaveExtras = {
+        ...saveExtras,
+        copyOverlay: measured,
+        layoutComposedPreviewUrl: previewUrl,
+      };
+      if (onConfirmCompose) {
+        await onConfirmCompose(promptDraft.trim(), extras, { previewUrl });
+      } else {
+        await onCompose!(promptDraft.trim(), extras);
+      }
+      markSavedBaseline();
+    });
+  }, [
+    markSavedBaseline,
+    onCompose,
+    onConfirmCompose,
+    previewStale,
+    previewUrl,
+    promptDraft,
+    runLayoutTask,
+    saveExtras,
+  ]);
+
+  const canApplySavedPreview = Boolean(
+    previewUrl && !previewStale && (onConfirmCompose ?? onCompose),
+  );
+
+  const saveDraft = useCallback(async () => {
+    if (!promptDraft.trim()) return;
+    await runLayoutTask("draft", async () => {
+      const measured = await measureOverlayFromCanvas();
+      const extras: EcomCopyLayoutStudioSaveExtras = {
+        ...saveExtras,
+        copyOverlay: measured,
+        layoutComposedPreviewUrl: previewUrl,
+      };
+      await onSave(promptDraft.trim(), extras);
+      setOverlay(measured);
+      markSavedBaseline();
+    });
+  }, [markSavedBaseline, onSave, previewUrl, promptDraft, runLayoutTask, saveExtras]);
+
+  const requestClose = useCallback(async () => {
+    if (layoutTaskBusy) return;
+    if (!hasUnsavedEdits()) {
+      onOpenChange(false);
+      return;
     }
-  };
+    const choice = await unsavedLayoutClose({
+      applyDisabled: !canApplySavedPreview,
+      message: !canApplySavedPreview
+        ? "当前有未保存的排版。可先存草稿；要「保存使用」需先生成预览且与当前排版一致。"
+        : undefined,
+    });
+    if (choice === "stay") return;
+    if (choice === "draft") {
+      try {
+        await saveDraft();
+        onOpenChange(false);
+      } catch {
+        /* 进度条与 alert 已提示，保持编辑窗 */
+      }
+      return;
+    }
+    if (choice === "apply") {
+      try {
+        await handleConfirmCompose();
+        onOpenChange(false);
+      } catch {
+        /* 保持编辑窗 */
+      }
+    }
+  }, [
+    canApplySavedPreview,
+    handleConfirmCompose,
+    hasUnsavedEdits,
+    layoutTaskBusy,
+    onOpenChange,
+    saveDraft,
+    unsavedLayoutClose,
+  ]);
 
   const visibleRefs = referenceImages.filter((item) => item.url.trim());
 
@@ -325,7 +506,7 @@ export function EcomCopyLayoutStudioDialog({
       open={open}
       zClassName={zClassName ?? "z-[280]"}
       title={title}
-      onClose={() => onOpenChange(false)}
+      onClose={() => void requestClose()}
       headerLeading={<EditorBrandMark />}
       headerCenter={
         twoStepCompose ? (
@@ -381,7 +562,7 @@ export function EcomCopyLayoutStudioDialog({
         ) : null
       }
       center={
-        <>
+        <div className="relative flex min-h-0 flex-1 flex-col">
           <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden p-4">
             <EcomCopyOverlayCanvas
               ref={canvasRef}
@@ -412,7 +593,15 @@ export function EcomCopyLayoutStudioDialog({
               </button>
             </div>
           ) : null}
-        </>
+          {layoutTask !== "idle" ? (
+            <EcomMediaGeneratingBusy
+              label={LAYOUT_TASK_LABEL[layoutTask]}
+              progress={null}
+              background="overlay"
+              className="z-30"
+            />
+          ) : null}
+        </div>
       }
       right={
         <>
@@ -459,7 +648,7 @@ export function EcomCopyLayoutStudioDialog({
             type="button"
             className={editorGhostBtn}
             disabled={busy}
-            onClick={() => onOpenChange(false)}
+            onClick={() => void requestClose()}
           >
             取消
           </button>
@@ -469,9 +658,9 @@ export function EcomCopyLayoutStudioDialog({
                 type="button"
                 className={editorGhostBtn}
                 disabled={busy || !promptDraft.trim()}
-                onClick={() => void onSave(promptDraft.trim(), saveExtras)}
+                onClick={() => void saveDraft()}
               >
-                {saving ? "保存中…" : "仅保存草稿"}
+                {layoutTask === "draft" ? "保存中…" : "保存草稿"}
               </button>
               <button
                 type="button"
@@ -479,7 +668,7 @@ export function EcomCopyLayoutStudioDialog({
                 disabled={busy || !baseImageUrl || !overlayHasAnyCopy(overlay)}
                 onClick={() => void handleGeneratePreview()}
               >
-                {previewBusy ? "生成中…" : "生成预览"}
+                {layoutTask === "preview" ? "生成中…" : "生成预览"}
               </button>
               <button
                 type="button"
@@ -492,7 +681,7 @@ export function EcomCopyLayoutStudioDialog({
                 }
                 onClick={() => void handleConfirmCompose()}
               >
-                {composing ? "保存中…" : "保存并关闭"}
+                {layoutTask === "apply" ? "保存中…" : "保存使用"}
               </button>
             </>
           ) : (

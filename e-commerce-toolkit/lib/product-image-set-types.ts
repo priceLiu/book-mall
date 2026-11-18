@@ -34,6 +34,7 @@ export type ProductImageSetSlot = {
   promptEdited?: boolean;
   slotCopy?: string;
   copyOverlay?: EcomCopyOverlay;
+  layoutComposedPreviewUrl?: string;
 };
 
 export type ProductImageSetStructureCounts = {

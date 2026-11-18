@@ -12,6 +12,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@private/generation-user-facing-error": "file:../shared/generation-user-facing-error",
     "@private/ecom-copy-overlay": "file:../shared/ecom-copy-overlay",
     "@private/federated-portal-logout": "file:../shared/federated-portal-logout",
     "@private/federated-portal-nav": "file:../shared/federated-portal-nav",

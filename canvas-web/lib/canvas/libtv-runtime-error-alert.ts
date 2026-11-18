@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 
 import { formatCanvasTaskError } from "./friendly-task-error";
+import { confirmOpenTopupCheckout } from "@/lib/platform-billing/open-topup-checkout";
 
 const STORAGE_PREFIX = "canvas-libtv-error-alert:";
 
@@ -51,6 +52,60 @@ export function libtvRuntimeErrorAlertScope(): string {
 }
 
 export type LibtvRuntimeErrorMediaKind = "image" | "video";
+
+export function isLibtvInsufficientCreditsError(
+  failCode?: string,
+  message?: string,
+): boolean {
+  const msg = message ?? "";
+  return (
+    failCode?.trim() === "INSUFFICIENT_CREDITS" ||
+    msg.includes("积分不足") ||
+    msg.includes("积分不够")
+  );
+}
+
+type LibtvRuntimeFailureDialogOpts = {
+  alert: (opts: {
+    title?: string;
+    message: string;
+    variant?: "error" | "info" | "success" | "warning";
+    dismissOnly?: boolean;
+  }) => Promise<void>;
+  confirm: (opts: {
+    title?: string;
+    message: string;
+    confirmLabel?: string;
+    cancelLabel?: string;
+  }) => Promise<boolean>;
+};
+
+/** 生成失败弹层：积分不足 → 去充值确认；其余 → dismissOnly 错误提示 */
+export async function showLibtvRuntimeFailureDialog(
+  deps: LibtvRuntimeFailureDialogOpts,
+  payload: {
+    message: string;
+    failCode?: string;
+    kind?: LibtvRuntimeErrorMediaKind;
+  },
+): Promise<void> {
+  if (isLibtvInsufficientCreditsError(payload.failCode, payload.message)) {
+    await confirmOpenTopupCheckout(deps.confirm, {
+      detailMessage: payload.message,
+    });
+    return;
+  }
+  await deps.alert({
+    title: libtvRuntimeErrorAlertTitle(
+      payload.failCode,
+      payload.message,
+      payload.kind,
+    ),
+    message: payload.message,
+    variant: "error",
+    dismissOnly: true,
+  });
+}
 
 export function libtvRuntimeErrorAlertTitle(
   failCode?: string,

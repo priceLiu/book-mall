@@ -916,19 +916,13 @@ export function PosterStudio({ initialProjectId }: { initialProjectId?: string }
               plan: { ...project.plan, artifacts },
             });
             applyProject(updated);
-            setLayoutOpen(false);
-            toast({ variant: "success", title: "已保存文案与排版" });
+            toast({ variant: "success", title: "已保存草稿" });
           }}
           onPreview={async (prompt, extras) => {
             try {
               const baseUrl = layoutArtifact.image.baseImageUrl?.trim();
               if (!baseUrl || !extras.copyOverlay) {
-                await alert({
-                  title: "无法预览",
-                  message: "请先出无字底图并填写文案",
-                  variant: "error",
-                });
-                return;
+                throw new Error("请先出无字底图并填写文案");
               }
               const multiBlock =
                 (extras.copyOverlay.layers.length ?? 0) > 1 ||
@@ -946,6 +940,7 @@ export function PosterStudio({ initialProjectId }: { initialProjectId?: string }
                 message: e instanceof Error ? e.message : "请稍后重试",
                 variant: "error",
               });
+              throw e;
             }
           }}
           onConfirmCompose={async (prompt, extras) => {
@@ -989,6 +984,7 @@ export function PosterStudio({ initialProjectId }: { initialProjectId?: string }
                 message: e instanceof Error ? e.message : "请稍后重试",
                 variant: "error",
               });
+              throw e;
             } finally {
               setBusy(false);
             }

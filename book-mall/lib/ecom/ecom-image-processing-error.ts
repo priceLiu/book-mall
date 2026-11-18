@@ -1,3 +1,7 @@
+import {
+  classifyGenerationUserFacingBucket,
+  formatGenerationUserMessage,
+} from "@private/generation-user-facing-error";
 import { GatewayRequiredError } from "@/lib/gateway/book-gateway-link";
 import {
   classifyGatewaySubmitError,
@@ -136,6 +140,23 @@ export function formatEcomImageProcessingUserError(error: unknown): {
       message:
         "读取基准主形象或线稿失败（URL 不可达或已过期）。请重新生成并定稿第 1 步主形象，或重新上传线稿后再试。",
       status: 400,
+    };
+  }
+
+  const failCode = classified.failCode;
+  const bucket = classifyGenerationUserFacingBucket({
+    failCode,
+    failMessage: raw,
+    httpStatus: classified.httpStatus,
+  });
+  if (bucket !== "VENDOR_INPUT") {
+    return {
+      message: formatGenerationUserMessage({
+        failCode,
+        failMessage: raw,
+        httpStatus: classified.httpStatus,
+      }),
+      status: classified.httpStatus && classified.httpStatus >= 400 ? classified.httpStatus : 500,
     };
   }
 

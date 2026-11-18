@@ -287,6 +287,12 @@ export function ProductImageSetSlotWorkspace({
             promptEdited: true,
             slotCopy: extras?.slotCopy ?? row.slotCopy,
             copyOverlay: extras?.copyOverlay ?? row.copyOverlay,
+            ...(extras?.layoutComposedPreviewUrl !== undefined
+              ? {
+                  layoutComposedPreviewUrl:
+                    extras.layoutComposedPreviewUrl?.trim() || undefined,
+                }
+              : {}),
             ...(composedImageUrl ? { imageUrl: composedImageUrl } : {}),
           }
         : row,
@@ -437,6 +443,7 @@ export function ProductImageSetSlotWorkspace({
             baseImageUrl={promptRow.imageUrl ?? null}
             slotCopy={promptRow.slotCopy ?? promptRow.title}
             copyOverlay={promptRow.copyOverlay ?? null}
+            layoutComposedPreviewUrl={promptRow.layoutComposedPreviewUrl ?? null}
             ratio={ratio}
             exportWidthPx={productDesignGenSlotExportWidth(ratio)}
             referenceImages={promptMentionRefs}
@@ -447,7 +454,6 @@ export function ProductImageSetSlotWorkspace({
             }}
             onSave={async (prompt, extras) => {
               await commitSlotLayout(promptRow.id, prompt, extras);
-              setPromptSlotId(null);
             }}
             onConfirmCompose={async (prompt, extras, url) => {
               await commitSlotLayout(promptRow.id, prompt, extras, url);

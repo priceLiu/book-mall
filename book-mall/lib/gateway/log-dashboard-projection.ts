@@ -538,7 +538,12 @@ export async function fetchDashboardChartStats(
   return { byCategory, byModel };
 }
 
-export type DashboardStatsParts = "summary" | "categories" | "models" | "failCodes";
+export type DashboardStatsParts =
+  | "summary"
+  | "categories"
+  | "models"
+  | "failCodes"
+  | "generationHealth";
 
 export function parseDashboardStatsParts(
   raw: string | null | undefined,
@@ -554,9 +559,10 @@ export function parseDashboardStatsParts(
       t === "summary" ||
       t === "categories" ||
       t === "models" ||
-      t === "failCodes"
+      t === "failcodes" ||
+      t === "generationhealth"
     ) {
-      parts.add(t);
+      parts.add(t === "failcodes" ? "failCodes" : t === "generationhealth" ? "generationHealth" : t);
     }
   }
   if (parts.size === 0) return new Set(["summary", "categories", "models"]);

@@ -42,6 +42,15 @@ type AlertOpts = {
   variant?: "default" | "error";
 };
 
+export type EcomUnsavedLayoutCloseChoice = "draft" | "apply" | "stay";
+
+export type EcomUnsavedLayoutCloseOpts = {
+  title?: string;
+  message?: string;
+  /** 无可用合成预览时禁用「保存使用」 */
+  applyDisabled?: boolean;
+};
+
 type DialogContextValue = {
   confirm: (opts: ConfirmOpts) => Promise<boolean>;
   alert: (opts: AlertOpts) => Promise<void>;
@@ -53,6 +62,7 @@ type DialogContextValue = {
     secondMessage: string;
     confirmLabel?: string;
   }) => Promise<boolean>;
+  unsavedLayoutClose: (opts?: EcomUnsavedLayoutCloseOpts) => Promise<EcomUnsavedLayoutCloseChoice>;
 };
 
 const DialogContext = createContext<DialogContextValue | null>(null);
@@ -68,6 +78,11 @@ export function useDialogs(): DialogContextValue {
 type ModalState =
   | { kind: "confirm"; opts: ConfirmOpts; resolve: (v: boolean) => void }
   | { kind: "alert"; opts: AlertOpts; resolve: () => void }
+  | {
+      kind: "unsavedLayout";
+      opts: EcomUnsavedLayoutCloseOpts;
+      resolve: (v: EcomUnsavedLayoutCloseChoice) => void;
+    }
   | {
       kind: "double";
       step: 1 | 2;
@@ -146,9 +161,15 @@ export function DialogProvider({ children }: { children: React.ReactNode }) {
     [],
   );
 
+  const unsavedLayoutClose = useCallback((opts?: EcomUnsavedLayoutCloseOpts) => {
+    return new Promise<EcomUnsavedLayoutCloseChoice>((resolve) => {
+      setModal({ kind: "unsavedLayout", opts: opts ?? {}, resolve });
+    });
+  }, []);
+
   const value = useMemo(
-    () => ({ confirm, alert, toast, doubleConfirm }),
-    [confirm, alert, toast, doubleConfirm],
+    () => ({ confirm, alert, toast, doubleConfirm, unsavedLayoutClose }),
+    [confirm, alert, toast, doubleConfirm, unsavedLayoutClose],
   );
 
   useEffect(() => {
@@ -174,6 +195,13 @@ export function DialogProvider({ children }: { children: React.ReactNode }) {
   function closeDouble(ok: boolean) {
     if (modal?.kind === "double") {
       modal.resolve(ok);
+      setModal(null);
+    }
+  }
+
+  function closeUnsavedLayout(choice: EcomUnsavedLayoutCloseChoice) {
+    if (modal?.kind === "unsavedLayout") {
+      modal.resolve(choice);
       setModal(null);
     }
   }
@@ -204,6 +232,42 @@ export function DialogProvider({ children }: { children: React.ReactNode }) {
               >
                 {modal.opts.confirmLabel ?? "确认"}
               </EcomDialogPrimaryButton>
+            </DialogFooter>
+          </DialogContent>
+        ) : null}
+      </Dialog>
+
+      <Dialog
+        open={modal?.kind === "unsavedLayout"}
+        onOpenChange={(open) => {
+          if (!open) closeUnsavedLayout("stay");
+        }}
+      >
+        {modal?.kind === "unsavedLayout" ? (
+          <DialogContent className="z-[400] sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>{modal.opts.title ?? "保存编辑内容？"}</DialogTitle>
+              <DialogDescription>
+                {modal.opts.message ??
+                  "当前有未保存的排版或预览。可只存草稿以便下次继续，或用最新预览合成并保存到点位。"}
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="flex-col gap-2 sm:flex-col sm:space-x-0">
+              <EcomDialogPrimaryButton
+                disabled={modal.opts.applyDisabled}
+                onClick={() => closeUnsavedLayout("apply")}
+              >
+                保存使用
+              </EcomDialogPrimaryButton>
+              <EcomDialogCancelButton
+                className="border border-[var(--ecom-hairline)] bg-white text-[var(--ecom-ink)] hover:bg-[#f5f5f7]"
+                onClick={() => closeUnsavedLayout("draft")}
+              >
+                保存草稿
+              </EcomDialogCancelButton>
+              <EcomDialogCancelButton onClick={() => closeUnsavedLayout("stay")}>
+                取消编辑
+              </EcomDialogCancelButton>
             </DialogFooter>
           </DialogContent>
         ) : null}

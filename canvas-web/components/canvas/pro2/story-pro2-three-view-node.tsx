@@ -52,7 +52,7 @@ import { useLibtvMediaAspectPresetSync } from "@/lib/canvas/libtv-media-aspect-p
 import { LibtvMediaGeneratingState, isLibtvMediaGenerating } from "../libtv-media-generating-state";
 import { isMislabeledVendorSuccessError } from "@/lib/canvas/friendly-task-error";
 import {
-  libtvRuntimeErrorAlertTitle,
+  showLibtvRuntimeFailureDialog,
   useLibtvRuntimeErrorAlert,
 } from "@/lib/canvas/libtv-runtime-error-alert";
 import { Pro2CrewTaskStatusBadge } from "./pro2-crew-task-status-badge";
@@ -75,7 +75,7 @@ import {
 /** 2.0 角色三视图 · 壳层与图片节点一致（LibTV） */
 export function StoryPro2ThreeViewNode({ id, data, selected }: NodeProps) {
   const base = useBookMallBaseUrl();
-  const { alert } = useDialogs();
+  const { alert, confirm } = useDialogs();
   const nodes = useCanvasStore((s) => s.nodes);
   const edges = useCanvasStore((s) => s.edges);
   const addNode = useCanvasStore((s) => s.addNode);
@@ -134,12 +134,10 @@ export function StoryPro2ThreeViewNode({ id, data, selected }: NodeProps) {
         Boolean(d.pro2ControllerNodeId?.trim())
       ),
     onAlert: ({ message, failCode }) => {
-      void alert({
-        title: libtvRuntimeErrorAlertTitle(failCode, message, "image"),
-        message,
-        variant: "error",
-        dismissOnly: true,
-      });
+      void showLibtvRuntimeFailureDialog(
+        { alert, confirm },
+        { message, failCode, kind: "image" },
+      );
     },
   });
   const label = d.label?.trim() || "角色";

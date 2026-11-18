@@ -101,6 +101,7 @@ export function DetailPageSuiteSlotLayoutEditBindings({
       showSlotCopyField
       baseImageUrl={promptEdit.baseImageUrl ?? null}
       copyOverlay={promptEdit.copyOverlay ?? null}
+      layoutComposedPreviewUrl={promptEdit.layoutComposedPreviewUrl ?? null}
       exportWidthPx={exportWidthPx}
       displayRatio={displayRatio}
       saving={saving}
@@ -113,20 +114,13 @@ export function DetailPageSuiteSlotLayoutEditBindings({
       onRewrite={onRewrite}
       onRegenerateImage={onRegenerateImage}
       onSave={async (prompt, extras) => {
-        await persistModules(prompt, extras, true);
-        if (!extras?.copyOverlay) {
-          toast({ variant: "success", title: "已保存" });
-        }
+        await persistModules(prompt, extras, false);
+        toast({ variant: "success", title: "已保存草稿" });
       }}
       onPreview={async (_prompt, extras) => {
         const baseUrl = promptEdit.baseImageUrl?.trim();
         if (!baseUrl || !extras.copyOverlay) {
-          await alert({
-            title: "无法预览",
-            message: "请先出无字底图并填写模块文案",
-            variant: "error",
-          });
-          return;
+          throw new Error("请先出无字底图并填写模块文案");
         }
         const { url } = await composeEcomCopyOverlay({
           baseImageUrl: baseUrl,
@@ -139,32 +133,19 @@ export function DetailPageSuiteSlotLayoutEditBindings({
       onConfirmCompose={async (prompt, extras) => {
         const baseUrl = promptEdit.baseImageUrl?.trim();
         if (!baseUrl || !extras.copyOverlay) {
-          await alert({
-            title: "无法保存",
-            message: "请先出无字底图并填写模块文案",
-            variant: "error",
-          });
-          return;
+          throw new Error("请先出无字底图并填写模块文案");
         }
-        try {
-          await persistModules(prompt, extras, false);
-          const result = await composeDetailPageSuiteSlot(projectModule, project.id, {
-            moduleId: promptEdit.moduleId,
-            slotKey: promptEdit.slotKey,
-            baseImageUrl: baseUrl,
-            overlay: extras.copyOverlay,
-            slotCopy: extras.slotCopy,
-          });
-          onProjectChange(result.project);
-          onOpenChange(false);
-          toast({ variant: "success", title: "已合成并保存" });
-        } catch (e) {
-          await alert({
-            title: "保存失败",
-            message: e instanceof Error ? e.message : "未知错误",
-            variant: "error",
-          });
-        }
+        await persistModules(prompt, extras, false);
+        const result = await composeDetailPageSuiteSlot(projectModule, project.id, {
+          moduleId: promptEdit.moduleId,
+          slotKey: promptEdit.slotKey,
+          baseImageUrl: baseUrl,
+          overlay: extras.copyOverlay,
+          slotCopy: extras.slotCopy,
+        });
+        onProjectChange(result.project);
+        onOpenChange(false);
+        toast({ variant: "success", title: "已合成并保存" });
       }}
     />
   );
