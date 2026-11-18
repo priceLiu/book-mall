@@ -1,5 +1,6 @@
 import { headers } from "next/headers";
 import { getServerSession } from "next-auth";
+import { HomeV2NavAuthSlot } from "@/components/layout/home-v2-nav-auth-slot";
 import { NavbarAuth } from "@/components/layout/navbar-auth";
 import { SiteLayoutShell } from "@/components/layout/site-home/site-layout-shell";
 import { authOptions } from "@/lib/auth";
@@ -20,7 +21,7 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
     <SiteLayoutShell
       pathname={pathname.split("?")[0] || "/"}
       navAuth={<NavbarAuth appearance="site-home" />}
-      v2NavAuth={<NavbarAuth appearance="site-home-v2" />}
+      v2NavAuth={<HomeV2NavAuthSlot />}
       isLoggedIn={Boolean(session?.user)}
     >
       {children}

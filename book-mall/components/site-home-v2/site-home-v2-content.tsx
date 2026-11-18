@@ -116,17 +116,15 @@ const PROOF_ROWS = [
 export function SiteHomeV2Content({
   showcaseTemplates,
   authSlot,
-  isLoggedIn,
 }: {
   showcaseTemplates: QrTemplateJson[];
   authSlot: React.ReactNode;
-  isLoggedIn: boolean;
 }) {
   const anchor = (hash: string) => `/home-v2${hash}`;
 
   return (
     <div data-site-home-v2>
-      <SiteHomeV2Nav isLoggedIn={isLoggedIn} authSlot={authSlot} />
+      <SiteHomeV2Nav isLoggedIn={false} authSlot={authSlot} />
       <SiteHomeV2Motion />
 
       <main>
@@ -138,9 +136,9 @@ export function SiteHomeV2Content({
           <div className="home-v2-copy-narrow">
             <div className="hero-copy">
               <h1 id="hero-title">
-                <span className="hero-title-brand">智选</span>
+                <span className="hero-title-brand">智选 AI</span>
                 <span className="hero-title-divider" aria-hidden />
-                <span className="hero-title-rest">办公・图像・视频・音乐全链路 AI 创作台</span>
+                <span className="hero-title-rest">办公・图像・视频・音乐全链路 创作台</span>
               </h1>
               <ul className="value-row" aria-label="平台价值">
                 <li>AI 创作</li>
@@ -448,7 +446,7 @@ export function SiteHomeV2Content({
                 <span className="brand-name">智选</span>
               </Link>
               <p>
-                智选｜办公・图像・视频・音乐全链路 AI 创作台。价值层是创作、协同、赋能；场景覆盖办公日常、内容创作、图像创意、视频创作与音乐制作。
+                智选 AI｜办公・图像・视频・音乐全链路 创作台。价值层是创作、协同、赋能；场景覆盖办公日常、内容创作、图像创意、视频创作与音乐制作。
               </p>
             </div>
             <div className="footer-col">

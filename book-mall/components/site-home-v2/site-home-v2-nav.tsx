@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { useEffect, useId, useRef, useState } from "react";
 import {
   BOOK_PORTAL_EXTERNAL_LINK_PROPS,
@@ -79,8 +80,11 @@ export function SiteHomeV2Nav({
   const [mobileOpen, setMobileOpen] = useState(false);
   const scrollActive = useHomeV2NavHighlight(onHomeV2);
   const [hashSection, setHashSection] = useState<HomeV2NavSectionId | null>(null);
+  const { data: session, status } = useSession();
+  const clientLoggedIn = status === "authenticated" && Boolean(session?.user);
+  const portalLoggedIn = isAdminShell ? isLoggedIn : clientLoggedIn;
 
-  const portalItems = buildBookPortalNavItems(undefined, isLoggedIn);
+  const portalItems = buildBookPortalNavItems(undefined, portalLoggedIn);
 
   useEffect(() => {
     setProductOpen(false);
