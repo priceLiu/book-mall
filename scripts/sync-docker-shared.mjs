@@ -11,7 +11,7 @@
  *   node scripts/sync-docker-shared.mjs           # 写入/更新快照
  *   node scripts/sync-docker-shared.mjs --check   # 仅校验（CI 用）
  */
-import { cpSync, existsSync, readdirSync, rmSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readdirSync, rmSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -50,6 +50,10 @@ const APP_SHARED_MAP = {
   "finance-web": ["platform-assistant"],
   "gateway-web": ["platform-assistant"],
 };
+
+/** next.config 引用 ../scripts/lib/*；CloudBase 子目录构建须快照到 docker-build/lib */
+const DOCKER_BUILD_LIB_APPS = ["gateway-web", "finance-web"];
+const WEBPACK_SINGLETON_REL = "lib/next-webpack-react-singleton.mjs";
 
 /** 由其它 sync 脚本维护，勿在 sync-docker-shared 时删掉 */
 const DOCKER_SHARED_PRESERVE = {
@@ -116,6 +120,27 @@ for (const [app, sharedPkgs] of Object.entries(APP_SHARED_MAP)) {
   }
 }
 
+const webpackSingletonSrc = join(ROOT, "scripts", WEBPACK_SINGLETON_REL);
+if (!existsSync(webpackSingletonSrc)) {
+  console.error(`[sync-docker-shared] source missing: scripts/${WEBPACK_SINGLETON_REL}`);
+  drift += 1;
+} else {
+  for (const app of DOCKER_BUILD_LIB_APPS) {
+    const dst = join(ROOT, app, "docker-build", WEBPACK_SINGLETON_REL);
+    if (CHECK_ONLY) {
+      if (!existsSync(dst)) {
+        drift += 1;
+        console.error(`[sync-docker-shared] MISSING ${app}/docker-build/${WEBPACK_SINGLETON_REL}`);
+      }
+      continue;
+    }
+    mkdirSync(dirname(dst), { recursive: true });
+    cpSync(webpackSingletonSrc, dst, { recursive: false });
+    wrote += 1;
+    console.log(`[sync-docker-shared] synced ${app}/docker-build/${WEBPACK_SINGLETON_REL}`);
+  }
+}
+
 if (CHECK_ONLY) {
   if (drift > 0) {
     console.error("Run `node scripts/sync-docker-shared.mjs` to sync snapshots.");
@@ -123,7 +148,9 @@ if (CHECK_ONLY) {
   }
   const appCount = Object.keys(APP_SHARED_MAP).length;
   const pkgCount = Object.values(APP_SHARED_MAP).reduce((n, list) => n + list.length, 0);
-  console.log(`[sync-docker-shared] OK · ${appCount} apps / ${pkgCount} package snapshots`);
+  console.log(
+    `[sync-docker-shared] OK · ${appCount} apps / ${pkgCount} package snapshots + ${DOCKER_BUILD_LIB_APPS.length} docker-build lib`,
+  );
 } else {
   console.log(`[sync-docker-shared] done · updated ${wrote} snapshots`);
 }
