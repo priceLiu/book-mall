@@ -349,6 +349,40 @@ export async function settleSucceededGatewayLog(input: {
       isWan30: isWan30Model(input.log.model, costSnap.canonicalModelKey ?? input.log.canonicalModelKey),
     };
     const units = billableUnitCount(costSnap.unit, unitMetrics);
+    const openFrozen = await readOpenFrozenCredits(input.log.id);
+    if (openFrozen != null) {
+      charged = await settleOpenFrozen({
+        target,
+        log: input.log,
+        snap: costSnap,
+        frozen: openFrozen,
+        chargeCredits: computeChargeCredits({
+          snapshot: costSnap,
+          units,
+          pricePerCreditYuan: accountSnap.pricePerCreditYuan,
+          promptTokens: input.metrics.promptTokens,
+          completionTokens: input.metrics.completionTokens,
+          totalTokens: input.metrics.totalTokens,
+          unit: costSnap.unit,
+        }),
+        description: platformConsumeDescription(input.log, units),
+      });
+      if (charged > 0) {
+        await recordBillingSettlement({
+          log: input.log,
+          ref: target.ref,
+          settlementKind: "PLATFORM_CREDIT",
+          creditsCharged: charged,
+          billingCategory: classifyBillingCategory(input.log),
+        }).catch(() => undefined);
+      }
+      if (charged > 0 && target.actorUserId) {
+        markShareRewardFirstBillable(target.actorUserId).catch((e) => {
+          console.warn("[credit-settlement] share reward first billable hook failed", e);
+        });
+      }
+      return charged;
+    }
     const credits = computeChargeCredits({
       snapshot: costSnap,
       units,
@@ -428,6 +462,77 @@ export async function settleSucceededGatewayLog(input: {
   return charged;
 }
 
+/** 仍占用的冻结额。已 release:<logId> 视为关闭，后续走实扣而不是再 settle。 */
+export async function readOpenFrozenCredits(logId: string): Promise<number | null> {
+  const rows = await prisma.creditLedger.findMany({
+    where: {
+      idempotencyKey: { in: [`reserve:${logId}`, `release:${logId}`] },
+    },
+    select: { idempotencyKey: true, credits: true },
+  });
+  const reserve = rows.find((r) => r.idempotencyKey === `reserve:${logId}`);
+  const released = rows.some((r) => r.idempotencyKey === `release:${logId}`);
+  if (!reserve || released) return null;
+  const frozen = Math.abs(Number(reserve.credits));
+  return frozen > 0 ? frozen : null;
+}
+
+async function settleOpenFrozen(input: {
+  target: BillingTarget;
+  log: GatewayRequestLog;
+  snap: CostSnapshot;
+  frozen: number;
+  chargeCredits: number;
+  description: string;
+}): Promise<number> {
+  const chargeCredits = input.chargeCredits > 0 ? input.chargeCredits : input.frozen;
+  try {
+    await settleReserved({
+      ref: input.target.ref,
+      credits: chargeCredits,
+      actorUserId: input.target.actorUserId,
+      seatId: input.target.seatId,
+      gatewayLogId: input.log.id,
+      canonicalModelKey: input.snap.canonicalModelKey,
+      costSnapshotYuan: input.snap.netCostYuan,
+      marginSnapshot: input.snap.marginRate,
+      description: input.description,
+    });
+    const overcharge = input.frozen - chargeCredits;
+    if (overcharge > 0) {
+      await releaseReserved({
+        ref: input.target.ref,
+        credits: overcharge,
+        gatewayLogId: input.log.id,
+        idempotencyKey: `release-overcharge:${input.log.id}`,
+        description: `${input.description}（预扣 ${input.frozen} → 实扣 ${chargeCredits}）`,
+      });
+    } else if (chargeCredits > input.frozen) {
+      await consumeCredits({
+        ref: input.target.ref,
+        credits: chargeCredits - input.frozen,
+        actorUserId: input.target.actorUserId,
+        seatId: input.target.seatId,
+        gatewayLogId: input.log.id,
+        canonicalModelKey: input.snap.canonicalModelKey,
+        costSnapshotYuan: input.snap.netCostYuan,
+        marginSnapshot: input.snap.marginRate,
+        idempotencyKey: `extra:${input.log.id}`,
+        allowNegative: true,
+        description: input.description,
+      });
+      await prisma.gatewayRequestLog.update({
+        where: { id: input.log.id },
+        data: { creditsCharged: chargeCredits },
+      });
+    }
+    return chargeCredits;
+  } catch (e) {
+    console.error("[credit-settlement] settle open freeze 失败", input.log.id, e);
+    return 0;
+  }
+}
+
 /**
  * 视频结算：按实际时长扣费。
  *  - 有 RESERVE：settle(实扣) + 多冻部分 release-overcharge 退还。
@@ -455,13 +560,9 @@ async function settleVideoFromReserve(
         }).credits
       : 0;
 
-  const reserveLedger = await prisma.creditLedger.findUnique({
-    where: { idempotencyKey: `reserve:${log.id}` },
-    select: { credits: true },
-  });
-  if (reserveLedger) {
-    const frozen = Math.abs(Number(reserveLedger.credits));
-    if (frozen <= 0) return 0;
+  const openFrozen = await readOpenFrozenCredits(log.id);
+  if (openFrozen != null && openFrozen > 0) {
+    const frozen = openFrozen;
     const chargeCredits = settleCredits > 0 ? settleCredits : frozen;
     try {
       await settleReserved({
@@ -559,28 +660,24 @@ export async function refundFailedGatewayLog(
   const target = await resolveLogBillingTarget(log);
   if (!target) return;
 
-  // 视频：解冻返还（冻结额记录在 RESERVE 流水里）
-  if (isVideoLog(log)) {
-    const reserveLedger = await prisma.creditLedger.findUnique({
-      where: { idempotencyKey: `reserve:${log.id}` },
-      select: { credits: true },
-    });
-    if (!reserveLedger) return; // 未冻结（如发起即失败）
-    const frozen = Math.abs(Number(reserveLedger.credits));
-    if (frozen <= 0) return;
+  const openFrozen = await readOpenFrozenCredits(log.id);
+  if (openFrozen != null) {
     try {
       await releaseReserved({
         ref: target.ref,
-        credits: frozen,
+        credits: openFrozen,
         gatewayLogId: log.id,
+        description: "生成失败，释放冻结积分",
       });
     } catch (e) {
-      console.error("[credit-settlement] video release 失败", log.id, e);
+      console.error("[credit-settlement] release 失败", log.id, e);
     }
     return;
   }
 
-  // 文本/图像：失败即退（按已扣）
+  if (isVideoLog(log)) return;
+
+  // 文本/图像：未冻结、但已实扣时失败即退
   if (!log.creditsCharged || Number(log.creditsCharged) <= 0) return;
   try {
     await refundCredits({
@@ -630,6 +727,64 @@ export async function reserveVideoCreditsForLog(log: GatewayRequestLog): Promise
     actorUserId: target.actorUserId,
     gatewayLogId: log.id,
     costSnapshotYuan: costSnap.netCostYuan,
+  });
+  return credits;
+}
+
+function estimateNonVideoReserveUnits(
+  unit: CreditCostUnit | null,
+  inputSummary: unknown,
+): number {
+  if (unit === "PER_KTOKEN") return 2;
+  if (unit === "PER_IMAGE") {
+    if (inputSummary && typeof inputSummary === "object" && !Array.isArray(inputSummary)) {
+      const n = (inputSummary as Record<string, unknown>).imageCount;
+      if (typeof n === "number" && n > 0) return Math.min(8, Math.round(n));
+    }
+    return 1;
+  }
+  return 1;
+}
+
+/**
+ * 图 / 文 / 语音发起时冻结预扣。余额不足抛 InsufficientCreditsError。
+ * 成功时按实际用量结算并退差额；失败或疏通任务释放。
+ */
+export async function reserveNonVideoCreditsForLog(log: GatewayRequestLog): Promise<number> {
+  if (!creditBillingEnabled()) return 0;
+  if (await isPlatformOperationalApiKey(log.apiKeyId)) return 0;
+  if (isVideoLog(log)) return 0;
+  if (log.model.trim().startsWith("portrait:")) return 0;
+
+  const canonical =
+    log.canonicalModelKey ??
+    (await resolveBillingCanonicalKey({
+      modelKey: log.model,
+      inputSummary: log.inputSummary,
+    }).catch(() => null));
+  if (!canonical) return 0;
+  const costSnap = await resolveCostSnapshot(canonical);
+  if (!costSnap?.creditsPerUnit) return 0;
+
+  const target = await resolveLogBillingTarget(log);
+  if (!target) return 0;
+  const accountSnap = await getAccountCreditBalances(target.ref);
+  const units = estimateNonVideoReserveUnits(costSnap.unit, log.inputSummary);
+  const credits = computeChargeCredits({
+    snapshot: costSnap,
+    units,
+    pricePerCreditYuan: accountSnap.pricePerCreditYuan,
+    unit: costSnap.unit,
+  });
+  if (credits <= 0) return 0;
+
+  await reserveCredits({
+    ref: target.ref,
+    credits,
+    actorUserId: target.actorUserId,
+    gatewayLogId: log.id,
+    costSnapshotYuan: costSnap.netCostYuan,
+    description: "生成冻结预扣",
   });
   return credits;
 }

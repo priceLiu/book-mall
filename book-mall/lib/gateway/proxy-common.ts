@@ -67,6 +67,7 @@ import {
 } from "./credit-billing-guard";
 import {
   refundFailedGatewayLog,
+  reserveNonVideoCreditsForLog,
   reserveVideoCreditsForLog,
   settleSucceededGatewayLog,
 } from "@/lib/billing/gateway-credit-settlement";
@@ -279,10 +280,11 @@ export async function createRequestLog(opts: {
   // Gen-HotCold-R2 Phase 2：新建 RUNNING 日志 → global 在飞 +1（best-effort）。
   void bumpGatewayStatusOnCreate();
 
-  // 视频「先冻结后渲染」：发起前冻结预扣；余额不足回滚并阻断
-  if (billingMode === "PLATFORM_CREDIT" && log.requestKind === "VIDEO") {
+  // 平台代付：发起前冻结预扣（视频按时长，图/文按预估单位）；余额不足回滚并阻断
+  if (billingMode === "PLATFORM_CREDIT") {
     try {
-      await reserveVideoCreditsForLog(log);
+      if (log.requestKind === "VIDEO") await reserveVideoCreditsForLog(log);
+      else await reserveNonVideoCreditsForLog(log);
     } catch (e) {
       await releaseVideoGenerate(riskAccountId).catch(() => undefined);
       const { failCode, failMessage } = mapGatewayBillingFailure(e);

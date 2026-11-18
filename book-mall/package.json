@@ -52,6 +52,7 @@
     "dev:reset-user-billing": "dotenv -e .env.local -- tsx scripts/dev-reset-user-billing.ts",
     "reconciliation:run": "dotenv -e .env.local -- tsx scripts/reconciliation-run-cli.ts",
     "credits:grant-monthly": "dotenv -e .env.local -- tsx scripts/grant-monthly-credits.ts",
+    "billing:traffic-reconcile": "dotenv -e .env.local -- tsx scripts/credit-traffic-reconcile.ts",
     "billing:print-dev-user": "dotenv -e .env.local -- tsx scripts/print-dev-user-id.ts",
     "billing:reset-data": "dotenv -e .env.local -- tsx scripts/reset-billing-data.ts",
     "billing:reconcile-byok-included-used": "dotenv -e .env.local -- tsx scripts/reconcile-byok-included-used.ts",

@@ -83,6 +83,13 @@ const NAV_GROUPS: NavGroup[] = [
         prefix: "/admin/credit-expiry-ops",
         show: (v) => canViewFinanceCost(v.user.role),
       },
+      {
+        href: "/admin/credit-traffic",
+        label: "积分疏通台",
+        icon: ListChecks,
+        prefix: "/admin/credit-traffic",
+        show: (v) => canViewFinanceCost(v.user.role),
+      },
     ],
   },
   {

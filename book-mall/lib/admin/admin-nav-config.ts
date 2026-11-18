@@ -86,6 +86,7 @@ export function buildAdminNavGroups(financeWebOrigin: string | null): AdminNavGr
         fin(o, "/admin/pnl-alerts", "盈亏预警中心", "/admin/finance/pnl-alerts"),
         fin(o, "/admin/pnl-report", "P&L 报表", "/admin/finance/pnl-report"),
         fin(o, "/admin/credit-expiry-ops", "积分清零运维台", "/admin/finance/credit-expiry-ops"),
+        fin(o, "/admin/credit-traffic", "积分疏通台", "/admin/finance/credit-traffic"),
         fin(o, "/admin/pnl-report", "盈亏报表", "/admin/finance/pnl-alerts"),
         fin(o, "/admin/teams", "团队与租户", "/admin/finance/usage-overview"),
         fin(o, "/admin/platform-models", "平台模型登记", "/admin/finance/model-cost"),

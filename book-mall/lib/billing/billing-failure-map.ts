@@ -1,5 +1,6 @@
 import { InsufficientCreditsError } from "@/lib/billing/credit-account-service";
 import { isPrismaConnectionUnavailable } from "@/lib/db-unavailable";
+import { PrismaPoolBusyError } from "@/lib/prisma-db-gate";
 import {
   isPrismaTransactionTimeoutError,
   isRetryableTxError,
@@ -7,6 +8,7 @@ import {
 
 /** Prisma 事务超时 / 连接池 / creditLedger 写失败 — 非真实余额不足。 */
 export function isBillingDbBusyError(e: unknown): boolean {
+  if (e instanceof PrismaPoolBusyError) return true;
   if (isPrismaConnectionUnavailable(e)) return true;
   if (isRetryableTxError(e)) return true;
   if (isPrismaTransactionTimeoutError(e)) return true;

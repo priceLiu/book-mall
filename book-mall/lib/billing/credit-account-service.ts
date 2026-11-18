@@ -282,7 +282,7 @@ async function writeLedger(input: LedgerWriteInput) {
 
   const [lockK1, lockK2] = accountAdvisoryLockKeys(input.ref);
 
-  return runTxWithRetry(
+  const result = await runTxWithRetry(
     () =>
       prisma.$transaction(async (tx) => {
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(${lockK1}::int, ${lockK2}::int)`;
@@ -341,16 +341,46 @@ async function writeLedger(input: LedgerWriteInput) {
           },
         });
 
-        await syncLotsForLedger(tx, account.id, input, now);
-
         return {
           ledger,
           balanceAfter,
           deduped: false as const,
+          accountId: account.id,
         };
       }, BILLING_DB_TX_OPTIONS),
     { label: "writeLedger" },
   );
+
+  // 批次同步放在余额事务提交之后，缩短账户 advisory 锁占用。
+  // 余额与流水是扣费真源；批次失败只记日志，由积分运维对账补齐。
+  if (!result.deduped && !input.skipLotSync && "accountId" in result) {
+    const accountId = result.accountId;
+    const ownedDelta = computeOwnedDelta(input.credits, input.reservedDelta ?? 0);
+    if (ownedDelta !== 0) {
+      try {
+        await runTxWithRetry(
+          () =>
+            prisma.$transaction(async (tx) => {
+              await tx.$executeRaw`SELECT pg_advisory_xact_lock(${lockK1}::int, ${lockK2}::int)`;
+              await syncLotsForLedger(tx, accountId, input, now);
+            }, BILLING_DB_TX_OPTIONS),
+          { label: "writeLedgerLots" },
+        );
+      } catch (e) {
+        console.error(
+          "[writeLedger] lot sync failed after balance commit",
+          input.idempotencyKey,
+          e,
+        );
+      }
+    }
+  }
+
+  return {
+    ledger: result.ledger,
+    balanceAfter: result.balanceAfter,
+    deduped: result.deduped,
+  };
 }
 
 /** 套餐发放（GRANT），用于开通/续费/月度重置。 */

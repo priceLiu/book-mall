@@ -15,7 +15,7 @@ const pendingUserWhere = {
     { aiAppPermissionsAcceptedAt: null },
     { aiPrivacyPolicyAcceptedAt: null },
   ],
-} as const;
+};
 
 /** 是否仍需存量补签战役（false = 库内无人缺三份时间戳，Gate/JWT 可跳过法律列） */
 export async function resolveAiLegalBackfillCampaignActive(): Promise<boolean> {
