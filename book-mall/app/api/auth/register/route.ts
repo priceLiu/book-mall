@@ -14,9 +14,11 @@ import { prisma } from "@/lib/prisma";
 import { getInviteByToken } from "@/lib/tenant/tenant-invite-service";
 import { resolveReferrerByCode } from "@/lib/referral/referral-service";
 import { grantWelcomeGift } from "@/lib/billing/welcome-gift";
+import { refreshAiLegalBackfillCampaignFromDb } from "@/lib/auth/ai-legal-backfill-campaign";
 import {
   aiLegalConsentBodySchema,
   buildAiLegalConsentForRegistration,
+  buildAiLegalConsentUpdate,
 } from "@/lib/auth/ai-legal-consent";
 import { issueAutoLoginToken } from "@/lib/auth/auto-login-token";
 import { lockReferralAttribution } from "@/lib/share/share-reward-service";
@@ -34,6 +36,7 @@ const registerSchema = z.object({
   inviteToken: z.string().min(1).optional(),
   /// 分享码（来自 /r/{code} 链接），用于注册归因
   referralCode: z.string().min(1).max(32).optional(),
+  legalConsent: aiLegalConsentBodySchema,
 });
 
 function isDev() {
@@ -57,7 +60,18 @@ export async function POST(request: Request) {
     }
 
     // 先检查是否已注册，避免浪费短信验证码
-    const existingUser = await prisma.user.findUnique({ where: { phone } });
+    const existingUser = await prisma.user.findUnique({
+      where: { phone },
+      select: {
+        id: true,
+        phoneVerifiedAt: true,
+        name: true,
+        referredByUserId: true,
+        aiUserAgreementAcceptedAt: true,
+        aiAppPermissionsAcceptedAt: true,
+        aiPrivacyPolicyAcceptedAt: true,
+      },
+    });
     if (existingUser?.phoneVerifiedAt) {
       return NextResponse.json({
         error: "该手机号已注册，请直接登录",
@@ -107,6 +121,15 @@ export async function POST(request: Request) {
       : null;
     const lockedAt = new Date();
     const verifiedAt = new Date();
+    const legalConsentPatch = buildAiLegalConsentUpdate(
+      existingUser ?? {
+        aiUserAgreementAcceptedAt: null,
+        aiAppPermissionsAcceptedAt: null,
+        aiPrivacyPolicyAcceptedAt: null,
+      },
+      parsed.data.legalConsent,
+    );
+    const legalConsentNew = buildAiLegalConsentForRegistration();
 
     const createdUserId = await prisma.$transaction(async (tx) => {
       if (existingUser) {
@@ -125,6 +148,7 @@ export async function POST(request: Request) {
             ...(referredByUserId && !existingUser.referredByUserId
               ? { referredByUserId }
               : {}),
+            ...legalConsentPatch,
           },
         });
         const wallet = await tx.wallet.findUnique({ where: { userId: user.id } });
@@ -143,10 +167,10 @@ export async function POST(request: Request) {
           billingPersonaLockedAt: lockedAt,
           ecomBillingMode: deriveEcomBillingMode(billingPersona),
           ...(referredByUserId ? { referredByUserId } : {}),
+          ...legalConsentNew,
         },
       });
       await tx.wallet.create({ data: { userId: user.id } });
-          ...legalConsent,
       return user.id;
     });
 
@@ -174,6 +198,7 @@ export async function POST(request: Request) {
 
     // 免密注册场景：返回一次性自动登录票据，客户端据此建立会话（无需二次短信）。
     const autoLoginToken = issueAutoLoginToken(createdUserId);
+    void refreshAiLegalBackfillCampaignFromDb().catch(() => undefined);
 
     return NextResponse.json({
       ok: true,

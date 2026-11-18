@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 
 import {
+  refreshAiLegalBackfillCampaignFromDb,
+  resolveAiLegalBackfillCampaignActive,
+} from "@/lib/auth/ai-legal-backfill-campaign";
+import {
   aiLegalConsentBodySchema,
   buildAiLegalConsentUpdate,
   isAiLegalConsentComplete,
@@ -28,11 +32,13 @@ export async function GET() {
   if (!user) {
     return NextResponse.json({ error: "用户不存在" }, { status: 404 });
   }
+  const backfillCampaignActive = await resolveAiLegalBackfillCampaignActive();
   return NextResponse.json({
     complete: isAiLegalConsentComplete(user),
     userAgreementAt: user.aiUserAgreementAcceptedAt?.toISOString() ?? null,
     appPermissionsAt: user.aiAppPermissionsAcceptedAt?.toISOString() ?? null,
     privacyPolicyAt: user.aiPrivacyPolicyAcceptedAt?.toISOString() ?? null,
+    backfillCampaignActive,
   });
 }
 
@@ -66,7 +72,13 @@ export async function POST(request: Request) {
 
     const patch = buildAiLegalConsentUpdate(existing, parsed.data);
     if (Object.keys(patch).length === 0) {
-      return NextResponse.json({ ok: true, complete: true, unchanged: true });
+      const backfillCampaignActive = await refreshAiLegalBackfillCampaignFromDb();
+      return NextResponse.json({
+        ok: true,
+        complete: true,
+        unchanged: true,
+        backfillCampaignActive,
+      });
     }
 
     const updated = await prisma.user.update({
@@ -79,12 +91,14 @@ export async function POST(request: Request) {
       },
     });
 
+    const backfillCampaignActive = await refreshAiLegalBackfillCampaignFromDb();
     return NextResponse.json({
       ok: true,
       complete: isAiLegalConsentComplete(updated),
       userAgreementAt: updated.aiUserAgreementAcceptedAt?.toISOString() ?? null,
       appPermissionsAt: updated.aiAppPermissionsAcceptedAt?.toISOString() ?? null,
       privacyPolicyAt: updated.aiPrivacyPolicyAcceptedAt?.toISOString() ?? null,
+      backfillCampaignActive,
     });
   } catch (e) {
     const dbResp = tryApiDbUnavailableResponse(e);

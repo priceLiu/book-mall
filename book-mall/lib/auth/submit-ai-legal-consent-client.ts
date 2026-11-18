@@ -2,6 +2,7 @@
 export async function submitAiLegalConsent(): Promise<{
   ok: boolean;
   error?: string;
+  backfillCampaignActive?: boolean;
 }> {
   const res = await fetch("/api/auth/legal-consent", {
     method: "POST",
@@ -13,9 +14,15 @@ export async function submitAiLegalConsent(): Promise<{
       privacyPolicy: true,
     }),
   });
-  const data = (await res.json().catch(() => ({}))) as { error?: string };
+  const data = (await res.json().catch(() => ({}))) as {
+    error?: string;
+    backfillCampaignActive?: boolean;
+  };
   if (!res.ok) {
     return { ok: false, error: data.error ?? "法律文档确认失败" };
   }
-  return { ok: true };
+  return {
+    ok: true,
+    backfillCampaignActive: data.backfillCampaignActive,
+  };
 }

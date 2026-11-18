@@ -40,7 +40,8 @@ export function AiLegalConsentGate() {
   const needsGate =
     status === "authenticated" &&
     session?.user &&
-    session.user.aiLegalConsentComplete === false &&
+    session.user.aiLegalBackfillActive !== false &&
+    session.user.aiLegalConsentComplete !== true &&
     !isExemptPath(pathname);
 
   useEffect(() => {
@@ -67,7 +68,12 @@ export function AiLegalConsentGate() {
         setError(res.error ?? "保存失败");
         return;
       }
-      await update({ aiLegalConsentComplete: true });
+      await update({
+        aiLegalConsentComplete: true,
+        ...(res.backfillCampaignActive === false
+          ? { aiLegalBackfillActive: false }
+          : {}),
+      });
     } finally {
       setSaving(false);
     }

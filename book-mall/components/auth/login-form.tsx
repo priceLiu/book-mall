@@ -1,7 +1,7 @@
 "use client";
 
 import { type FormEvent, useEffect, useState } from "react";
-import { signIn, useSession } from "next-auth/react";
+import { signIn } from "next-auth/react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
@@ -13,12 +13,6 @@ import {
 } from "@/components/auth/auth-home-v2-fields";
 import { SmsCodeField } from "@/components/auth/sms-code-field";
 import { LoginLegacyGuide } from "@/components/auth/login-legacy-guide";
-import {
-  AiLegalConsentCheckboxes,
-  type AiLegalConsentChecks,
-  isAiLegalConsentChecksComplete,
-} from "@/components/legal/ai-legal-consent-checkboxes";
-import { syncAiLegalConsentAfterAuth } from "@/lib/auth/after-auth-legal-consent";
 import { navigateAfterAuth } from "@/lib/post-auth-navigate";
 
 function safeNextPath(raw: string | null): string {
@@ -59,12 +53,6 @@ export function LoginForm() {
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const { update: updateSession } = useSession();
-  const [legalChecks, setLegalChecks] = useState<AiLegalConsentChecks>({
-    userAgreement: false,
-    appPermissions: false,
-    privacyPolicy: false,
-  });
 
   useEffect(() => {
     redirectProductionHttpToHttps();
@@ -73,10 +61,6 @@ export function LoginForm() {
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
-    if (!isAiLegalConsentChecksComplete(legalChecks)) {
-      setError("请分别勾选三份法律文档后再登录");
-      return;
-    }
     setLoading(true);
     try {
       // 先检查手机号状态，给出明确提示
@@ -122,11 +106,6 @@ export function LoginForm() {
       }
       if (!res?.ok) {
         setError("登录请求失败，请清除本站 Cookie 后重试或稍后再试");
-        return;
-      }
-      const legal = await syncAiLegalConsentAfterAuth(updateSession);
-      if (!legal.ok) {
-        setError(legal.error ?? "登录成功，但法律文档确认失败，请重试");
         return;
       }
       navigateAfterAuth(next);
@@ -208,23 +187,13 @@ export function LoginForm() {
             />
           ) : null}
 
-          <AiLegalConsentCheckboxes
-            value={legalChecks}
-            onChange={setLegalChecks}
-            disabled={loading}
-            showOtpHint={tab === "otp"}
-          />
-
           {error ? (
             <p className="text-sm text-red-500" role="alert">
               {error}
             </p>
           ) : null}
 
-        <AuthHomeV2SubmitButton
-          disabled={loading || !isAiLegalConsentChecksComplete(legalChecks)}
-          loading={loading}
-        >
+        <AuthHomeV2SubmitButton disabled={loading} loading={loading}>
           登录
         </AuthHomeV2SubmitButton>
       </form>

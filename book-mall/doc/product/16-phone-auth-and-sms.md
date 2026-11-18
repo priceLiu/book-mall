@@ -27,7 +27,7 @@ Google 登录已下线；邮箱字段保留供历史订单/管理展示，**不�
 
 | 模式 | 步骤 |
 |------|------|
-| 密码 | 手机号 + 密码 |
+| 密码 | 手机号 + 密码（无需重复勾选法律文档；缺同意的老用户登录后由全站补签弹层处理） |
 | 验证码 | 手机号 → 发码（purpose=`LOGIN`）→ 输入验证码 |
 
 ### 2.3 老用户绑手机
@@ -75,7 +75,7 @@ Google 登录已下线；邮箱字段保留供历史订单/管理展示，**不�
 }
 ```
 
-注册须勾选三份法律文档；同意时间写入 `User.ai*AcceptedAt`。登录/补签见 `POST /api/auth/legal-consent` 与 `/legal/*` 静态页。
+注册须勾选三份法律文档；同意时间写入 `User.ai*AcceptedAt`。**登录页不再勾选**；存量用户缺字段时登录后 `AiLegalConsentGate` 补签一次（`POST /api/auth/legal-consent`）。当库内无人再缺同意时间时，系统自动将 `PlatformConfig.aiLegalLegacyBackfillActive` 置 `false`，关闭弹窗并停止登录 JWT 对三列的读取（内存缓存约 2 分钟）。法律全文见 `/legal/*`。
 
 ### POST `/api/auth/bind-phone`
 
