@@ -1,4 +1,4 @@
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { CANVAS_DB_TX_OPTIONS } from "@/lib/db-tx-retry";
@@ -130,10 +130,21 @@ export async function releaseTrafficSlotFromGatewayLog(log: {
   await releaseTrafficSlot(scope.scopeKey);
 }
 
+function isScopeCreateRace(error: unknown): boolean {
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002";
+}
+
 export async function acquireTrafficSlot(scope: TrafficScope): Promise<AcquireSlotResult> {
   const maxConcurrency = await resolveMaxConcurrencyForScope(scope);
-  return prisma.$transaction(
-    (tx) => acquireTrafficSlotInTx(tx, scope, maxConcurrency),
-    CANVAS_DB_TX_OPTIONS,
-  );
+  const run = () =>
+    prisma.$transaction(
+      (tx) => acquireTrafficSlotInTx(tx, scope, maxConcurrency),
+      CANVAS_DB_TX_OPTIONS,
+    );
+  try {
+    return await run();
+  } catch (error) {
+    if (!isScopeCreateRace(error)) throw error;
+    return run();
+  }
 }

@@ -1,4 +1,4 @@
-import type { GenerationSubmitTier } from "@prisma/client";
+import { Prisma, type GenerationSubmitTier } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import {
   GENERATION_SUBMIT_TIER_LABEL,
@@ -88,7 +88,23 @@ function retryAfterSec(windowStart: Date, now: Date, windowSec: number): number 
   return Math.max(1, Math.ceil((endMs - now.getTime()) / 1000));
 }
 
+function isScopeCreateRace(error: unknown): boolean {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === "P2002"
+  );
+}
+
 export async function assertSubmitBurstAllowed(scopeKey: string): Promise<void> {
+  try {
+    await assertSubmitBurstOnce(scopeKey);
+  } catch (error) {
+    if (!isScopeCreateRace(error)) throw error;
+    await assertSubmitBurstOnce(scopeKey);
+  }
+}
+
+async function assertSubmitBurstOnce(scopeKey: string): Promise<void> {
   const now = new Date();
   const config = await loadSubmitQuotaConfig(scopeKey);
   const burstLimit = config.burstLimit;
