@@ -18,6 +18,12 @@ describe("layer-ops", () => {
     expect(overlay.layers[1]?.text).toBe("");
   });
 
+  it("keeps trailing spaces while editing", () => {
+    const o = defaultCopyOverlay("A", 750);
+    const next = patchOverlayLayerText(o, "main", "game ");
+    expect(next.layers.find((l) => l.id === "main")?.text).toBe("game ");
+  });
+
   it("patches layer text independently", () => {
     let o = defaultCopyOverlay("A", 750);
     const { overlay, layerId } = addOverlayTextLayer(o);

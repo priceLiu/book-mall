@@ -1,4 +1,8 @@
-import { defaultCopyOverlayLayer, normalizeEcomCopyText } from "./defaults";
+import {
+  defaultCopyOverlayLayer,
+  normalizeEcomCopyLineEndings,
+  normalizeEcomCopyText,
+} from "./defaults";
 import type { EcomCopyOverlay, EcomCopyOverlayLayer } from "./types";
 
 function clamp01(n: number, fallback: number): number {
@@ -52,7 +56,7 @@ export function patchOverlayLayerText(
   id: string,
   text: string,
 ): EcomCopyOverlay {
-  const t = normalizeEcomCopyText(text);
+  const t = normalizeEcomCopyLineEndings(text);
   return {
     ...overlay,
     layers: overlay.layers.map((l) => (l.id === id ? { ...l, text: t } : l)),

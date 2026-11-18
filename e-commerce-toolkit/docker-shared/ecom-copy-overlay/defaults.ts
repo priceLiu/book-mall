@@ -2,9 +2,14 @@ import { normalizeCopyFontPresetId } from "./copy-fonts";
 import type { EcomCopyOverlay, EcomCopyOverlayLayer } from "./types";
 import { ECOM_COPY_OVERLAY_VERSION } from "./types";
 
-/** 统一换行符，仅去掉首尾空白；保留中间换行供排版与合成 */
+/** 统一换行符；编辑态保留首尾空格（行内空格、末尾加字） */
+export function normalizeEcomCopyLineEndings(text: string): string {
+  return text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+}
+
+/** 落库 / 合成前：统一换行并去掉整体首尾空白 */
 export function normalizeEcomCopyText(text: string): string {
-  return text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").replace(/^\s+|\s+$/g, "");
+  return normalizeEcomCopyLineEndings(text).replace(/^\s+|\s+$/g, "");
 }
 
 /** 打开排版编辑器时：优先 main 层已存文案（含多行），与 slotCopy 对齐 */

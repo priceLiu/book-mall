@@ -18,6 +18,7 @@ COPY docker-shared/federated-portal-nav /shared/federated-portal-nav
 COPY docker-shared/media-render-subtitle-style /shared/media-render-subtitle-style
 COPY docker-shared/platform-assistant /shared/platform-assistant
 COPY docker-shared/ecom-copy-overlay /shared/ecom-copy-overlay
+COPY docker-shared/generation-user-facing-error /shared/generation-user-facing-error
 
 FROM with-shared AS deps
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
