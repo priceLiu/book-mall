@@ -21,6 +21,12 @@ COPY docker-shared/ecom-copy-overlay /shared/ecom-copy-overlay
 COPY docker-shared/generation-user-facing-error /shared/generation-user-facing-error
 
 FROM with-shared AS deps
+# install 前再拷 shared 快照：绑定 deps 层缓存，避免部分构建机 with-shared 层未带入 /shared
+COPY docker-shared/federated-portal-nav /shared/federated-portal-nav
+COPY docker-shared/media-render-subtitle-style /shared/media-render-subtitle-style
+COPY docker-shared/platform-assistant /shared/platform-assistant
+COPY docker-shared/ecom-copy-overlay /shared/ecom-copy-overlay
+COPY docker-shared/generation-user-facing-error /shared/generation-user-facing-error
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 # postinstall 会跑 prisma generate；schema 须先于 install 拷入
 COPY prisma ./prisma

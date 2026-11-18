@@ -16,6 +16,13 @@ COPY docker-shared/generation-user-facing-error /shared/generation-user-facing-e
 COPY docker-shared/platform-compose-ui /book-mall/platform-compose-ui
 
 FROM with-shared AS deps
+COPY docker-shared/federated-portal-logout /shared/federated-portal-logout
+COPY docker-shared/federated-portal-nav /shared/federated-portal-nav
+COPY docker-shared/media-render-subtitle-style /shared/media-render-subtitle-style
+COPY docker-shared/platform-assistant /shared/platform-assistant
+COPY docker-shared/ecom-copy-overlay /shared/ecom-copy-overlay
+COPY docker-shared/generation-user-facing-error /shared/generation-user-facing-error
+COPY docker-shared/platform-compose-ui /book-mall/platform-compose-ui
 # pnpm-workspace.yaml 含 allowBuilds: unrs-resolver；不拷会触发 ERR_PNPM_IGNORED_BUILDS
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY scripts/docker-sync-platform-assistant.mjs scripts/docker-sync-platform-assistant.mjs

@@ -34,12 +34,12 @@ const VENDOR_INPUT_HINTS: Record<string, string> = {
 export function stripLeadingHttpStatusPrefix(raw: string): string {
   const t = raw.trim();
   if (!t) return t;
-  const withComma = t.match(/^(\d{3})\s*[,，]\s*(.+)$/s);
+  const withComma = t.match(/^(\d{3})\s*[,，]\s*([\s\S]+)$/);
   if (withComma) {
     const status = Number(withComma[1]);
     if (status >= 400 && status < 600) return withComma[2].trim();
   }
-  const withSpace = t.match(/^(\d{3})\s+(.+)$/s);
+  const withSpace = t.match(/^(\d{3})\s+([\s\S]+)$/);
   if (withSpace) {
     const status = Number(withSpace[1]);
     if (status >= 400 && status < 600) return withSpace[2].trim();
