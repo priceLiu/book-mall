@@ -82,6 +82,7 @@ import { LibtvNodeErrorBanner } from "../libtv-node-error-banner";
 import { useLibtvRuntimeErrorBanner } from "@/lib/canvas/use-libtv-runtime-error-banner";
 import { useSaveNodeAsAsset } from "@/lib/canvas/use-save-node-as-asset";
 import {
+  libtvRuntimeErrorAlertTitle,
   useLibtvRuntimeErrorAlert,
   showLibtvRuntimeFailureDialog,
 } from "@/lib/canvas/libtv-runtime-error-alert";
