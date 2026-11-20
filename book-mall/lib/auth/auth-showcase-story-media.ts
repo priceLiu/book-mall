@@ -9,26 +9,29 @@ export async function listAuthStoryVerticalShowcaseMedia(): Promise<
 > {
   const catalog = await listStoryDiscoverCatalog();
 
-  return catalog
-    .filter((p) => p.aspectRatio === "9:16")
-    .map((p) => {
-      const videoUrl = p.previewVideoUrl?.trim() ?? "";
-      const poster =
-        p.coverImageUrl?.trim() || p.styleFallbackUrl?.trim() || undefined;
-      const url = videoUrl || poster || "";
-      if (!url) return null;
+  const out: PortalFilmShowcaseMedia[] = [];
 
-      return {
-        id: `story:${p.id}`,
-        url: videoUrl || poster!,
-        kind: videoUrl ? ("video" as const) : ("image" as const),
-        posterUrl: videoUrl ? poster : undefined,
-        sourceKind: "story" as const,
-        sourceId: p.id,
-        projectName: p.name,
-        description: p.description?.trim() || "竖屏漫剧 · 9:16",
-        owner: null,
-      } satisfies PortalFilmShowcaseMedia;
-    })
-    .filter((row): row is PortalFilmShowcaseMedia => row !== null);
+  for (const p of catalog) {
+    if (p.aspectRatio !== "9:16") continue;
+
+    const videoUrl = p.previewVideoUrl?.trim() ?? "";
+    const poster =
+      p.coverImageUrl?.trim() || p.styleFallbackUrl?.trim() || undefined;
+    const url = videoUrl || poster || "";
+    if (!url) continue;
+
+    out.push({
+      id: `story:${p.id}`,
+      url: videoUrl || url,
+      kind: videoUrl ? "video" : "image",
+      posterUrl: videoUrl ? poster : undefined,
+      sourceKind: "story",
+      sourceId: p.id,
+      projectName: p.name,
+      description: p.description?.trim() || "竖屏漫剧 · 9:16",
+      owner: null,
+    });
+  }
+
+  return out;
 }
