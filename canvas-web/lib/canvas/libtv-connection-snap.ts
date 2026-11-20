@@ -224,6 +224,25 @@ export function inferLibtvConnectHandleType(
   return "source";
 }
 
+export type ConnectHoverEdge = "left" | "right";
+
+/** 吸附目标节点 · 连线将接触的边（下游入边左倾 / 上游出边右倾） */
+export function resolveConnectDragHoverEdge(
+  nodes: CanvasFlowNode[],
+  flowPoint: { x: number; y: number },
+  fromHandleId: string | null,
+  hoverNodeId: string | null,
+): ConnectHoverEdge | null {
+  if (!hoverNodeId) return null;
+  const fromHandleType = inferLibtvConnectHandleType(fromHandleId);
+  if (fromHandleType === "source") return "left";
+  if (fromHandleType === "target") return "right";
+  const node = nodes.find((n) => n.id === hoverNodeId);
+  if (!node) return null;
+  const { x, w } = nodeFlowBounds(node, nodes);
+  return flowPoint.x < x + w / 2 ? "left" : "right";
+}
+
 /** 侧栏 + 拖线过程中 · 指针下可 snap 的目标节点（与松手 snap 规则一致） */
 export function findConnectDragHoverNodeId(
   nodes: CanvasFlowNode[],

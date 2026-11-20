@@ -135,6 +135,7 @@ export default defineConfig({
       "test/unit/pro2-selection-bbox.test.ts",
       "test/unit/batch-connect-selection-screen-box.test.ts",
       "test/unit/sbv1-upstream-ref-links.test.ts",
+      "test/unit/libtv-connection-hover-edge.test.ts",
       "test/unit/libtv-video-track-split.test.ts",
       "test/unit/libtv-video-compose-workbench.test.ts",
       "test/unit/libtv-image-node-title.test.ts",

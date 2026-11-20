@@ -130,6 +130,7 @@ import { CANVAS_GRAPH_UNDO_REDO_EVENT } from "@/lib/canvas/canvas-graph-undo-red
 import {
   findConnectDragHoverNodeId,
   findNearestSidePlusHandle,
+  resolveConnectDragHoverEdge,
   resolveSnapConnectionOnNodeHit,
 } from "@/lib/canvas/libtv-connection-snap";
 import {
@@ -446,6 +447,7 @@ function FlowCanvasInner({
     (s) => s.connectingFromHandleId,
   );
   const connectionHoverNodeId = useCanvasStore((s) => s.connectionHoverNodeId);
+  const connectionHoverEdge = useCanvasStore((s) => s.connectionHoverEdge);
   const fitViewNonce = useCanvasStore((s) => s.fitViewNonce);
   const canvasFocusNodeId = useCanvasStore((s) => s.canvasFocusNodeId);
   const canvasFocusNonce = useCanvasStore((s) => s.canvasFocusNonce);
@@ -2188,9 +2190,20 @@ function FlowCanvasInner({
         connectingFromNodeId,
         connectingFromHandleId,
       );
-      const cur = useCanvasStore.getState().connectionHoverNodeId;
-      if (hoverId !== cur) {
-        setConnectionHoverNodeId(hoverId);
+      const hoverEdge = hoverId
+        ? resolveConnectDragHoverEdge(
+            nodes,
+            flowPoint,
+            connectingFromHandleId,
+            hoverId,
+          )
+        : null;
+      const cur = useCanvasStore.getState();
+      if (
+        hoverId !== cur.connectionHoverNodeId ||
+        hoverEdge !== cur.connectionHoverEdge
+      ) {
+        setConnectionHoverNodeId(hoverId, hoverEdge);
       }
     };
 
@@ -2376,12 +2389,19 @@ function FlowCanvasInner({
         let className = (n.className ?? "")
           .replace(/\bis-drop-target\b/g, "")
           .replace(/\bis-connect-target\b/g, "")
+          .replace(/\bis-connect-target-edge-left\b/g, "")
+          .replace(/\bis-connect-target-edge-right\b/g, "")
           .trim();
         if (dragHoverGroupId && n.id === dragHoverGroupId) {
           className = `${className} is-drop-target`.trim();
         }
         if (connectionHoverNodeId && n.id === connectionHoverNodeId) {
           className = `${className} is-connect-target`.trim();
+          if (connectionHoverEdge === "left") {
+            className = `${className} is-connect-target-edge-left`.trim();
+          } else if (connectionHoverEdge === "right") {
+            className = `${className} is-connect-target-edge-right`.trim();
+          }
         }
         if (className === (n.className ?? "").trim()) return n;
         return { ...n, className };
@@ -2393,6 +2413,7 @@ function FlowCanvasInner({
     rfNodes,
     dragHoverGroupId,
     connectionHoverNodeId,
+    connectionHoverEdge,
     canvasDraggingNodeId,
     libtvCanvas,
   ]);

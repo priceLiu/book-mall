@@ -772,6 +772,50 @@ html[data-canvas-modal-open] .libtv-node-toolbar-portal {
   .libtv-media-node-bg {
   outline: 2px solid var(--canvas-accent) !important;
   box-shadow: 0 0 0 4px var(--canvas-accent-glow) !important;
+  transition:
+    outline 0.12s ease-out,
+    box-shadow 0.12s ease-out,
+    transform 0.18s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* 下游汇入 · 左缘向内收 */
+.canvas-connecting
+  .react-flow__node.is-connect-target-edge-left:not(.react-flow__node-group):not(
+    .dragging
+  )
+  .canvas-node-shell,
+.canvas-connecting
+  .react-flow__node.is-connect-target-edge-left:not(.react-flow__node-group):not(
+    .dragging
+  )
+  .libtv-control-node-bg,
+.canvas-connecting
+  .react-flow__node.is-connect-target-edge-left:not(.react-flow__node-group):not(
+    .dragging
+  )
+  .libtv-media-node-bg {
+  transform: perspective(960px) rotateY(3.2deg);
+  transform-origin: left center;
+}
+
+/* 上游 / 右侧接住 · 右缘向内收 */
+.canvas-connecting
+  .react-flow__node.is-connect-target-edge-right:not(.react-flow__node-group):not(
+    .dragging
+  )
+  .canvas-node-shell,
+.canvas-connecting
+  .react-flow__node.is-connect-target-edge-right:not(.react-flow__node-group):not(
+    .dragging
+  )
+  .libtv-control-node-bg,
+.canvas-connecting
+  .react-flow__node.is-connect-target-edge-right:not(.react-flow__node-group):not(
+    .dragging
+  )
+  .libtv-media-node-bg {
+  transform: perspective(960px) rotateY(-3.2deg);
+  transform-origin: right center;
 }
 
 /* ----------------------------------------

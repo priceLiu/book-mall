@@ -297,11 +297,13 @@ type CanvasState = {
    * - `connectingFromNodeId`：用户按住源 handle 拖线时该 handle 所属节点
    * - `dragHoverGroupId`：拖动节点过程中，鼠标当前悬停在哪个 group 容器内
    * - `connectionHoverNodeId`：侧栏 + 拖线时指针下可 snap 的目标节点
+   * - `connectionHoverEdge`：吸附侧（左=下游入边 / 右=上游出边）· 连线接触倾斜
    */
   connectingFromNodeId: string | null;
   /** 正在拖线的源 handle id · 拖线中仅该侧 + 保持可见 */
   connectingFromHandleId: string | null;
   connectionHoverNodeId: string | null;
+  connectionHoverEdge: import("./libtv-connection-snap").ConnectHoverEdge | null;
   /** 侧栏 + 拖线松手空白处 · 待选菜单（与 connectingFrom 并存） */
   pendingSideConnect: PendingSideConnect | null;
   dragHoverGroupId: string | null;
@@ -330,7 +332,10 @@ type CanvasState = {
   /** 鼠标悬停的 LibTV 媒体组（未选中时也可显示顶栏） */
   hoveredMediaGroupId: string | null;
   setConnectingFrom: (id: string | null, handleId?: string | null) => void;
-  setConnectionHoverNodeId: (id: string | null) => void;
+  setConnectionHoverNodeId: (
+    id: string | null,
+    edge?: import("./libtv-connection-snap").ConnectHoverEdge | null,
+  ) => void;
   setPendingSideConnect: (pending: PendingSideConnect | null) => void;
   clearPendingSideConnect: () => void;
   setDragHoverGroup: (id: string | null) => void;
@@ -575,6 +580,7 @@ export const useCanvasStore = create<CanvasState>()(
       connectingFromNodeId: null,
       connectingFromHandleId: null,
       connectionHoverNodeId: null,
+      connectionHoverEdge: null,
       pendingSideConnect: null,
       dragHoverGroupId: null,
       hoveredMediaGroupId: null,
@@ -594,9 +600,18 @@ export const useCanvasStore = create<CanvasState>()(
         set({
           connectingFromNodeId: id,
           connectingFromHandleId: id ? handleId : null,
-          connectionHoverNodeId: id ? get().connectionHoverNodeId : null,
+          ...(id
+            ? {}
+            : {
+                connectionHoverNodeId: null,
+                connectionHoverEdge: null,
+              }),
         }),
-      setConnectionHoverNodeId: (id) => set({ connectionHoverNodeId: id }),
+      setConnectionHoverNodeId: (id, edge = null) =>
+        set({
+          connectionHoverNodeId: id,
+          connectionHoverEdge: id ? (edge ?? null) : null,
+        }),
       setPendingSideConnect: (pending) => set({ pendingSideConnect: pending }),
       clearPendingSideConnect: () =>
         set({
@@ -604,6 +619,7 @@ export const useCanvasStore = create<CanvasState>()(
           connectingFromNodeId: null,
           connectingFromHandleId: null,
           connectionHoverNodeId: null,
+          connectionHoverEdge: null,
         }),
       setDragHoverGroup: (id) => set({ dragHoverGroupId: id }),
       setHoveredMediaGroupId: (id) => set({ hoveredMediaGroupId: id }),
@@ -622,6 +638,7 @@ export const useCanvasStore = create<CanvasState>()(
           connectingFromNodeId: null,
           connectingFromHandleId: null,
           connectionHoverNodeId: null,
+          connectionHoverEdge: null,
           pendingSideConnect: null,
         }),
       setCanvasGeometryDragging: (dragging) =>
