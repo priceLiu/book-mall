@@ -1,5 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 
+import { filterPortalFilmShowcaseForAuth } from "@/lib/auth/auth-showcase-exclusions";
+import { listAuthStoryVerticalShowcaseMedia } from "@/lib/auth/auth-showcase-story-media";
 import { listPortalFilmShowcaseMedia } from "@/lib/canvas/sbv1-film-showcase";
 import {
   canvasErrorToResponse,
@@ -16,9 +18,15 @@ export async function GET(request: NextRequest) {
   try {
     const raw = request.nextUrl.searchParams.get("limit");
     const limit = raw ? Number.parseInt(raw, 10) : undefined;
-    const items = await listPortalFilmShowcaseMedia(
+    const forAuth = request.nextUrl.searchParams.get("for") === "auth";
+    let items = await listPortalFilmShowcaseMedia(
       Number.isFinite(limit) ? limit : undefined,
     );
+    if (forAuth) {
+      items = filterPortalFilmShowcaseForAuth(items);
+      const storyVertical = await listAuthStoryVerticalShowcaseMedia();
+      items = [...items, ...storyVertical];
+    }
     return NextResponse.json({ items }, { headers: jsonHeaders(request) });
   } catch (err) {
     return canvasErrorToResponse(request, err);

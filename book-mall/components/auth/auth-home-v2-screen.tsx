@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 
 import { AuthHomeV2Showcase } from "@/components/auth/auth-home-v2-showcase";
+import { AuthV2Starfield } from "@/components/auth/auth-v2-starfield";
 
 type Props = {
   children: ReactNode;
@@ -17,13 +18,17 @@ export function AuthHomeV2Screen({ children, formTheme = "light" }: Props) {
 
   return (
     <div className={pageClass} data-site-home-v2>
+      {formTheme === "dark" ? <AuthV2Starfield /> : null}
       <div data-auth-v2-shell className="auth-v2-shell">
         <aside className="auth-v2-showcase-pane" aria-label="精选成片预览">
           <AuthHomeV2Showcase />
         </aside>
-        <main className="auth-v2-form-pane" data-auth-v2-form>
-          <div className="auth-v2-form-inner">{children}</div>
-        </main>
+        <div className="auth-v2-form-column">
+          <div className="auth-v2-form-glass-underlay" aria-hidden />
+          <main className="auth-v2-form-pane" data-auth-v2-form>
+            <div className="auth-v2-form-inner">{children}</div>
+          </main>
+        </div>
       </div>
     </div>
   );

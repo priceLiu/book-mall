@@ -207,6 +207,11 @@ export async function listStoryDiscoverProjects(): Promise<StoryProjectListDto[]
   return page.projects;
 }
 
+/** 全量 discover 目录（门户精品漫剧 + 9:16/16:9 兜底卡片；供登录左栏等合并片源） */
+export async function listStoryDiscoverCatalog(): Promise<StoryDiscoverListDto[]> {
+  return buildFullDiscoverCatalog();
+}
+
 /** 门户精品漫剧卡片 · 只读工作台详情（无 DB 行） */
 export async function getDiscoverShowcaseProjectDetail(
   projectId: string,

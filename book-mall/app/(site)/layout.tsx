@@ -1,8 +1,7 @@
-import { headers } from "next/headers";
 import { getServerSession } from "next-auth";
 import { HomeV2NavAuthSlot } from "@/components/layout/home-v2-nav-auth-slot";
 import { NavbarAuth } from "@/components/layout/navbar-auth";
-import { SiteLayoutShell } from "@/components/layout/site-home/site-layout-shell";
+import { SiteLayoutShellGate } from "@/components/layout/site-home/site-layout-shell-gate";
 import { authOptions } from "@/lib/auth";
 import "../site-home.css";
 import "../site-home-v2.css";
@@ -12,19 +11,14 @@ export const dynamic = "force-dynamic";
 
 export default async function SiteLayout({ children }: { children: React.ReactNode }) {
   const session = await getServerSession(authOptions);
-  const pathname =
-    headers().get("x-book-pathname") ??
-    headers().get("next-url")?.replace(/^https?:\/\/[^/]+/, "") ??
-    "/";
 
   return (
-    <SiteLayoutShell
-      pathname={pathname.split("?")[0] || "/"}
+    <SiteLayoutShellGate
       navAuth={<NavbarAuth appearance="site-home" />}
       v2NavAuth={<HomeV2NavAuthSlot />}
       isLoggedIn={Boolean(session?.user)}
     >
       {children}
-    </SiteLayoutShell>
+    </SiteLayoutShellGate>
   );
 }

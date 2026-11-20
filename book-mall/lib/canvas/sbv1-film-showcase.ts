@@ -17,13 +17,15 @@ const SBV1_VIDEO_NODE = "sbv1-video-engine";
 
 export type PortalFilmShowcaseMediaKind = "image" | "video";
 
+export type PortalFilmShowcaseSourceKind = "project" | "story";
+
 export type PortalFilmShowcaseMedia = {
   id: string;
   url: string;
   kind: PortalFilmShowcaseMediaKind;
   /** 视频封面（悬停播放前展示） */
   posterUrl?: string;
-  sourceKind: "project";
+  sourceKind: PortalFilmShowcaseSourceKind;
   sourceId: string;
   projectName: string;
   description: string;
@@ -253,7 +255,7 @@ async function fetchPortalFilmCaseSbv1Projects(): Promise<ProjectRow[]> {
       ],
     },
     orderBy: [{ portalFilmCaseSort: "asc" }, { updatedAt: "desc" }],
-    take: 20,
+    take: 48,
     select: {
       id: true,
       name: true,

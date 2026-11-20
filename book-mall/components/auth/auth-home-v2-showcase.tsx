@@ -1,10 +1,11 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { pickAuthShowcaseHero } from "@/lib/auth/shuffle-portal-showcase";
 import type { PortalFilmShowcaseMedia } from "@/lib/canvas/sbv1-film-showcase";
+
+const AUTH_SHOWCASE_LAST_URL_KEY = "auth-v2-showcase-last-url";
 
 export function AuthHomeV2Showcase() {
   const [hero, setHero] = useState<PortalFilmShowcaseMedia | null | undefined>(undefined);
@@ -13,13 +14,28 @@ export function AuthHomeV2Showcase() {
     let cancelled = false;
     void (async () => {
       try {
-        const res = await fetch("/api/canvas/projects/portal-film-showcase?limit=48", {
-          cache: "no-store",
-        });
+        const res = await fetch(
+          "/api/canvas/projects/portal-film-showcase?limit=200&for=auth",
+          { cache: "no-store" },
+        );
         const data = (await res.json()) as { items?: PortalFilmShowcaseMedia[] };
         if (cancelled) return;
         const raw = Array.isArray(data.items) ? data.items : [];
-        setHero(pickAuthShowcaseHero(raw));
+        let excludeUrl: string | null = null;
+        try {
+          excludeUrl = sessionStorage.getItem(AUTH_SHOWCASE_LAST_URL_KEY);
+        } catch {
+          /* private mode */
+        }
+        const picked = pickAuthShowcaseHero(raw, { excludeUrl });
+        if (picked?.url) {
+          try {
+            sessionStorage.setItem(AUTH_SHOWCASE_LAST_URL_KEY, picked.url.trim());
+          } catch {
+            /* private mode */
+          }
+        }
+        setHero(picked);
       } catch {
         if (!cancelled) setHero(null);
       }
@@ -33,9 +49,6 @@ export function AuthHomeV2Showcase() {
 
   return (
     <div className="auth-v2-showcase">
-      <Link href="/" className="auth-v2-showcase-back" aria-label="返回首页">
-        ←
-      </Link>
       <div className="auth-v2-showcase-hero">
         {loading ? (
           <div className="auth-v2-showcase-skeleton" aria-hidden />
