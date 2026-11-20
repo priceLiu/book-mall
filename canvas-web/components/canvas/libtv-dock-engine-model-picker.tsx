@@ -18,7 +18,7 @@ import {
   useSbv1ToolbarAnchor,
 } from "./sbv1/sbv1-toolbar-anchor-popover";
 import { useModelTemplateCatalog } from "@/lib/canvas/use-model-template-catalog";
-import { modelKeysForTemplate } from "@/lib/canvas/model-template-catalog";
+import { resolveDockAllowedModelKeys } from "@/lib/canvas/resolve-dock-allowed-model-keys";
 import {
   LIBTV_DOCK_MODEL_POPOVER_CLASS,
   LIBTV_DOCK_PICKER_CHECK_CLASS,
@@ -72,13 +72,15 @@ export function LibtvDockEngineModelPicker({
   const setOpen = onOpenChange ?? setInternalOpen;
   const { fontPx, minHeightPx, chevronPx } = useLibtvDockToolbarMetrics();
 
-  const effectiveAllowed = useMemo(() => {
-    if (sceneTemplateId) {
-      const keys = modelKeysForTemplate(catalog, sceneTemplateId);
-      if (keys.length > 0) return keys;
-    }
-    return allowedModelKeys;
-  }, [sceneTemplateId, catalog, allowedModelKeys]);
+  const effectiveAllowed = useMemo(
+    () =>
+      resolveDockAllowedModelKeys({
+        sceneTemplateId,
+        catalog,
+        allowedModelKeys,
+      }),
+    [sceneTemplateId, catalog, allowedModelKeys],
+  );
 
   const modelGroups = useMemo(() => {
     const flat = collectLibtvDockEngineModels(providers, {

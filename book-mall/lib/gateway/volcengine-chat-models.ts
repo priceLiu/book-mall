@@ -173,11 +173,11 @@ export const VOLCENGINE_VIDEO_KNOWN_MODELS: CanvasGatewayListedModel[] = [
 /** 火山方舟 · 图像生成（Seedream） */
 export const VOLCENGINE_IMAGE_KNOWN_MODELS: CanvasGatewayListedModel[] = [
   {
-    modelKey: "doubao-seedream-5-0-pro",
-    displayName: "Doubao Seedream 5.0 Pro",
+    modelKey: "doubao-seedream-4-5",
+    displayName: "Doubao Seedream 4.5",
     role: "IMAGE",
     description:
-      "火山方舟 · 旗舰文生图/图生图/交互编辑（可框选或纯提示词换背景，上游 doubao-seedream-5-0-pro-260628）",
+      "火山方舟 · 文生图/图生图（上游 doubao-seedream-4-5-251128）",
     paramsSchema: [],
     defaultParams: {},
   },
@@ -190,20 +190,20 @@ export const VOLCENGINE_IMAGE_KNOWN_MODELS: CanvasGatewayListedModel[] = [
     defaultParams: {},
   },
   {
+    modelKey: "doubao-seedream-5-0-pro",
+    displayName: "Doubao Seedream 5.0 Pro",
+    role: "IMAGE",
+    description:
+      "火山方舟 · 旗舰文生图/图生图/交互编辑（可框选或纯提示词换背景，上游 doubao-seedream-5-0-pro-260628）",
+    paramsSchema: [],
+    defaultParams: {},
+  },
+  {
     modelKey: VOLCENGINE_SEEDREAM_55_GATEWAY_KEY,
     displayName: "Doubao Seedream 5.5",
     role: "IMAGE",
     description:
       "火山方舟 · 文生图/图生图/交互编辑/图层拆分/RGBA（上游 doubao-seedream-5-5-261028）",
-    paramsSchema: [],
-    defaultParams: {},
-  },
-  {
-    modelKey: "doubao-seedream-4-5",
-    displayName: "Doubao Seedream 4.5",
-    role: "IMAGE",
-    description:
-      "火山方舟 · 文生图/图生图（上游 doubao-seedream-4-5-251128）",
     paramsSchema: [],
     defaultParams: {},
   },

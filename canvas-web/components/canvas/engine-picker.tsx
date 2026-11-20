@@ -40,7 +40,7 @@ import {
   modelMatchesDockGatewayRole,
 } from "@/lib/canvas/libtv-dock-engine-models";
 import { useModelTemplateCatalog } from "@/lib/canvas/use-model-template-catalog";
-import { modelKeysForTemplate } from "@/lib/canvas/model-template-catalog";
+import { resolveDockAllowedModelKeys } from "@/lib/canvas/resolve-dock-allowed-model-keys";
 
 export type EnginePickerProps = {
   /** 过滤模型 role：LLM / IMAGE / VIDEO / MUSIC / TTS */
@@ -135,13 +135,12 @@ export function EnginePicker({
   // 若直接进 useMemo 依赖会导致 filtered/groups 每帧变更，进而让弹层 effect 反复 setDraft → 闪烁。
   // 改用「序列化 key」做依赖，按内容稳定。
   const SEP = "\u0001";
-  const templateKeys = sceneTemplateId
-    ? modelKeysForTemplate(catalog, sceneTemplateId)
-    : [];
-  /** 静态目录已发布且有绑定时优先模板；否则回退调用方白名单 */
-  const effectiveAllowed =
-    templateKeys.length > 0 ? templateKeys : (allowedModelKeys ?? []);
-  const allowedKey = effectiveAllowed.join(SEP);
+  const effectiveAllowed = resolveDockAllowedModelKeys({
+    sceneTemplateId,
+    catalog,
+    allowedModelKeys,
+  });
+  const allowedKey = (effectiveAllowed ?? []).join(SEP);
   const providerIdsKey = (providerIds ?? []).join(SEP);
   const reqCapsKey = (requiredCapabilities ?? []).join(SEP);
 

@@ -118,3 +118,52 @@ describe("libtv-dock-engine-models · Gateway TTS role", () => {
     expect(isAllowedDockModelKey("gpt-4", allowed)).toBe(false);
   });
 });
+
+import { resolveDockAllowedModelKeys } from "@/lib/canvas/resolve-dock-allowed-model-keys";
+
+describe("resolveDockAllowedModelKeys", () => {
+  it("unions template catalog with node whitelist", () => {
+    const keys = resolveDockAllowedModelKeys({
+      sceneTemplateId: "t2i",
+      catalog: {
+        version: "1",
+        publishedAt: "",
+        templates: [
+          {
+            id: "t2i",
+            title: "t2i",
+            status: "ACTIVE",
+            rules: {},
+            models: [
+              {
+                canonicalModelKey: "doubao-seedream-5-0-lite",
+                displayName: "Lite",
+                unit: "PER_IMAGE",
+                creditsPerUnit: 1,
+                tiers: [],
+                rules: {},
+                resolved: {
+                  modelKey: "doubao-seedream-5-0-lite",
+                  vendor: "volcengine",
+                  providerKind: "VOLCENGINE",
+                },
+              },
+            ],
+          },
+        ],
+      },
+      allowedModelKeys: [
+        "doubao-seedream-5-0-lite",
+        "doubao-seedream-5-5",
+        "doubao-seedream-4-5",
+      ],
+    });
+    expect(keys).toEqual(
+      expect.arrayContaining([
+        "doubao-seedream-5-0-lite",
+        "doubao-seedream-5-5",
+        "doubao-seedream-4-5",
+      ]),
+    );
+  });
+});

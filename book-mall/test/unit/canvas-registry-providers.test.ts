@@ -111,6 +111,57 @@ describe("stripCanvasSupersededImageModels", () => {
 });
 
 describe("mergeKnownVolcengineImageModelsForCanvas", () => {
+  it("forces all Seedream onto volcengine even when another provider had 5.5", () => {
+    const providers: CanvasProviderDto[] = [
+      {
+        ...shell("platform:offering"),
+        models: [
+          {
+            id: "platform:offering::doubao-seedream-5-5",
+            modelKey: "doubao-seedream-5-5",
+            displayName: "5.5",
+            role: "IMAGE",
+            description: null,
+            paramsSchema: null,
+            defaultParams: null,
+            enabled: true,
+            sortOrder: 0,
+          },
+        ],
+      },
+      {
+        ...shell(GATEWAY_VOLCENGINE_PROVIDER_ID),
+        models: [
+          {
+            id: `${GATEWAY_VOLCENGINE_PROVIDER_ID}::doubao-seedream-5-0-pro`,
+            modelKey: "doubao-seedream-5-0-pro",
+            displayName: "Pro",
+            role: "IMAGE",
+            description: null,
+            paramsSchema: null,
+            defaultParams: null,
+            enabled: true,
+            sortOrder: 0,
+          },
+        ],
+      },
+    ];
+    const merged = mergeKnownVolcengineImageModelsForCanvas(providers, {
+      role: "IMAGE",
+    });
+    const volc = merged.find((p) => p.id === GATEWAY_VOLCENGINE_PROVIDER_ID);
+    const platform = merged.find((p) => p.id === "platform:offering");
+    expect(
+      volc?.models.some((m) => m.modelKey === "doubao-seedream-5-5"),
+    ).toBe(true);
+    expect(
+      volc?.models.some((m) => m.modelKey === "doubao-seedream-4-5"),
+    ).toBe(true);
+    expect(platform?.models.some((m) => m.modelKey === "doubao-seedream-5-5")).toBe(
+      false,
+    );
+  });
+
   it("appends doubao-seedream-5-5 when registry list omitted it", () => {
     const providers: CanvasProviderDto[] = [
       {

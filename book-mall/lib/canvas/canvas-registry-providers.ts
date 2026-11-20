@@ -279,29 +279,30 @@ function knownVolcengineImageToModelDto(
   };
 }
 
-/** 注册表漏项时兜底火山方舟 Seedream（含 5.5），与电商 mergeBackgroundReplaceModels 对齐。 */
+/** 画布 · 火山 Seedream 固定归在 gateway:volcengine（勿散落在平台/KIE）。 */
 export function mergeKnownVolcengineImageModelsForCanvas(
   providers: CanvasProviderDto[],
   opts: { role?: CanvasModelRole },
 ): CanvasProviderDto[] {
   if (opts.role && opts.role !== "IMAGE") return providers;
 
-  const presentKeys = new Set<string>();
-  for (const p of providers) {
-    for (const m of p.models) presentKeys.add(m.modelKey);
-  }
-
-  const missing = VOLCENGINE_IMAGE_KNOWN_MODELS.filter(
-    (m) => m.role === "IMAGE" && !presentKeys.has(m.modelKey),
+  const volcImageKeys = new Set(
+    VOLCENGINE_IMAGE_KNOWN_MODELS.filter((m) => m.role === "IMAGE").map(
+      (m) => m.modelKey,
+    ),
   );
-  if (missing.length === 0) return providers;
 
   const now = new Date().toISOString();
-  const out = providers.map((p) =>
-    p.id === GATEWAY_VOLCENGINE_PROVIDER_ID
-      ? { ...p, models: [...p.models] }
-      : p,
-  );
+  const out = providers.map((p) => {
+    if (p.id === GATEWAY_VOLCENGINE_PROVIDER_ID) {
+      return { ...p, models: [...p.models] };
+    }
+    return {
+      ...p,
+      models: p.models.filter((m) => !volcImageKeys.has(m.modelKey)),
+    };
+  });
+
   let volc = out.find((p) => p.id === GATEWAY_VOLCENGINE_PROVIDER_ID);
   if (!volc) {
     volc = {
@@ -311,15 +312,15 @@ export function mergeKnownVolcengineImageModelsForCanvas(
     out.push(volc);
   }
 
-  const baseSort = volc.models.length;
-  for (let i = 0; i < missing.length; i++) {
+  const existing = new Set(volc.models.map((m) => m.modelKey));
+  let sort = Math.max(380, ...volc.models.map((m) => m.sortOrder), 0);
+  for (const meta of VOLCENGINE_IMAGE_KNOWN_MODELS) {
+    if (meta.role !== "IMAGE" || existing.has(meta.modelKey)) continue;
+    sort += 1;
     volc.models.push(
-      knownVolcengineImageToModelDto(
-        GATEWAY_VOLCENGINE_PROVIDER_ID,
-        missing[i]!,
-        baseSort + i,
-      ),
+      knownVolcengineImageToModelDto(GATEWAY_VOLCENGINE_PROVIDER_ID, meta, sort),
     );
+    existing.add(meta.modelKey);
   }
   volc.models.sort((a, b) => a.sortOrder - b.sortOrder);
   return out;
