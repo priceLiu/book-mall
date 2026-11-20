@@ -754,15 +754,7 @@ function Inner({ initialPage }: { initialPage?: CanvasProjectListPage | null }) 
               className="twenty-btn-accent text-sm"
             >
               <Plus className="mr-2 size-4" />
-              新建影视专业版 2.0
-            </button>
-            <button
-              type="button"
-              onClick={() => onOpenPicker("sbv1")}
-              className="rounded-lg border border-cyan-400/40 bg-cyan-500/15 px-3 py-2 text-sm font-medium text-cyan-100 hover:bg-cyan-500/25"
-            >
-              <Plus className="mr-2 inline size-4" />
-              新建分镜视频 1.0
+              开始我的创作之旅
             </button>
           </div>
         </div>
@@ -785,7 +777,7 @@ function Inner({ initialPage }: { initialPage?: CanvasProjectListPage | null }) 
         <CanvasListSkeleton sections={3} cardsPerSection={5} />
       ) : projects.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-[var(--canvas-border)] bg-[var(--canvas-surface)] p-12 text-center text-sm text-[var(--canvas-muted)]">
-          还没有画布。请使用上方按钮创建影视专业版 2.0 或分镜视频画布。
+          还没有画布。点击上方「开始我的创作之旅」即可创建。
         </div>
       ) : (
         <div className="space-y-10">
@@ -832,28 +824,29 @@ function Inner({ initialPage }: { initialPage?: CanvasProjectListPage | null }) 
             openingProjectId={openingProjectId}
             onOpeningProject={setOpeningProjectId}
           />
-          <ProjectsSection
-            title="分镜视频 1.0"
-            edition="sbv1"
-            projects={sbv1Projects}
-            mayLoadMore={hasMore}
-            onDelete={onDelete}
-            onDuplicate={onDuplicate}
-            duplicatingId={duplicatingId}
-            onPrefetchProject={prefetchProject}
-            onRename={onRename}
-            onCreate={() => onOpenPicker("sbv1")}
-            isAdmin={isAdmin}
-            portalFeaturedIds={portalFeaturedIds}
-            portalCaseIds={portalFilmCaseIds}
-            onTogglePortalFeatured={onTogglePortalFeatured}
-            onTogglePortalCase={onTogglePortalCase}
-            onOpenSubmit={(id, name) =>
-              setSubmitTarget({ id, name, edition: "sbv1" })
-            }
-            openingProjectId={openingProjectId}
-            onOpeningProject={setOpeningProjectId}
-          />
+          {sbv1Projects.length > 0 ? (
+            <ProjectsSection
+              title="分镜视频 1.0"
+              edition="sbv1"
+              projects={sbv1Projects}
+              mayLoadMore={hasMore}
+              onDelete={onDelete}
+              onDuplicate={onDuplicate}
+              duplicatingId={duplicatingId}
+              onPrefetchProject={prefetchProject}
+              onRename={onRename}
+              isAdmin={isAdmin}
+              portalFeaturedIds={portalFeaturedIds}
+              portalCaseIds={portalFilmCaseIds}
+              onTogglePortalFeatured={onTogglePortalFeatured}
+              onTogglePortalCase={onTogglePortalCase}
+              onOpenSubmit={(id, name) =>
+                setSubmitTarget({ id, name, edition: "sbv1" })
+              }
+              openingProjectId={openingProjectId}
+              onOpeningProject={setOpeningProjectId}
+            />
+          ) : null}
         </div>
       )}
 
