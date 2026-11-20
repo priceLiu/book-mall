@@ -2,14 +2,14 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ChevronRight, Loader2 } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import {
   CanvasListCover,
   CANVAS_LIST_GRID_CLASS,
 } from "@/components/canvas/canvas-list-cover";
-import { CanvasListSkeleton } from "@/components/canvas/canvas-list-skeleton";
+import { CanvasListGridSkeleton } from "@/components/canvas/canvas-list-skeleton";
 import {
   CanvasProjectOpenLink,
   CanvasProjectOpeningOverlay,
@@ -25,6 +25,7 @@ import {
   listMyCanvasProjects,
   type CanvasProjectSummary,
 } from "@/lib/canvas-api";
+import { cn } from "@/lib/utils";
 
 const RECENT_LIMIT = 5;
 
@@ -94,12 +95,7 @@ export function RecentProjectsSection() {
     <>
       <section className="canvas-page pb-6">
         <div className="mb-4 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <h2 className="text-base font-semibold text-white">最近项目</h2>
-            {refreshing ? (
-              <Loader2 className="size-3.5 animate-spin text-[var(--canvas-muted)]" aria-hidden />
-            ) : null}
-          </div>
+          <h2 className="text-base font-semibold text-white">最近项目</h2>
           <Link
             href="/projects"
             className="inline-flex items-center gap-0.5 text-sm text-[var(--canvas-muted)] transition hover:text-white"
@@ -110,9 +106,18 @@ export function RecentProjectsSection() {
         </div>
 
         {initialLoading && projects.length === 0 ? (
-          <CanvasListSkeleton sections={1} cardsPerSection={RECENT_LIMIT} />
+          <CanvasListGridSkeleton
+            cards={RECENT_LIMIT}
+            gridClassName={CANVAS_LIST_GRID_CLASS}
+          />
         ) : (
-          <ul className={CANVAS_LIST_GRID_CLASS}>
+          <ul
+            className={cn(
+              CANVAS_LIST_GRID_CLASS,
+              refreshing && "opacity-60 transition-opacity",
+            )}
+            aria-busy={refreshing || undefined}
+          >
             {projects.map((p, index) => (
               <li
                 key={p.id}

@@ -9,6 +9,7 @@ import {
   CanvasListCover,
   CANVAS_LIST_GRID_CLASS,
 } from "@/components/canvas/canvas-list-cover";
+import { CanvasListGridSkeleton } from "@/components/canvas/canvas-list-skeleton";
 import { TemplatePreviewDialog } from "@/components/home/template-preview-dialog";
 import { usePortalHome } from "@/components/home/portal-home-context";
 import {
@@ -104,10 +105,13 @@ export function PortalDiscoverySection() {
   const base = useBookMallBaseUrl();
   const {
     viewerUserId,
+    viewerLoading,
     featured: featuredProjects,
     templates: publicTemplates,
     cases,
   } = usePortalHome();
+  const hasDiscoverySnapshot =
+    featuredProjects.length + publicTemplates.length + cases.length > 0;
   const [activeTab, setActiveTab] = useState<string>(TAB_ALL);
   const [search, setSearch] = useState("");
   const [preview, setPreview] = useState<PreviewState | null>(null);
@@ -319,7 +323,9 @@ export function PortalDiscoverySection() {
 
       {error ? <p className="mb-4 text-sm text-red-300/90">{error}</p> : null}
 
-      {filtered.length === 0 ? (
+      {!hasDiscoverySnapshot && viewerLoading ? (
+        <CanvasListGridSkeleton cards={10} gridClassName={CANVAS_LIST_GRID_CLASS} />
+      ) : filtered.length === 0 ? (
         <p className="rounded-xl border border-dashed border-white/10 px-4 py-10 text-center text-sm text-white/40">
           暂无匹配内容。
         </p>

@@ -2,10 +2,15 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Copy, Eye, Loader2, Sparkles } from "lucide-react";
+
 import Link from "next/link";
 
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
-import { CanvasListCover } from "@/components/canvas/canvas-list-cover";
+import {
+  CANVAS_LIST_GRID_CLASS,
+  CanvasListCover,
+} from "@/components/canvas/canvas-list-cover";
+import { CanvasListGridSkeleton } from "@/components/canvas/canvas-list-skeleton";
 import { PortalCardIconButton } from "@/components/home/portal-card-icon-button";
 import { TemplatePreviewDialog } from "@/components/home/template-preview-dialog";
 import {
@@ -66,21 +71,20 @@ export function FeaturedWorkflowsSection() {
             平台示例画布，封面与「我的画布」同源；一键复制到你的账户继续编辑。
           </p>
         </div>
-        {loading ? (
-          <Loader2 className="size-4 animate-spin text-white/40" />
-        ) : null}
       </div>
 
       {error ? (
         <p className="mb-4 text-sm text-red-300/90">{error}</p>
       ) : null}
 
-      {!loading && projects.length === 0 ? (
+      {loading && projects.length === 0 ? (
+        <CanvasListGridSkeleton cards={10} gridClassName={CANVAS_LIST_GRID_CLASS} />
+      ) : !loading && projects.length === 0 ? (
         <p className="rounded-xl border border-dashed border-white/10 px-4 py-10 text-center text-sm text-white/40">
           暂无精选示例。管理员可在「我的画布」将已出图的项目设为首页示例。
         </p>
       ) : (
-        <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+        <ul className={CANVAS_LIST_GRID_CLASS}>
           {projects.map((item) => (
             <li
               key={item.id}

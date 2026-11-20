@@ -19,7 +19,10 @@ import {
   Users,
 } from "lucide-react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
-import { CanvasListSkeleton } from "@/components/canvas/canvas-list-skeleton";
+import {
+  CanvasListGridSkeleton,
+  CanvasListSkeleton,
+} from "@/components/canvas/canvas-list-skeleton";
 import { CanvasPanelShellLoading } from "@/components/canvas/canvas-panel-shell-loading";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import {
@@ -371,12 +374,13 @@ export function UnifiedProjectAssetsView({
                 />
               ))}
             </div>
-            {loadingMore ? (
-              <p className="py-3 text-center text-[11px] text-white/45">加载更多…</p>
-            ) : hasMore && scrollPaginate ? (
-              <p className="py-3 text-center text-[11px] text-white/35">
-                向下滚动自动加载下一页
-              </p>
+            {loadingMore && scrollPaginate ? (
+              <div className="mt-4" aria-busy>
+                <CanvasListGridSkeleton
+                  cards={PROJECT_ASSETS_FULL_PAGE_SIZE}
+                  gridClassName={styleLibraryGridClass(compact)}
+                />
+              </div>
             ) : null}
             <div
               ref={loadMoreSentinelRef}

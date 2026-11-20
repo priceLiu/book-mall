@@ -15,10 +15,24 @@ export function isMyCanvasHubPath(pathname: string): boolean {
   );
 }
 
+function isProjectsListPath(pathname: string): boolean {
+  return pathname === "/projects" || pathname.startsWith("/projects/");
+}
+
+function activeMyCanvasSubNav(pathname: string) {
+  return CANVAS_PROJECTS_SUB_NAV.find(
+    (item) => pathname === item.href || pathname.startsWith(`${item.href}/`),
+  );
+}
+
 /** 顶栏「我的画布」：主链到画布列表，子入口下拉 */
 export function MyCanvasNavDropdown() {
   const pathname = usePathname() || "/";
   const active = isMyCanvasHubPath(pathname);
+  const onProjectsList = isProjectsListPath(pathname);
+  const activeSub = activeMyCanvasSubNav(pathname);
+  const primaryLabel = onProjectsList ? "我的画布" : activeSub?.label ?? "我的画布";
+  const primaryHref = onProjectsList ? "/projects" : activeSub?.href ?? "/projects";
   const [open, setOpen] = useState(false);
   const [menuRect, setMenuRect] = useState<{ top: number; left: number } | null>(null);
   const [mounted, setMounted] = useState(false);
@@ -86,6 +100,20 @@ export function MyCanvasNavDropdown() {
         style={{ top: menuRect.top, left: menuRect.left }}
         className="fixed z-[200] min-w-[11rem] rounded-xl border border-white/10 bg-[#1f1f1f] py-1 shadow-[0_12px_40px_rgba(0,0,0,0.45)]"
       >
+        <Link
+          href="/projects"
+          scroll={false}
+          role="menuitem"
+          className={cn(
+            "block px-3 py-2 text-sm transition",
+            onProjectsList
+              ? "bg-[var(--canvas-accent)]/15 text-white"
+              : "text-white/75 hover:bg-white/5 hover:text-white",
+          )}
+          onClick={closeMenu}
+        >
+          我的画布
+        </Link>
         {CANVAS_PROJECTS_SUB_NAV.map((item) => {
           const subActive =
             pathname === item.href || pathname.startsWith(`${item.href}/`);
@@ -120,8 +148,8 @@ export function MyCanvasNavDropdown() {
             : "text-white/70 hover:bg-white/10 hover:text-white",
         )}
       >
-        <Link href="/projects" scroll={false} className="px-2.5 py-1.5 sm:px-3">
-          我的画布
+        <Link href={primaryHref} scroll={false} className="px-2.5 py-1.5 sm:px-3">
+          {primaryLabel}
         </Link>
         <button
           type="button"

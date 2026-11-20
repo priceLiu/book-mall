@@ -5,7 +5,11 @@ import { Copy, Eye, Loader2, Trash2, Users } from "lucide-react";
 
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
-import { CanvasListCover } from "@/components/canvas/canvas-list-cover";
+import {
+  CANVAS_LIST_GRID_CLASS,
+  CanvasListCover,
+} from "@/components/canvas/canvas-list-cover";
+import { CanvasListGridSkeleton } from "@/components/canvas/canvas-list-skeleton";
 import { PortalCardIconButton } from "@/components/home/portal-card-icon-button";
 import { TemplatePreviewDialog } from "@/components/home/template-preview-dialog";
 import { useCanvasAdmin } from "@/components/home/use-canvas-admin";
@@ -115,23 +119,18 @@ export function CommunityTemplatesSection() {
         </p>
       </div>
 
-      {loading ? (
-        <div className="flex items-center gap-2 text-sm text-white/45">
-          <Loader2 className="size-4 animate-spin" />
-          加载社区模板…
-        </div>
-      ) : null}
-
       {error ? (
         <p className="mb-4 text-sm text-red-300/90">{error}</p>
       ) : null}
 
-      {!loading && templates.length === 0 ? (
+      {loading && templates.length === 0 ? (
+        <CanvasListGridSkeleton cards={10} gridClassName={CANVAS_LIST_GRID_CLASS} />
+      ) : !loading && templates.length === 0 ? (
         <p className="rounded-xl border border-dashed border-white/10 px-4 py-8 text-center text-sm text-white/40">
           暂无公开模板。在画布工具栏或组顶栏点击「分享工作流」即可发布到社区。
         </p>
       ) : (
-        <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+        <ul className={CANVAS_LIST_GRID_CLASS}>
           {templates.map((tpl) => (
             <li
               key={tpl.id}

@@ -23,7 +23,10 @@ import {
   CanvasListCover,
   CANVAS_LIST_GRID_CLASS,
 } from "@/components/canvas/canvas-list-cover";
-import { CanvasListSkeleton } from "@/components/canvas/canvas-list-skeleton";
+import {
+  CanvasListGridSkeleton,
+  CanvasListSkeleton,
+} from "@/components/canvas/canvas-list-skeleton";
 import {
   CanvasProjectOpenLink,
   CanvasProjectOpeningOverlay,
@@ -844,21 +847,21 @@ function Inner({ initialPage }: { initialPage?: CanvasProjectListPage | null }) 
       )}
 
       {!loading && projects.length > 0 ? (
-        <div
-          ref={hasMore ? loadMoreSentinelRef : undefined}
-          className="flex items-center justify-center py-8 text-sm text-[var(--canvas-muted)]"
-        >
+        <>
           {hasMore && loadingMore ? (
-            <>
-              <Loader2 className="mr-2 size-4 animate-spin" />
-              加载更多…
-            </>
-          ) : (
+            <div className="mt-6" aria-busy>
+              <CanvasListGridSkeleton cards={PROJECTS_LOAD_MORE_SIZE} />
+            </div>
+          ) : null}
+          <div
+            ref={hasMore ? loadMoreSentinelRef : undefined}
+            className="flex items-center justify-center py-8 text-sm text-[var(--canvas-muted)]"
+          >
             <span className="text-white/30">
-              {hasMore ? "滚动获取更多作品" : "到底了"}
+              {hasMore ? (loadingMore ? "" : "滚动获取更多作品") : "到底了"}
             </span>
-          )}
-        </div>
+          </div>
+        </>
       ) : null}
 
       {pickerOpen ? (

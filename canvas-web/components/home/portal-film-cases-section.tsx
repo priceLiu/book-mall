@@ -9,6 +9,7 @@ import { FilmShowcaseCardMedia } from "@/components/home/film-showcase-card-medi
 import { ShowcaseMediaKindBadge } from "@/components/home/showcase-media-kind-badge";
 import { usePortalHome } from "@/components/home/portal-home-context";
 import { CANVAS_LIST_GRID_CLASS } from "@/components/canvas/canvas-list-cover";
+import { CanvasListGridSkeleton } from "@/components/canvas/canvas-list-skeleton";
 import { TemplatePreviewDialog } from "@/components/home/template-preview-dialog";
 import {
   duplicatePortalFilmShowcaseProject,
@@ -38,7 +39,7 @@ function tabToKind(tab: MediaTab): PortalFilmShowcaseMedia["kind"] {
 
 export function PortalFilmCasesSection() {
   const base = useBookMallBaseUrl();
-  const { viewerUserId, filmShowcase: items } = usePortalHome();
+  const { viewerUserId, viewerLoading, filmShowcase: items } = usePortalHome();
   const [activeTab, setActiveTab] = useState<MediaTab>(TAB_VIDEO);
   const [search, setSearch] = useState("");
   const [preview, setPreview] = useState<PortalFilmShowcaseMedia | null>(null);
@@ -88,7 +89,7 @@ export function PortalFilmCasesSection() {
     [viewerUserId],
   );
 
-  if (items.length === 0) return null;
+  if (!viewerLoading && items.length === 0) return null;
 
   return (
     <section className="canvas-page border-t border-[var(--canvas-border)] pb-16 pt-8">
@@ -131,7 +132,13 @@ export function PortalFilmCasesSection() {
 
       {error ? <p className="mb-4 text-sm text-red-300/90">{error}</p> : null}
 
-      {filtered.length > 0 ? (
+      {viewerLoading && items.length === 0 ? (
+        <CanvasListGridSkeleton
+          cards={10}
+          gridClassName={CANVAS_LIST_GRID_CLASS}
+          className="mt-8"
+        />
+      ) : filtered.length > 0 ? (
         <ul className={`mt-8 ${CANVAS_LIST_GRID_CLASS}`}>
           {filtered.map((item, index) => {
             const own = viewerUserId != null && item.owner?.id === viewerUserId;

@@ -4,7 +4,10 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Plus } from "lucide-react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
-import { CanvasListSkeleton } from "@/components/canvas/canvas-list-skeleton";
+import {
+  CanvasListGridSkeleton,
+  CanvasListSkeleton,
+} from "@/components/canvas/canvas-list-skeleton";
 import {
   CREW_COLLABORATION_PERSONAL_HINT,
 } from "@/lib/canvas/crew-collaboration-access";
@@ -151,11 +154,12 @@ export function ScriptsClient() {
             ))}
           </ul>
           {loadingMore ? (
-            <p className="py-3 text-center text-[11px] text-white/45">加载更多…</p>
-          ) : hasMore ? (
-            <p className="py-3 text-center text-[11px] text-white/35">
-              向下滚动自动加载下一页
-            </p>
+            <div className="mt-4" aria-busy>
+              <CanvasListGridSkeleton
+                cards={SCRIPT_PACKAGE_TAB_PAGE_SIZE}
+                gridClassName="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
+              />
+            </div>
           ) : null}
           <div ref={loadMoreSentinelRef} className="h-8" aria-hidden />
         </>
