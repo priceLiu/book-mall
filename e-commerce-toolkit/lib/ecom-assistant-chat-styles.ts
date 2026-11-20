@@ -1,16 +1,24 @@
 /** 电商工具箱 · 右侧助手会话区气泡与选项区样式（种草视频 / 产品主图 / 详情页统一） */
 
-/** 折叠态悬浮输入外框（全站助手统一品牌蓝描边） */
+/** 折叠态悬浮输入外框（浅灰描边，内边距尽量小） */
 export const ECOM_ASSISTANT_FLOATING_COMPOSER_SHELL_CLASS =
-  "rounded-2xl border border-[var(--ecom-chrome-accent)] bg-white p-2 shadow-[0_8px_32px_rgba(0,0,0,0.12)] ring-1 ring-[var(--ecom-chrome-accent)]/25 transition-[box-shadow,ring-color] hover:shadow-[0_12px_40px_rgba(0,0,0,0.16)] hover:ring-[var(--ecom-chrome-accent)]/40";
+  "rounded-2xl border border-[#e8e8ed] bg-white p-1 shadow-[0_8px_32px_rgba(0,0,0,0.08)]";
 
-/** 展开态 composer 底栏（折叠悬浮时省略顶部分割线，避免与蓝框叠层） */
+/** 展开态 composer 底栏 */
 export const ECOM_ASSISTANT_COMPOSER_SHELL_BASE =
-  "shrink-0 bg-[var(--ecom-assistant-composer-bg)] px-4 pb-[max(1rem,calc(env(safe-area-inset-bottom,0px)+0.75rem))] pt-4 pr-14";
+  "shrink-0 bg-[var(--ecom-assistant-composer-bg)] px-3 pb-[max(0.75rem,calc(env(safe-area-inset-bottom,0px)+0.5rem))] pt-3 pr-3";
 
-/** 折叠悬浮 composer 内层（外框已有 padding，内层略收紧） */
+/** 折叠悬浮 composer 内层（贴外框，无额外留白） */
 export const ECOM_ASSISTANT_COMPOSER_SHELL_COMPACT =
-  "shrink-0 bg-[var(--ecom-assistant-composer-bg)] p-0.5";
+  "shrink-0 bg-transparent p-0";
+
+/** 输入行：发送钮靠右，间距收紧 */
+export const ECOM_ASSISTANT_COMPOSER_ROW_CLASS =
+  "flex w-full items-center gap-1";
+
+/** 助手输入框（悬浮 / 展开共用） */
+export const ECOM_ASSISTANT_COMPOSER_TEXTAREA_CLASS =
+  "min-h-[2.25rem] min-w-0 flex-1 resize-y rounded-lg border border-[var(--ecom-assistant-input-border)] bg-[var(--ecom-assistant-input-bg)] px-2 py-1.5 text-sm leading-snug text-[#1d1d1f] outline-none placeholder:text-[#86868b] focus:border-[#d2d2d7] disabled:opacity-50";
 
 export const ECOM_ASSISTANT_COMPOSER_SHELL_EXPANDED_BORDER =
   "border-t border-[var(--ecom-assistant-border)]";

@@ -6,7 +6,7 @@
 
 ```
 EcomAppShell（全屏）
-├── EcomProfileSidebar（左导航，深色，可折叠）
+├── EcomProfileSidebar（左导航，玻璃态，收起图标轨 / 展开手风琴）
 └── 主工作区（rounded-xl, parchment 底）
     ├── EcomMobileBar / EcomAuthBanner
     └── 页面内容
@@ -20,9 +20,10 @@ EcomAppShell（全屏）
 
 | 属性 | 值 |
 |------|-----|
-| 外底 | `bg-[#0c0c0e]`，`p-3 md:p-5`，`h-dvh` |
-| 内工作区 | `rounded-xl bg-[var(--ecom-parchment)] shadow-inner` |
-| 侧栏 | `EcomProfileSidebar`，`md:flex`，深色 tile |
+| 外底 | `bg-[var(--ecom-shell-bg)]`（`#3c3c3c`），`py-3 md:py-5` 上下；左右为一半 `px-1.5 md:px-2.5` |
+| 内栅格 | `gap-3 md:gap-4`（侧栏与主区分离） |
+| 内工作区 | 白底 `rounded-xl` |
+| 侧栏 | `EcomProfileSidebar`，`md:flex`，玻璃态 `ecom-glass-sidebar`，收起 `4.5rem` / 展开 `21rem` |
 
 ## EcomWorkspaceLayout
 

@@ -461,7 +461,7 @@ export function PosterStudio({ initialProjectId }: { initialProjectId?: string }
                   className={cn(
                     "rounded-xl border p-3 text-left text-sm transition",
                     easyPath === c.path
-                      ? "border-[#0071e3] bg-[#f0f6ff] ring-1 ring-[#0071e3]/30"
+                      ? "border-[var(--ecom-outline-border)] bg-[#f0f6ff] ring-1 ring-[#1d1d1f]/15"
                       : "border-[#e8e8ed] hover:border-[#d2d2d7]",
                   )}
                   onClick={() => {

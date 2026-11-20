@@ -68,7 +68,7 @@ function EditableCell({
     return (
       <div className="space-y-1.5" onClick={(e) => e.stopPropagation()}>
         <textarea
-          className="w-full rounded-lg border border-[#0071e3]/40 bg-white px-2 py-1.5 text-[11px] leading-relaxed text-[#1d1d1f] outline-none ring-2 ring-[#0071e3]/15"
+          className="w-full rounded-lg border border-[var(--ecom-outline-border)] bg-white px-2 py-1.5 text-[11px] leading-relaxed text-[#1d1d1f] outline-none ring-2 ring-[#1d1d1f]/12"
           rows={3}
           value={draft}
           disabled={saving}
@@ -159,7 +159,7 @@ function EditableTag({
     return (
       <div className="space-y-1.5" onClick={(e) => e.stopPropagation()}>
         <select
-          className="w-full rounded-lg border border-[#0071e3]/40 bg-white px-2 py-1 text-[11px] text-[#1d1d1f] outline-none ring-2 ring-[#0071e3]/15"
+          className="w-full rounded-lg border border-[var(--ecom-outline-border)] bg-white px-2 py-1 text-[11px] text-[#1d1d1f] outline-none ring-2 ring-[#1d1d1f]/12"
           value={draft}
           disabled={saving}
           onChange={(e) => setDraft(e.target.value as OutlineRow["tag"])}

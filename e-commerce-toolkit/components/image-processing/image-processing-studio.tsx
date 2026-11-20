@@ -157,7 +157,7 @@ function ImageProcessingCtaButton({
         "inline-flex items-center justify-center gap-2 rounded-full px-5 py-2.5 text-sm font-medium text-white transition-colors disabled:cursor-not-allowed disabled:opacity-50",
         variant === "green"
           ? "bg-emerald-600 hover:bg-emerald-700"
-          : "bg-[#0071e3] hover:bg-[#0066cc]",
+          : "bg-[var(--ecom-btn-fill)] hover:bg-[var(--ecom-btn-fill-hover)]",
         className,
       )}
     >
@@ -778,7 +778,7 @@ export function ImageProcessingStudio() {
                   className={cn(
                     "rounded-lg border px-3 py-2 text-center text-sm",
                     activeTag === tag.id
-                      ? "border-[#0071e3] bg-[#f0f6ff] text-[#0071e3]"
+                      ? "border-[var(--ecom-outline-border)] bg-[#f0f6ff] text-[#0071e3]"
                       : "border-[#e5e5ea] bg-white text-[#1d1d1f] hover:border-[#d2d2d7]",
                   )}
                 >
@@ -826,7 +826,7 @@ export function ImageProcessingStudio() {
                   <button
                     type="button"
                     onClick={() => retouchFileRef.current?.click()}
-                    className="flex w-full flex-col items-center justify-center rounded-xl border-2 border-dashed border-[#d2d2d7] px-4 py-12 text-center transition-colors hover:border-[#0071e3] hover:bg-[#fafafa] sm:px-6 sm:py-16"
+                    className="flex w-full flex-col items-center justify-center rounded-xl border-2 border-dashed border-[#d2d2d7] px-4 py-12 text-center transition-colors hover:border-[var(--ecom-outline-border)] hover:bg-[#fafafa] sm:px-6 sm:py-16"
                   >
                     <Pencil className="h-8 w-8 text-[#86868b]" />
                     <p className="mt-3 font-medium text-[#1d1d1f]">上传图片进行修图</p>
@@ -1491,7 +1491,7 @@ export function ImageProcessingStudio() {
                         className={cn(
                           "rounded-lg border px-3 py-2 text-xs font-medium",
                           editorAspect === a
-                            ? "border-[#0071e3] bg-[#f0f6ff] text-[#0071e3]"
+                            ? "border-[var(--ecom-outline-border)] bg-[#f0f6ff] text-[#0071e3]"
                             : "border-[#e5e5ea] text-[#1d1d1f]",
                         )}
                       >

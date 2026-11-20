@@ -194,7 +194,7 @@ export function SeedVideoShotTable({
                     {showGenerateActions ? (
                       <input
                         type="checkbox"
-                        className="size-3.5 shrink-0 rounded border-[#d2d2d7] text-[#0071e3] focus:ring-[#0071e3]/30 disabled:opacity-40"
+                        className="size-3.5 shrink-0 rounded border-[#d2d2d7] text-[#0071e3] focus:ring-[#1d1d1f]/15 disabled:opacity-40"
                         checked={isSelected}
                         disabled={selectDisabled || isGenerating}
                         aria-label={`选择镜 ${shot.index}`}
@@ -258,7 +258,7 @@ export function SeedVideoShotTable({
                 ) : null}
                 <td className="px-3 py-2">
                   <textarea
-                    className="ecom-scrollbar-thin w-full min-h-[4rem] resize-y rounded-lg border border-[#e8e8ed] bg-white px-2 py-1.5 text-[#1d1d1f] focus:border-[#0071e3] focus:outline-none disabled:opacity-50"
+                    className="ecom-scrollbar-thin w-full min-h-[4rem] resize-y rounded-lg border border-[#e8e8ed] bg-white px-2 py-1.5 text-[#1d1d1f] focus:border-[var(--ecom-outline-border)] focus:outline-none disabled:opacity-50"
                     value={shot.sceneDescription}
                     disabled={disabled || isGenerating}
                     onChange={(e) => patchShot(shot.index, { sceneDescription: e.target.value })}
@@ -278,7 +278,7 @@ export function SeedVideoShotTable({
                     />
                   ) : (
                     <textarea
-                      className="ecom-scrollbar-thin w-full min-h-[4rem] resize-y rounded-lg border border-[#e8e8ed] bg-white px-2 py-1.5 text-[#1d1d1f] focus:border-[#0071e3] focus:outline-none disabled:opacity-50"
+                      className="ecom-scrollbar-thin w-full min-h-[4rem] resize-y rounded-lg border border-[#e8e8ed] bg-white px-2 py-1.5 text-[#1d1d1f] focus:border-[var(--ecom-outline-border)] focus:outline-none disabled:opacity-50"
                       value={shot.videoPrompt}
                       disabled={disabled || isGenerating}
                       onChange={(e) => patchShot(shot.index, { videoPrompt: e.target.value })}
@@ -300,7 +300,7 @@ export function SeedVideoShotTable({
                       </EcomButtonSecondary>
                     ) : null}
                     <textarea
-                      className="ecom-scrollbar-thin w-full min-h-[4rem] resize-y rounded-lg border border-[#e8e8ed] bg-white px-2 py-1.5 text-[#1d1d1f] focus:border-[#0071e3] focus:outline-none disabled:opacity-50"
+                      className="ecom-scrollbar-thin w-full min-h-[4rem] resize-y rounded-lg border border-[#e8e8ed] bg-white px-2 py-1.5 text-[#1d1d1f] focus:border-[var(--ecom-outline-border)] focus:outline-none disabled:opacity-50"
                       value={shot.voiceover ?? ""}
                       placeholder="可留空"
                       disabled={disabled || isGenerating}

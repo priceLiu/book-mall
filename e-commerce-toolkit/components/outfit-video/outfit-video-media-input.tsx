@@ -117,7 +117,7 @@ export function OutfitVideoMediaInput({
             value={urlDraft}
             disabled={busy}
             placeholder="https:// 公网视频地址"
-            className="min-w-0 flex-1 rounded-lg border border-[#d2d2d7] px-3 py-2 text-sm outline-none focus:border-[#0071e3] focus:ring-2 focus:ring-[#0071e3]/20"
+            className="min-w-0 flex-1 rounded-lg border border-[#d2d2d7] px-3 py-2 text-sm outline-none focus:border-[var(--ecom-outline-border)] focus:ring-2 focus:ring-[#1d1d1f]/15"
             onChange={(e) => setUrlDraft(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter") void handleUrlSubmit();

@@ -56,8 +56,8 @@ export function ProductImageSetLayoutRefUpload({ projectId, disabled }: Props) {
       className={cn(
         "mt-4 rounded-lg border border-dashed px-3 py-3 outline-none transition-colors",
         dragOver
-          ? "border-[#0071e3] bg-[#f0f6ff]"
-          : "border-[#c7c7cc] bg-[#fafafa] hover:border-[#0071e3]/50",
+          ? "border-[var(--ecom-outline-border)] bg-[#f0f6ff]"
+          : "border-[#c7c7cc] bg-[#fafafa] hover:border-[var(--ecom-outline-border)]/50",
       )}
     >
       <input

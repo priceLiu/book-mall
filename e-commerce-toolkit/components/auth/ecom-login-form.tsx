@@ -4,7 +4,7 @@ import { type FormEvent, useCallback, useState } from "react";
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
 
 const INPUT_CLASS =
-  "w-full rounded-xl border border-[#e8e8ed] bg-white px-3.5 py-2.5 text-sm text-[#1d1d1f] outline-none transition focus:border-[var(--ecom-primary)]";
+  "w-full rounded-xl border border-[#e8e8ed] bg-white px-3.5 py-2.5 text-sm text-[#1d1d1f] outline-none transition focus:border-[var(--ecom-outline-border)]";
 
 function buildPortalSigninHref(
   bookOrigin: string,

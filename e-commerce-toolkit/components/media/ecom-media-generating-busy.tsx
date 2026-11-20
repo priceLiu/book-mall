@@ -60,8 +60,8 @@ export function EcomMediaGeneratingBusy({
             className={cn(
               "flex items-center justify-center rounded-full border shadow-sm",
               light
-                ? "size-10 border-[#0071e3]/35 bg-white text-[#0071e3]"
-                : "size-12 border-[#0071e3]/45 bg-black/55 text-[#2997ff] shadow-lg backdrop-blur-sm sm:size-[3.25rem]",
+                ? "size-10 border-[var(--ecom-outline-border)] bg-white text-[var(--ecom-outline-text)]"
+                : "size-12 border-[var(--ecom-outline-border)] bg-black/55 text-[#2997ff] shadow-lg backdrop-blur-sm sm:size-[3.25rem]",
             )}
           >
             <RefreshCw className={cn("animate-spin", light ? "h-4 w-4" : "h-5 w-5 sm:h-6 sm:w-6")} />

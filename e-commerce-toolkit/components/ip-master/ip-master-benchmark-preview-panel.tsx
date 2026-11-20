@@ -60,7 +60,7 @@ export function IpMasterBenchmarkPreviewPanel({
         className={cn(
           "relative flex w-full max-w-full flex-col overflow-hidden rounded-xl border bg-white",
           canPreview
-            ? "cursor-zoom-in border-[#d2d2d7] hover:border-[#0071e3]"
+            ? "cursor-zoom-in border-[#d2d2d7] hover:border-[var(--ecom-outline-border)]"
             : "cursor-default border-dashed border-[#d2d2d7]",
           "aspect-[3/4] w-full min-h-[320px] max-h-[min(88vh,920px)] lg:min-h-[420px]",
         )}

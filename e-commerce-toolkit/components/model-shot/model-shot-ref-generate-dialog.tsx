@@ -111,8 +111,8 @@ function PresetPicker({
               className={cn(
                 "w-full rounded-lg border px-3 py-2 text-left transition",
                 active
-                  ? "border-[#0071e3] bg-[#f0f6ff]"
-                  : "border-transparent bg-white hover:border-[#0071e3]/30",
+                  ? "border-[var(--ecom-outline-border)] bg-[#f0f6ff]"
+                  : "border-transparent bg-white hover:border-[var(--ecom-outline-border)]",
               )}
               onClick={() => onSelect(preset)}
             >
@@ -296,7 +296,7 @@ export function ModelShotRefGenerateDialog({
 
               <p className="mb-2 text-xs font-medium text-[#6e6e73]">生图 Prompt（可微调）</p>
               <textarea
-                className="min-h-[20vh] w-full resize-y rounded-lg border border-[#e8e8ed] px-3 py-2.5 text-[13px] leading-relaxed text-[#1d1d1f] focus:border-[#0071e3]/40 focus:outline-none focus:ring-2 focus:ring-[#0071e3]/15 disabled:cursor-not-allowed disabled:bg-[#f5f5f7]"
+                className="min-h-[20vh] w-full resize-y rounded-lg border border-[#e8e8ed] px-3 py-2.5 text-[13px] leading-relaxed text-[#1d1d1f] focus:border-[var(--ecom-outline-border)] focus:outline-none focus:ring-2 focus:ring-[#1d1d1f]/12 disabled:cursor-not-allowed disabled:bg-[#f5f5f7]"
                 value={draft}
                 autoFocus={role === "model"}
                 disabled={busy}
@@ -339,8 +339,8 @@ export function ModelShotRefGenerateDialog({
                         className={cn(
                           "rounded-xl border px-3 py-3 text-left transition",
                           active
-                            ? "border-[#0071e3] bg-[#f0f6ff]"
-                            : "border-[#e5e5ea] bg-white hover:border-[#0071e3]/40",
+                            ? "border-[var(--ecom-outline-border)] bg-[#f0f6ff]"
+                            : "border-[#e5e5ea] bg-white hover:border-[var(--ecom-outline-border)]",
                         )}
                         onClick={() => {
                           setDraftModelKey(m.modelKey);

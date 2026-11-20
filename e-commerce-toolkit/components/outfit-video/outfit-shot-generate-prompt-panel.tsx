@@ -105,7 +105,7 @@ export function OutfitShotGeneratePromptPanel({
             rows={4}
             disabled={disabled}
             value={draft}
-            className="ecom-scrollbar-thin w-full resize-y rounded-lg border border-[#d2d2d7] bg-white px-3 py-2 text-xs leading-relaxed text-[#1d1d1f] outline-none focus:border-[#0071e3] focus:ring-2 focus:ring-[#0071e3]/20 disabled:opacity-60"
+            className="ecom-scrollbar-thin w-full resize-y rounded-lg border border-[#d2d2d7] bg-white px-3 py-2 text-xs leading-relaxed text-[#1d1d1f] outline-none focus:border-[var(--ecom-outline-border)] focus:ring-2 focus:ring-[#1d1d1f]/15 disabled:opacity-60"
             placeholder="可留空（Kling 动作控制将仅依赖参考片段 + 模特图）"
             onChange={(e) => {
               const value = e.target.value;

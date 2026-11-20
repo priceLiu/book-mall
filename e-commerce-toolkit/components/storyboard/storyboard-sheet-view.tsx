@@ -108,7 +108,7 @@ export function StoryboardSheetView({
         </h1>
         <p className="mt-2 text-sm text-[#6e6e73]">{draft.overview.logline}</p>
         {draft.overview.productHighlight ? (
-          <div className="mt-4 rounded-lg border-l-4 border-[#0071e3] bg-[#f5f5f7] px-4 py-3 text-sm">
+          <div className="mt-4 rounded-lg border-l-4 border-[var(--ecom-outline-border)] bg-[#f5f5f7] px-4 py-3 text-sm">
             <span className="font-medium">商品卖点：</span>
             {draft.overview.productHighlight}
           </div>
@@ -173,7 +173,7 @@ export function StoryboardSheetView({
                   <td className="px-3 py-2.5 align-top text-[#6e6e73]">
                     {editable ? (
                       <input
-                        className="w-full min-w-[4rem] rounded border border-[#d2d2d7] bg-white px-2 py-1.5 text-sm outline-none focus:border-[#0071e3] focus:ring-1 focus:ring-[#0071e3]/30"
+                        className="w-full min-w-[4rem] rounded border border-[#d2d2d7] bg-white px-2 py-1.5 text-sm outline-none focus:border-[var(--ecom-outline-border)] focus:ring-1 focus:ring-[#1d1d1f]/15"
                         value={p.timeline ?? ""}
                         onChange={(e) =>
                           updatePanel(p.index, { timeline: e.target.value })
@@ -186,7 +186,7 @@ export function StoryboardSheetView({
                   <td className="px-3 py-2.5 align-top">
                     {editable ? (
                       <input
-                        className="w-full min-w-[3rem] rounded border border-[#d2d2d7] bg-white px-2 py-1.5 text-sm outline-none focus:border-[#0071e3] focus:ring-1 focus:ring-[#0071e3]/30"
+                        className="w-full min-w-[3rem] rounded border border-[#d2d2d7] bg-white px-2 py-1.5 text-sm outline-none focus:border-[var(--ecom-outline-border)] focus:ring-1 focus:ring-[#1d1d1f]/15"
                         value={p.shotType}
                         onChange={(e) =>
                           updatePanel(p.index, { shotType: e.target.value })
@@ -202,7 +202,7 @@ export function StoryboardSheetView({
                   <td className="px-3 py-2.5 align-top">
                     {editable ? (
                       <input
-                        className="w-full min-w-[3rem] rounded border border-[#d2d2d7] bg-white px-2 py-1.5 text-sm outline-none focus:border-[#0071e3] focus:ring-1 focus:ring-[#0071e3]/30"
+                        className="w-full min-w-[3rem] rounded border border-[#d2d2d7] bg-white px-2 py-1.5 text-sm outline-none focus:border-[var(--ecom-outline-border)] focus:ring-1 focus:ring-[#1d1d1f]/15"
                         value={p.camera ?? ""}
                         onChange={(e) =>
                           updatePanel(p.index, { camera: e.target.value })
@@ -215,7 +215,7 @@ export function StoryboardSheetView({
                   <td className="px-3 py-2.5 align-top">
                     {editable ? (
                       <textarea
-                        className="w-full min-h-[72px] resize-y rounded border border-[#d2d2d7] bg-white px-2 py-1.5 text-sm leading-relaxed outline-none focus:border-[#0071e3] focus:ring-1 focus:ring-[#0071e3]/30"
+                        className="w-full min-h-[72px] resize-y rounded border border-[#d2d2d7] bg-white px-2 py-1.5 text-sm leading-relaxed outline-none focus:border-[var(--ecom-outline-border)] focus:ring-1 focus:ring-[#1d1d1f]/15"
                         value={`${p.scene}\n${p.action}`.trim()}
                         onChange={(e) => {
                           const v = e.target.value;
@@ -236,7 +236,7 @@ export function StoryboardSheetView({
                   <td className="px-3 py-2.5 align-top">
                     {editable ? (
                       <input
-                        className="w-full min-w-[4rem] rounded border border-[#d2d2d7] bg-white px-2 py-1.5 text-sm outline-none focus:border-[#0071e3] focus:ring-1 focus:ring-[#0071e3]/30"
+                        className="w-full min-w-[4rem] rounded border border-[#d2d2d7] bg-white px-2 py-1.5 text-sm outline-none focus:border-[var(--ecom-outline-border)] focus:ring-1 focus:ring-[#1d1d1f]/15"
                         value={p.emotion ?? ""}
                         onChange={(e) =>
                           updatePanel(p.index, { emotion: e.target.value })
@@ -249,7 +249,7 @@ export function StoryboardSheetView({
                   <td className="px-3 py-2.5 align-top">
                     {editable ? (
                       <textarea
-                        className="w-full min-h-[72px] resize-y rounded border border-[#d2d2d7] bg-white px-2 py-1.5 text-sm leading-relaxed outline-none focus:border-[#0071e3] focus:ring-1 focus:ring-[#0071e3]/30"
+                        className="w-full min-h-[72px] resize-y rounded border border-[#d2d2d7] bg-white px-2 py-1.5 text-sm leading-relaxed outline-none focus:border-[var(--ecom-outline-border)] focus:ring-1 focus:ring-[#1d1d1f]/15"
                         value={p.dialogue ?? ""}
                         onChange={(e) =>
                           updatePanel(p.index, { dialogue: e.target.value })

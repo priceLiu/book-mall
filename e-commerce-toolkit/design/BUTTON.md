@@ -16,7 +16,7 @@
 
 | Token | 默认值 | 用途 |
 |-------|--------|------|
-| `--ecom-btn-fill` | `var(--ecom-primary)` | 主按钮填充（品牌蓝 `#0066cc`） |
+| `--ecom-btn-fill` | `var(--ecom-brand-orange)` | 主按钮填充（品牌橙 `#ff6b3d`，hover `--ecom-btn-fill-hover`） |
 | `--ecom-btn-on-fill` | `#ffffff` | 主按钮文字 |
 | `--ecom-btn-alt-fill` | `#f4f4f5` | 翻转后面填充（浅灰） |
 | `--ecom-btn-alt-on-fill` | `#18181b` | 翻转后面文字 |
@@ -28,7 +28,7 @@
 
 ### 1. `EcomButtonPrimary`（默认主按钮）
 
-- 单态：品牌蓝底白字、圆角 999、`font-medium`；尺寸见上表 `size`
+- 单态：品牌橙底白字、圆角 999、`font-medium`；尺寸见上表 `size`
 - 交互：`whileHover scale 1.05`、`whileTap scale 0.95`
 - 用法：`<EcomButtonPrimary>开始制作</EcomButtonPrimary>`
 
@@ -55,7 +55,7 @@
 
 ### 4. `EcomButtonSecondary`（描边胶囊）
 
-白/透明底 + 主色描边与文字，无翻转。门户「了解更多」等次要 CTA。
+白/透明底 + **墨黑描边**（`--ecom-outline-border`）与 `--ecom-outline-text`；hover 保持黑边 + `--ecom-outline-hover-bg`。门户「了解更多」、参考图「我的资产 / 上传」等。
 
 ## 尺寸（仅 sm | md | lg）
 

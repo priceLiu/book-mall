@@ -117,7 +117,7 @@ export function OutfitShotSceneSetupDialog({
                   className={cn(
                     "rounded-xl border px-3 py-2 text-left text-xs transition-colors",
                     fusion?.mode === opt.id
-                      ? "border-[#0071e3] bg-[#f0f6ff]"
+                      ? "border-[var(--ecom-outline-border)] bg-[#f0f6ff]"
                       : "border-[#e8e8ed] hover:border-[#d2d2d7]",
                   )}
                   onClick={() => {
@@ -140,7 +140,7 @@ export function OutfitShotSceneSetupDialog({
           <label className="block space-y-1.5">
             <span className="text-xs font-medium text-[#1d1d1f]">场景描述（融图 Prompt 片段）</span>
             <textarea
-              className="ecom-scrollbar-thin min-h-[5rem] w-full resize-y rounded-lg border border-[#d2d2d7] px-3 py-2 text-xs leading-relaxed text-[#1d1d1f] focus:border-[#0071e3] focus:outline-none focus:ring-2 focus:ring-[#0071e3]/20 disabled:opacity-50"
+              className="ecom-scrollbar-thin min-h-[5rem] w-full resize-y rounded-lg border border-[#d2d2d7] px-3 py-2 text-xs leading-relaxed text-[#1d1d1f] focus:border-[var(--ecom-outline-border)] focus:outline-none focus:ring-2 focus:ring-[#1d1d1f]/15 disabled:opacity-50"
               value={promptDraft}
               disabled={busy}
               onChange={(e) => setPromptDraft(e.target.value)}

@@ -89,13 +89,13 @@ export function StoryboardPanelEditDialog({
               <span className="text-sm font-medium text-[#1d1d1f]">{label}</span>
               {multiline ? (
                 <textarea
-                  className="w-full min-h-[88px] resize-y rounded-lg border border-[#d2d2d7] px-3 py-2 text-sm leading-relaxed outline-none focus:border-[#0071e3] focus:ring-1 focus:ring-[#0071e3]/30"
+                  className="w-full min-h-[88px] resize-y rounded-lg border border-[#d2d2d7] px-3 py-2 text-sm leading-relaxed outline-none focus:border-[var(--ecom-outline-border)] focus:ring-1 focus:ring-[#1d1d1f]/15"
                   value={key === "visual" ? visual : String(draft[key as keyof StoryboardPanel] ?? "")}
                   onChange={(e) => setField(key, e.target.value)}
                 />
               ) : (
                 <input
-                  className="w-full rounded-lg border border-[#d2d2d7] px-3 py-2 text-sm outline-none focus:border-[#0071e3] focus:ring-1 focus:ring-[#0071e3]/30"
+                  className="w-full rounded-lg border border-[#d2d2d7] px-3 py-2 text-sm outline-none focus:border-[var(--ecom-outline-border)] focus:ring-1 focus:ring-[#1d1d1f]/15"
                   value={String(draft[key as keyof StoryboardPanel] ?? "")}
                   onChange={(e) => setField(key, e.target.value)}
                 />

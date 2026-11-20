@@ -255,7 +255,7 @@ function CellEditor({
     return <span className="block whitespace-pre-wrap break-words">{text}</span>;
   }
   const className =
-    "w-full rounded border border-[#d2d2d7] px-1.5 py-1 text-xs outline-none focus:border-[#0071e3] focus:ring-1 focus:ring-[#0071e3]/20";
+    "w-full rounded border border-[#d2d2d7] px-1.5 py-1 text-xs outline-none focus:border-[var(--ecom-outline-border)] focus:ring-1 focus:ring-[#1d1d1f]/15";
   if (multiline) {
     return (
       <textarea className={className} rows={2} value={value} onChange={(e) => onChange(e.target.value)} />

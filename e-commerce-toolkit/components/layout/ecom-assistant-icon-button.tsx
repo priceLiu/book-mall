@@ -5,7 +5,8 @@ import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 /** 助手区圆形控件 · 统一尺寸（发送 / 设置 / 顶栏图标） */
-export const ECOM_ASSISTANT_SEND_SIZE_CLASS = "h-10 w-10";
+export const ECOM_ASSISTANT_SEND_SIZE_CLASS = "h-8 w-8";
+export const ECOM_ASSISTANT_SEND_ICON_CLASS = "h-3.5 w-3.5";
 export const ECOM_ASSISTANT_ICON_BTN_SIZE_CLASS = "h-9 w-9";
 export const ECOM_ASSISTANT_CONTROL_ICON_CLASS = "h-4 w-4";
 
@@ -37,8 +38,8 @@ export function EcomAssistantIconButton({
         "inline-flex shrink-0 items-center justify-center rounded-full border bg-white transition-colors disabled:cursor-not-allowed disabled:opacity-40",
         ECOM_ASSISTANT_ICON_BTN_SIZE_CLASS,
         variant === "outline"
-          ? "border-[var(--ecom-primary)] text-[var(--ecom-primary)] hover:bg-[var(--ecom-btn-fill)]/5"
-          : "border-[#e8e8ed] text-[#6e6e73] hover:border-[var(--ecom-chrome-accent)]",
+          ? "border-[var(--ecom-outline-border)] text-[var(--ecom-outline-text)] hover:border-[var(--ecom-outline-border)] hover:bg-[var(--ecom-outline-hover-bg)]"
+          : "border-[#e8e8ed] text-[#6e6e73] hover:border-[var(--ecom-outline-border)]",
         className,
       )}
       whileTap={disabled ? undefined : { scale: 0.95 }}

@@ -42,7 +42,7 @@ export function EcomLandingHome() {
               <Link
                 key={card.id}
                 href={card.href}
-                className="group relative flex min-h-[168px] flex-col justify-end overflow-hidden rounded-[20px] border border-white/10 p-5 text-left transition hover:border-[var(--ecom-primary)]/45 hover:shadow-[0_0_24px_rgba(0,113,227,0.15)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ecom-primary)]/60"
+                className="group relative flex min-h-[168px] flex-col justify-end overflow-hidden rounded-[20px] border border-white/10 p-5 text-left transition hover:border-[var(--ecom-outline-border)]/45 hover:shadow-[0_0_24px_rgba(0,113,227,0.15)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ecom-primary)]/60"
               >
                 <div
                   className="absolute inset-0"

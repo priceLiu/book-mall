@@ -41,7 +41,7 @@ const POOL_COLUMN_CLASS = "flex min-h-[240px] flex-col space-y-1.5";
 const POOL_CARD_CONTENT_MIN_H = "min-h-[140px]";
 const POOL_COLUMN_HINT_CLASS = "text-[10px] leading-snug text-[#86868b]";
 const POOL_CARD_SHELL_CLASS =
-  "rounded-lg border border-[#e8e8ed] bg-white px-2.5 py-2 outline-none transition-colors hover:border-[#0071e3]/40";
+  "rounded-lg border border-[#e8e8ed] bg-white px-2.5 py-2 outline-none transition-colors hover:border-[var(--ecom-outline-border)]";
 
 export type VtonGarmentUploadOpts = {
   fullSetSlot?: VtonFullSetUploadSlot;
@@ -154,7 +154,7 @@ function PoolAddLookButton({
   return (
     <button
       type="button"
-      className="flex w-full items-center justify-center gap-1 rounded-md border border-[#e8e8ed] bg-white px-2 py-1.5 text-[10px] font-medium text-[#0071e3] transition hover:border-[#0071e3]/35 hover:bg-[#f0f6ff] disabled:opacity-50"
+      className="flex w-full items-center justify-center gap-1 rounded-md border border-[#e8e8ed] bg-white px-2 py-1.5 text-[10px] font-medium text-[#0071e3] transition hover:border-[var(--ecom-outline-border)] hover:bg-[#f0f6ff] disabled:opacity-50"
       disabled={busy || disabled || atMax}
       title={atMax ? `已达 ${ECOM_VTON_MAX_BATCH_LOOKS} 套上限` : undefined}
       onClick={() => void onAddLook(lookKind, fullSetMode ? { fullSetMode } : undefined)}
@@ -391,8 +391,8 @@ function CompositeFullSetColumn({
             {...dropZoneProps}
             className={cn(
               POOL_CARD_SHELL_CLASS,
-              "focus-visible:ring-2 focus-visible:ring-[#0071e3]/30",
-              dragOver && "border-[#0071e3] bg-white ring-1 ring-[#0071e3]/30",
+              "focus-visible:ring-2 focus-visible:ring-[#1d1d1f]/15",
+              dragOver && "border-[var(--ecom-outline-border)] bg-white ring-1 ring-[#1d1d1f]/15",
             )}
           >
             <PoolUploadToolbar
@@ -530,7 +530,7 @@ function ManualFullSetColumn({
       {items.length > 0 && !hasIncompleteSet && !draftNewSet ? (
         <button
           type="button"
-          className="flex w-full items-center justify-center gap-1 rounded-md border border-dashed border-[#c7c7cc] bg-white px-2 py-1.5 text-[10px] text-[#0071e3] transition hover:border-[#0071e3]/40 hover:bg-[#f0f6ff] disabled:opacity-50"
+          className="flex w-full items-center justify-center gap-1 rounded-md border border-dashed border-[#c7c7cc] bg-white px-2 py-1.5 text-[10px] text-[#0071e3] transition hover:border-[var(--ecom-outline-border)] hover:bg-[#f0f6ff] disabled:opacity-50"
           disabled={disabled}
           onClick={() => setDraftNewSet(true)}
         >

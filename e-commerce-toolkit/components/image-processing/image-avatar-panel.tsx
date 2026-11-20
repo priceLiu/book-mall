@@ -188,7 +188,7 @@ export function ImageAvatarPanel({
                   prev.trim() ? `${prev.trim()}，${tag}` : tag,
                 )
               }
-              className="rounded-full border border-[#e5e5ea] px-2.5 py-1 text-xs text-[#6e6e73] hover:border-[#0071e3] hover:text-[#0071e3]"
+              className="rounded-full border border-[#e5e5ea] px-2.5 py-1 text-xs text-[#6e6e73] hover:border-[var(--ecom-outline-border)] hover:text-[#0071e3]"
             >
               {tag}
             </button>

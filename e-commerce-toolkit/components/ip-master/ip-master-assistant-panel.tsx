@@ -9,8 +9,11 @@ import { StoryboardMarkdownBlock } from "@/components/storyboard/storyboard-mark
 import { StoryboardTaskStatus } from "@/components/storyboard/storyboard-task-status";
 import {
   ECOM_ASSISTANT_BUBBLE_CLASS,
+  ECOM_ASSISTANT_COMPOSER_ROW_CLASS,
   ECOM_ASSISTANT_COMPOSER_SHELL_BASE,
+  ECOM_ASSISTANT_COMPOSER_SHELL_COMPACT,
   ECOM_ASSISTANT_COMPOSER_SHELL_EXPANDED_BORDER,
+  ECOM_ASSISTANT_COMPOSER_TEXTAREA_CLASS,
   ECOM_ASSISTANT_MESSAGE_BUBBLE_BASE,
   ECOM_ASSISTANT_USER_BUBBLE_CLASS,
 } from "@/lib/ecom-assistant-chat-styles";
@@ -171,13 +174,13 @@ export function IpMasterAssistantPanel({
   const renderComposer = (compact: boolean) => (
     <div
       className={cn(
-        ECOM_ASSISTANT_COMPOSER_SHELL_BASE,
+        compact ? ECOM_ASSISTANT_COMPOSER_SHELL_COMPACT : ECOM_ASSISTANT_COMPOSER_SHELL_BASE,
         !compact && ECOM_ASSISTANT_COMPOSER_SHELL_EXPANDED_BORDER,
       )}
     >
-      <div className="flex items-end gap-2">
+      <div className={ECOM_ASSISTANT_COMPOSER_ROW_CLASS}>
         <textarea
-          className="min-h-[2.5rem] flex-1 resize-none rounded-xl border border-[var(--ecom-assistant-input-border)] bg-[var(--ecom-assistant-input-bg)] px-3 py-2 text-sm text-[#1d1d1f] outline-none placeholder:text-[#86868b] focus:border-[var(--ecom-chrome-accent)] disabled:opacity-50"
+          className={cn(ECOM_ASSISTANT_COMPOSER_TEXTAREA_CLASS, "resize-none")}
           rows={compact ? 1 : composerWide ? 4 : 2}
           placeholder="请助手按 Skill 解析模板或补充 IP 设定…"
           value={draft}

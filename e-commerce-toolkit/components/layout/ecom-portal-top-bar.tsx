@@ -17,7 +17,7 @@ export function EcomPortalTopBar({ authed = true, bookOrigin = null }: Props) {
   const bookAccountUrl = getBookAccountUrl();
 
   return (
-    <header className="sticky top-0 z-50 shrink-0 border-b border-white/10 bg-[#0c0c0e]">
+    <header className="sticky top-0 z-50 shrink-0 border-b border-white/10 bg-[var(--ecom-shell-bg)]">
       <div className="flex h-12 items-center gap-2 px-3 md:h-14 md:gap-3 md:px-5">
         <div className="flex w-[6.5rem] shrink-0 items-center sm:w-28">
           <span className="truncate text-sm font-semibold text-white/90">电商工具箱</span>

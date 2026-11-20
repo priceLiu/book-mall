@@ -5,10 +5,12 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   BookOpen,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   ExternalLink,
   LogOut,
+  Search,
 } from "lucide-react";
 import { navigatePortalLogout } from "@private/federated-portal-logout";
 import { buildEcomLoginUrl } from "@/lib/portal-auth-links";
@@ -25,9 +27,12 @@ import { PlatformTopupNavLink } from "@/lib/platform-billing/platform-topup-nav-
 import { ecomPrimaryLinkClass } from "@/components/ui/ecom-button";
 import { unlockEcomDocumentInteraction } from "@/lib/ecom-document-unlock";
 import { feishuGuideUrlForPathname } from "@/lib/ecom-feishu-guide-urls";
+import { ECOM_SIDEBAR_LOGO_MARK_CLASS } from "@/lib/ecom-outline-ui";
 import { cn } from "@/lib/utils";
 
 const NAV_ACTIVE_SECTION_KEY = "ecom-nav-active-section";
+
+const GLASS_DIVIDER = "mx-auto h-px w-8 shrink-0 bg-white/12";
 
 type RailEntry =
   | { kind: "group"; id: string; group: EcomSidebarNavGroup }
@@ -107,6 +112,46 @@ function inferSectionId(pathname: string, entries: RailEntry[]): string | null {
   return null;
 }
 
+function normalizeSearch(q: string): string {
+  return q.trim().toLowerCase();
+}
+
+function linkMatchesSearch(label: string, q: string): boolean {
+  if (!q) return true;
+  return label.toLowerCase().includes(q);
+}
+
+function filterGroupChildren(
+  children: EcomSidebarNavGroupChild[],
+  q: string,
+): EcomSidebarNavGroupChild[] {
+  if (!q) return children;
+  const out: EcomSidebarNavGroupChild[] = [];
+  let pendingSubheading: EcomSidebarNavGroupChild | null = null;
+  for (const child of children) {
+    if (child.type === "subheading") {
+      pendingSubheading = child;
+      continue;
+    }
+    if (linkMatchesSearch(child.label, q)) {
+      if (pendingSubheading) {
+        out.push(pendingSubheading);
+        pendingSubheading = null;
+      }
+      out.push(child);
+    }
+  }
+  return out;
+}
+
+function groupMatchesSearch(group: EcomSidebarNavGroup, q: string): boolean {
+  if (!q) return true;
+  if (linkMatchesSearch(group.label, q)) return true;
+  return group.children.some(
+    (c) => c.type !== "subheading" && linkMatchesSearch(c.label, q),
+  );
+}
+
 type RailTipState = { label: string; x: number; y: number } | null;
 
 const RailTipContext = React.createContext<{
@@ -141,7 +186,7 @@ function RailTipLayer({ tip }: { tip: RailTipState }) {
   return (
     <div
       role="tooltip"
-      className="pointer-events-none fixed z-[9999] -translate-y-1/2 whitespace-nowrap rounded-md border border-zinc-600/80 bg-zinc-900 px-2.5 py-1.5 text-xs font-medium text-zinc-100 shadow-xl"
+      className="pointer-events-none fixed z-[9999] -translate-y-1/2 whitespace-nowrap rounded-full border border-white/15 bg-zinc-900/80 px-3 py-1.5 text-xs font-medium text-zinc-100 shadow-xl backdrop-blur-md"
       style={{ left: tip.x, top: tip.y }}
     >
       {tip.label}
@@ -149,22 +194,25 @@ function RailTipLayer({ tip }: { tip: RailTipState }) {
   );
 }
 
-function DetailNavLink({
+function ExpandedNavLink({
   item,
   active,
+  nested,
 }: {
   item: EcomSidebarNavLink;
   active: boolean;
+  nested?: boolean;
 }) {
   const Icon = item.icon;
   const rowClass = cn(
-    "group flex items-center rounded-lg transition-colors",
+    "group flex items-center rounded-xl transition-colors",
+    nested ? "ml-3 border-l border-white/10 pl-3" : "",
     active
-      ? "bg-[var(--ecom-chrome-hover)]"
-      : "hover:bg-[var(--ecom-chrome-hover)]",
+      ? "border border-white/20 bg-white/[0.11] shadow-[inset_0_1px_0_rgba(255,255,255,0.14)]"
+      : "border border-transparent hover:bg-white/[0.07]",
   );
   const linkClass = cn(
-    "flex min-w-0 flex-1 items-center rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+    "flex min-w-0 flex-1 items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm font-medium transition-colors",
     active
       ? "text-[var(--ecom-chrome-text)]"
       : "text-[var(--ecom-chrome-text-muted)] group-hover:text-[var(--ecom-chrome-text)]",
@@ -172,11 +220,15 @@ function DetailNavLink({
 
   const linkInner = (
     <>
-      <span className="mr-3 flex h-5 w-5 shrink-0 items-center justify-center opacity-90">
-        <Icon className="h-full w-full" />
+      <span className="flex size-5 shrink-0 items-center justify-center opacity-90">
+        <Icon className="size-4" />
       </span>
       <span className="min-w-0 flex-1 truncate">{item.label}</span>
-      <ChevronRight className="ml-auto h-4 w-4 shrink-0 opacity-0 transition-opacity group-hover:opacity-70" />
+      {item.external ? (
+        <ExternalLink className="size-3.5 shrink-0 opacity-50" aria-hidden />
+      ) : (
+        <ChevronRight className="size-4 shrink-0 opacity-0 transition-opacity group-hover:opacity-50" />
+      )}
     </>
   );
 
@@ -204,6 +256,73 @@ function DetailNavLink({
   );
 }
 
+function NavGroupAccordion({
+  entry,
+  pathname,
+  open,
+  onToggle,
+  searchQ,
+}: {
+  entry: { id: string; group: EcomSidebarNavGroup };
+  pathname: string;
+  open: boolean;
+  onToggle: () => void;
+  searchQ: string;
+}) {
+  const { group } = entry;
+  const Icon = group.icon;
+  const q = normalizeSearch(searchQ);
+  if (!groupMatchesSearch(group, q)) return null;
+
+  const children = filterGroupChildren(group.children, q);
+  const sectionActive = groupHasActiveChild(pathname, group);
+
+  return (
+    <div className="space-y-0.5">
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        className={cn(
+          "flex w-full items-center gap-2.5 rounded-xl border px-2.5 py-2 text-left text-sm font-medium transition-colors",
+          sectionActive && open
+            ? "border-white/20 bg-white/[0.09] text-[var(--ecom-chrome-text)]"
+            : "border-transparent text-[var(--ecom-chrome-text-muted)] hover:bg-white/[0.07] hover:text-[var(--ecom-chrome-text)]",
+        )}
+      >
+        <Icon className="size-4 shrink-0 opacity-90" />
+        <span className="min-w-0 flex-1 truncate">{group.label}</span>
+        <ChevronDown
+          className={cn(
+            "size-4 shrink-0 opacity-60 transition-transform",
+            open ? "rotate-180" : "",
+          )}
+        />
+      </button>
+      {open ? (
+        <div className="space-y-0.5 pb-1 pl-1">
+          {children.map((child) =>
+            child.type === "subheading" ? (
+              <div key={`subheading:${child.label}`} className="px-3 pb-0.5 pt-2">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--ecom-chrome-text-subtle)]">
+                  {child.label}
+                </p>
+              </div>
+            ) : (
+              <ExpandedNavLink
+                key={child.href}
+                item={child}
+                active={linkIsActive(pathname, child)}
+                nested
+              />
+            ),
+          )}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function RailIconButton({
   active,
   title,
@@ -222,10 +341,10 @@ function RailIconButton({
         aria-label={title}
         onClick={onClick}
         className={cn(
-          "flex size-10 shrink-0 items-center justify-center rounded-lg transition-colors",
+          "flex size-10 shrink-0 items-center justify-center rounded-xl transition-all",
           active
-            ? "bg-[var(--ecom-chrome-hover)] text-[var(--ecom-chrome-text)]"
-            : "text-[var(--ecom-chrome-text-muted)] hover:bg-[var(--ecom-chrome-hover)] hover:text-[var(--ecom-chrome-text)]",
+            ? "bg-white/[0.14] text-[var(--ecom-chrome-text)] ring-1 ring-white/20"
+            : "text-[var(--ecom-chrome-text-muted)] hover:bg-white/[0.1] hover:text-[var(--ecom-chrome-text)]",
         )}
       >
         {children}
@@ -252,11 +371,36 @@ function RailExternalLink({
         target="_blank"
         rel="noopener noreferrer"
         aria-label={title}
-        className="flex size-10 shrink-0 items-center justify-center rounded-lg text-[var(--ecom-chrome-text-muted)] transition-colors hover:bg-[var(--ecom-chrome-hover)] hover:text-[var(--ecom-chrome-text)]"
+        className="flex size-10 shrink-0 items-center justify-center rounded-xl text-[var(--ecom-chrome-text-muted)] transition-colors hover:bg-white/[0.1] hover:text-[var(--ecom-chrome-text)]"
       >
         {children}
       </a>
     </RailTooltip>
+  );
+}
+
+function UserAvatar({ user }: { user: EcomShellUser }) {
+  if (user.avatarUrl) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={user.avatarUrl}
+        alt=""
+        className="size-9 rounded-full object-cover ring-2 ring-white/15"
+      />
+    );
+  }
+  const initial = (user.name?.trim() || user.email)?.[0]?.toUpperCase() ?? "?";
+  return (
+    <div
+      className={cn(
+        ECOM_SIDEBAR_LOGO_MARK_CLASS,
+        "relative size-9 text-sm font-semibold",
+      )}
+    >
+      {initial}
+      <span className="absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full border-2 border-[#1c1c1e] bg-emerald-400" />
+    </div>
   );
 }
 
@@ -315,6 +459,10 @@ export function EcomProfileSidebar({
   );
 
   const [activeSectionId, setActiveSectionId] = React.useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = React.useState("");
+  const [openGroupIds, setOpenGroupIds] = React.useState<Set<string>>(() => new Set());
+  const searchRef = React.useRef<HTMLInputElement>(null);
+  const prevInferredIdRef = React.useRef<string | null>(null);
 
   React.useEffect(() => {
     if (inferredId) {
@@ -339,33 +487,64 @@ export function EcomProfileSidebar({
     }
   }, [inferredId, railSectionEntries]);
 
+  /** 首屏默认展开当前路由所在分组（或第一个分组）；用户手动收起后不再因 size===0 强行弹开 */
+  React.useEffect(() => {
+    if (railSectionEntries.length === 0) return;
+    setOpenGroupIds((prev) => {
+      if (prev.size > 0) return prev;
+      const ids = new Set<string>();
+      if (inferredId?.startsWith("group:")) ids.add(inferredId);
+      else {
+        const first = railSectionEntries.find((e) => e.kind === "group");
+        if (first) ids.add(first.id);
+      }
+      return ids;
+    });
+  }, [inferredId, railSectionEntries]);
+
+  /** 仅当路由推断的分组切换时自动展开，避免与手风琴 toggle 打架 */
+  React.useEffect(() => {
+    if (!inferredId?.startsWith("group:")) {
+      prevInferredIdRef.current = inferredId;
+      return;
+    }
+    if (prevInferredIdRef.current === inferredId) return;
+    prevInferredIdRef.current = inferredId;
+    setOpenGroupIds((prev) => new Set(prev).add(inferredId));
+  }, [inferredId]);
+
+  React.useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        if (collapsed) onCollapsedChange?.(false);
+        e.preventDefault();
+        window.setTimeout(() => searchRef.current?.focus(), 50);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [collapsed, onCollapsedChange]);
+
   const resolvedSectionId =
     activeSectionId ??
     inferredId ??
     defaultSectionId(railSectionEntries);
 
-  const activeEntry = railSectionEntries.find((e) => e.id === resolvedSectionId);
-
-  const detailTitle =
-    activeEntry?.kind === "group"
-      ? activeEntry.group.label
-      : activeEntry?.kind === "link"
-        ? activeEntry.link.label
-        : "导航";
-
-  const detailLinks: EcomSidebarNavGroupChild[] =
-    activeEntry?.kind === "group"
-      ? activeEntry.group.children
-      : activeEntry?.kind === "link"
-        ? [activeEntry.link]
-        : [];
-
   function signOut() {
     navigatePortalLogout("/api/auth/logout");
   }
 
-  const collapseDetail = () => onCollapsedChange?.(true);
-  const expandDetail = () => onCollapsedChange?.(false);
+  const collapseSidebar = () => onCollapsedChange?.(true);
+  const expandSidebar = () => onCollapsedChange?.(false);
+
+  function toggleGroup(id: string) {
+    setOpenGroupIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
 
   function selectRailEntry(entry: RailEntry) {
     if (entry.kind === "link" && entry.link.directOpen) {
@@ -384,17 +563,22 @@ export function EcomProfileSidebar({
     } catch {
       /* ignore */
     }
+
+    if (entry.kind === "group") {
+      setOpenGroupIds(new Set([entry.id]));
+      if (collapsed) expandSidebar();
+      return;
+    }
+
     if (entry.kind === "link") {
       if (entry.link.external) {
         window.open(entry.link.href, "_blank", "noopener,noreferrer");
       } else {
-        if (collapsed) expandDetail();
+        if (collapsed) expandSidebar();
         unlockEcomDocumentInteraction();
         window.location.assign(entry.link.href);
       }
-      return;
     }
-    if (collapsed) expandDetail();
   }
 
   function renderRailQuickLink(entry: RailEntry) {
@@ -426,7 +610,7 @@ export function EcomProfileSidebar({
     const rect = el.getBoundingClientRect();
     setRailTip({
       label,
-      x: rect.right + 10,
+      x: rect.right + 12,
       y: rect.top + rect.height / 2,
     });
   }, []);
@@ -438,183 +622,276 @@ export function EcomProfileSidebar({
     [showRailTip, hideRailTip],
   );
 
+  const searchQ = normalizeSearch(searchQuery);
+
+  const homeActive = navTargetActive(pathname ?? "", "/");
+
   return (
     <RailTipContext.Provider value={railTipApi}>
       <aside
-      className={cn(
-        "pointer-events-auto relative isolate z-[250] flex h-full max-h-full shrink-0 flex-row overflow-hidden rounded-xl border border-zinc-800/80 bg-[#141416] text-zinc-100 shadow-lg",
-        collapsed ? "w-16" : "w-[21rem]",
-        className,
-      )}
-      aria-label="电商工具箱导航"
-      onPointerDown={() => unlockEcomDocumentInteraction()}
-    >
-      {/* 左侧图标轨 */}
-      <div className="flex w-16 shrink-0 flex-col items-center gap-2 overflow-visible border-r border-[var(--ecom-chrome-border-subtle)] py-3">
-        {railQuickTop.map(renderRailQuickLink)}
-
-        <RailTooltip label="电商工具箱首页">
-          <Link
-            href="/"
-            prefetch
-            className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#0071e3] text-sm font-bold text-white shadow-md transition hover:scale-105"
-            aria-label="电商工具箱首页"
-          >
-            商
-          </Link>
-        </RailTooltip>
-
-        <div className="ecom-scrollbar-thin flex min-h-0 flex-1 flex-col items-center gap-1 overflow-y-auto px-2">
-          {railSectionEntries.map((entry) => {
-            const active = entry.id === resolvedSectionId;
-            if (entry.kind === "group") {
-              const Icon = entry.group.icon;
-              return (
-                <RailIconButton
-                  key={entry.id}
-                  active={active}
-                  title={entry.group.label}
-                  onClick={() => selectRailEntry(entry)}
-                >
-                  <Icon className="size-4" />
-                </RailIconButton>
-              );
-            }
-            const Icon = entry.link.icon;
-            return (
-              <RailIconButton
-                key={entry.id}
-                active={active}
-                title={entry.link.label}
-                onClick={() => selectRailEntry(entry)}
-              >
-                <Icon className="size-4" />
-              </RailIconButton>
-            );
-          })}
-        </div>
-
-        {railQuickBottom.map(renderRailQuickLink)}
-
-        {user ? (
-          <>
-            <div className="px-1">
-              <EcomCreditsBalanceChip collapsed />
-            </div>
-            <RailIconButton title="退出登录" onClick={signOut}>
-              <LogOut className="size-4" />
-            </RailIconButton>
-          </>
-        ) : null}
-      </div>
-
-      {/* 右侧详情面板 */}
-      <div
         className={cn(
-          "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden transition-[opacity] duration-150 ease-out",
-          collapsed ? "w-0 opacity-0 pointer-events-none" : "w-[17rem] opacity-100",
+          "ecom-glass-sidebar pointer-events-auto relative isolate z-[250] flex h-full max-h-full shrink-0 flex-col overflow-hidden rounded-xl border border-white/10 text-zinc-100",
+          collapsed ? "w-[4.5rem]" : "w-[21rem]",
+          className,
         )}
+        aria-label="电商工具箱导航"
+        onPointerDown={() => unlockEcomDocumentInteraction()}
       >
-        <div className="flex min-h-0 flex-1 flex-col p-4">
-          <div className="mb-3 flex items-start justify-between gap-2">
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-lg font-semibold leading-tight text-[var(--ecom-chrome-text)]">
-                {detailTitle}
-              </p>
-              <p className="truncate text-xs text-[var(--ecom-chrome-text-muted)]">
-                {user?.name ?? "未登录"}
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={collapseDetail}
-              className="flex size-8 shrink-0 items-center justify-center rounded-lg text-[var(--ecom-chrome-text-muted)] transition-colors hover:bg-[var(--ecom-chrome-hover)] hover:text-[var(--ecom-chrome-text)]"
-              title="收起子菜单"
-              aria-label="收起子菜单"
-            >
-              <ChevronLeft className="size-4" />
-            </button>
-          </div>
+        {collapsed ? (
+          <div className="flex min-h-0 flex-1 flex-col items-center gap-2 py-4">
+            {railQuickTop.map(renderRailQuickLink)}
 
-          {user ? (
-            <div className="mb-3 space-y-2">
-              <EcomCreditsBalanceChip />
-              <PlatformTopupNavLink
-                bookOrigin={bookOrigin}
-                className="inline-flex w-full items-center justify-center rounded-lg border border-[var(--ecom-chrome-border-subtle)] px-3 py-2 text-xs font-medium text-[var(--ecom-chrome-text)] transition-colors hover:bg-[var(--ecom-chrome-hover)]"
-              />
-            </div>
-          ) : null}
+            <RailTooltip label="电商工具箱首页">
+              <Link
+                href="/"
+                prefetch
+                className={cn(
+                  ECOM_SIDEBAR_LOGO_MARK_CLASS,
+                  "size-10 text-sm transition hover:scale-105",
+                  homeActive &&
+                    "ring-2 ring-white/35 ring-offset-1 ring-offset-transparent",
+                )}
+                aria-label="电商工具箱首页"
+              >
+                商
+              </Link>
+            </RailTooltip>
 
-          <nav
-            className="ecom-scrollbar-thin min-h-0 flex-1 space-y-0.5 overflow-y-auto pr-1"
-            role="navigation"
-            aria-label={detailTitle}
-          >
-            {detailLinks.map((entry) =>
-              entry.type === "subheading" ? (
-                <div
-                  key={`subheading:${entry.label}`}
-                  className="px-3 pb-1 pt-3 first:pt-0"
-                >
-                  <p className="text-[11px] font-semibold tracking-wide text-[var(--ecom-chrome-text-muted)]">
-                    {entry.label}
-                  </p>
+            <GlassDivider />
+
+            <RailTooltip label="搜索页面">
+              <button
+                type="button"
+                className="flex size-10 items-center justify-center rounded-xl text-[var(--ecom-chrome-text-muted)] transition-colors hover:bg-white/[0.1] hover:text-[var(--ecom-chrome-text)]"
+                aria-label="搜索页面"
+                onClick={() => {
+                  expandSidebar();
+                  window.setTimeout(() => searchRef.current?.focus(), 80);
+                }}
+              >
+                <Search className="size-4" />
+              </button>
+            </RailTooltip>
+
+            <div className="ecom-scrollbar-thin flex min-h-0 w-full flex-1 flex-col items-center gap-1 overflow-y-auto px-2">
+              {railSectionEntries.map((entry) => {
+                const active =
+                  entry.id === resolvedSectionId ||
+                  (entry.kind === "group" &&
+                    groupHasActiveChild(pathname ?? "", entry.group));
+                if (entry.kind === "group") {
+                  const Icon = entry.group.icon;
+                  return (
+                    <RailIconButton
+                      key={entry.id}
+                      active={active}
+                      title={entry.group.label}
+                      onClick={() => selectRailEntry(entry)}
+                    >
+                      <Icon className="size-4" />
+                    </RailIconButton>
+                  );
+                }
+                const Icon = entry.link.icon;
+                return (
+                  <RailIconButton
+                    key={entry.id}
+                    active={active}
+                    title={entry.link.label}
+                    onClick={() => selectRailEntry(entry)}
+                  >
+                    <Icon className="size-4" />
+                  </RailIconButton>
+                );
+              })}
+            </div>
+
+            <GlassDivider />
+
+            {railQuickBottom.map(renderRailQuickLink)}
+
+            {user ? (
+              <>
+                <div className="px-1">
+                  <EcomCreditsBalanceChip collapsed />
                 </div>
+                <RailTooltip label={user.name}>
+                  <div className="pointer-events-none">
+                    <UserAvatar user={user} />
+                  </div>
+                </RailTooltip>
+                <RailIconButton title="退出登录" onClick={signOut}>
+                  <LogOut className="size-4" />
+                </RailIconButton>
+              </>
+            ) : null}
+          </div>
+        ) : (
+          <div className="flex min-h-0 flex-1 flex-col p-4">
+            <div className="mb-4 flex items-start gap-3">
+              <Link
+                href="/"
+                prefetch
+                className={cn(ECOM_SIDEBAR_LOGO_MARK_CLASS, "size-10 text-sm")}
+                aria-label="电商工具箱首页"
+              >
+                商
+              </Link>
+              <div className="min-w-0 flex-1 pt-0.5">
+                <p className="truncate text-base font-semibold leading-tight text-[var(--ecom-chrome-text)]">
+                  电商工具箱
+                </p>
+                <p className="truncate text-[11px] text-[var(--ecom-chrome-text-subtle)]">
+                  E-commerce workspace
+                </p>
+              </div>
+            </div>
+
+            <div className="mb-4 flex items-center gap-2 rounded-full border border-white/10 bg-black/20 px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
+              <Search className="size-4 shrink-0 text-[var(--ecom-chrome-text-subtle)]" />
+              <input
+                ref={searchRef}
+                type="search"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="搜索页面"
+                className="min-w-0 flex-1 bg-transparent text-sm text-[var(--ecom-chrome-text)] outline-none placeholder:text-[var(--ecom-chrome-text-subtle)]"
+                aria-label="搜索导航"
+              />
+              <kbd className="hidden shrink-0 rounded-md border border-white/10 bg-white/5 px-1.5 py-0.5 text-[10px] text-[var(--ecom-chrome-text-subtle)] sm:inline">
+                ⌘K
+              </kbd>
+            </div>
+
+            <p className="mb-2 px-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--ecom-chrome-text-subtle)]">
+              主导航
+            </p>
+
+            <nav
+              className="ecom-scrollbar-thin min-h-0 flex-1 space-y-1 overflow-y-auto pr-0.5"
+              role="navigation"
+              aria-label="主导航"
+            >
+              {railSectionEntries.map((entry) => {
+                if (entry.kind === "group") {
+                  const autoOpen = Boolean(searchQ) && groupMatchesSearch(entry.group, searchQ);
+                  const open = openGroupIds.has(entry.id) || autoOpen;
+                  return (
+                    <NavGroupAccordion
+                      key={entry.id}
+                      entry={entry}
+                      pathname={pathname ?? ""}
+                      open={open}
+                      onToggle={() => toggleGroup(entry.id)}
+                      searchQ={searchQuery}
+                    />
+                  );
+                }
+                if (!linkMatchesSearch(entry.link.label, searchQ)) return null;
+                return (
+                  <ExpandedNavLink
+                    key={entry.id}
+                    item={entry.link}
+                    active={linkIsActive(pathname ?? "", entry.link)}
+                  />
+                );
+              })}
+            </nav>
+
+            {currentPageGuideUrl ? (
+              <div className="mt-2 shrink-0 border-t border-white/10 pt-3">
+                <a
+                  href={currentPageGuideUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 rounded-xl px-2.5 py-2 text-sm font-medium text-[var(--ecom-chrome-text-muted)] transition-colors hover:bg-white/[0.07] hover:text-[var(--ecom-chrome-text)]"
+                  title="当前工具使用指南（飞书，新标签打开）"
+                >
+                  <BookOpen className="size-4 shrink-0 opacity-90" aria-hidden />
+                  <span className="min-w-0 flex-1 truncate">当前页使用指南</span>
+                  <ExternalLink className="size-3.5 shrink-0 opacity-60" aria-hidden />
+                </a>
+              </div>
+            ) : null}
+
+            <div className="mt-3 shrink-0 space-y-2 border-t border-white/10 pt-3">
+              {user ? (
+                <>
+                  <EcomCreditsBalanceChip />
+                  <PlatformTopupNavLink
+                    bookOrigin={bookOrigin}
+                    className="inline-flex w-full items-center justify-center rounded-xl border border-white/12 bg-white/[0.05] px-3 py-2 text-xs font-medium text-[var(--ecom-chrome-text)] transition-colors hover:bg-white/[0.1]"
+                  />
+                  <div className="flex items-center gap-2.5 rounded-xl border border-white/10 bg-white/[0.04] px-2.5 py-2">
+                    <UserAvatar user={user} />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-[var(--ecom-chrome-text)]">
+                        {user.name}
+                      </p>
+                      <p className="truncate text-[11px] text-[var(--ecom-chrome-text-subtle)]">
+                        {user.email}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={signOut}
+                      className="flex size-8 shrink-0 items-center justify-center rounded-lg text-[var(--ecom-chrome-text-muted)] transition-colors hover:bg-white/[0.08] hover:text-[var(--ecom-chrome-text)]"
+                      title="退出登录"
+                      aria-label="退出登录"
+                    >
+                      <LogOut className="size-4" />
+                    </button>
+                  </div>
+                </>
               ) : (
-                <DetailNavLink
-                  key={entry.href}
-                  item={entry}
-                  active={linkIsActive(pathname, entry)}
-                />
-              ),
-            )}
-          </nav>
+                <a
+                  href={buildEcomLoginUrl(pathname || "/")}
+                  className={ecomPrimaryLinkClass("sm", "max-w-none")}
+                >
+                  登录
+                </a>
+              )}
 
-          {currentPageGuideUrl ? (
-            <div className="mt-3 shrink-0 border-t border-[var(--ecom-chrome-border-subtle)] pt-3">
-              <a
-                href={currentPageGuideUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium text-[var(--ecom-chrome-text-muted)] transition-colors hover:bg-[var(--ecom-chrome-hover)] hover:text-[var(--ecom-chrome-text)]"
-                title="当前工具使用指南（飞书，新标签打开）"
-              >
-                <BookOpen className="size-4 shrink-0 opacity-90" aria-hidden />
-                <span className="min-w-0 flex-1 truncate">使用指南</span>
-                <ExternalLink className="size-3.5 shrink-0 opacity-60" aria-hidden />
-              </a>
+              <div className="flex flex-wrap gap-x-3 gap-y-1 px-1 pt-1 text-[11px]">
+                {[...railQuickTop, ...railQuickBottom].map((entry) => {
+                  if (entry.kind !== "link") return null;
+                  return (
+                    <a
+                      key={entry.id}
+                      href={entry.link.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[var(--ecom-chrome-text-subtle)] underline-offset-2 hover:text-[var(--ecom-chrome-text)] hover:underline"
+                    >
+                      {entry.link.label}
+                    </a>
+                  );
+                })}
+              </div>
             </div>
-          ) : null}
+          </div>
+        )}
 
-          {!user ? (
-            <div className="mt-3 border-t border-[var(--ecom-chrome-border-subtle)] pt-3">
-              <a
-                href={buildEcomLoginUrl(pathname || "/")}
-                className={ecomPrimaryLinkClass("sm", "max-w-none")}
-              >
-                登录
-              </a>
-            </div>
-          ) : null}
-        </div>
-      </div>
-
-      {/* 折叠后展开把手 */}
-      {collapsed ? (
-        <RailTooltip label="展开子菜单">
+        <RailTooltip label={collapsed ? "展开菜单" : "收起菜单"}>
           <button
             type="button"
-            onClick={expandDetail}
-            className="absolute -right-px top-1/2 z-10 flex h-10 w-4 -translate-y-1/2 translate-x-full items-center justify-center rounded-r-lg border border-l-0 border-[var(--ecom-chrome-border)] bg-[#141416] text-[var(--ecom-chrome-text-muted)] shadow-md transition hover:border-[var(--ecom-chrome-text-muted)] hover:text-[var(--ecom-chrome-text)]"
-            aria-label="展开子菜单"
+            onClick={collapsed ? expandSidebar : collapseSidebar}
+            className="absolute -right-3 top-1/2 z-20 flex size-7 -translate-y-1/2 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white/90 shadow-lg backdrop-blur-md transition hover:bg-white/20"
+            aria-label={collapsed ? "展开菜单" : "收起菜单"}
           >
-            <ChevronRight className="h-3.5 w-3.5" />
+            {collapsed ? (
+              <ChevronRight className="size-4" />
+            ) : (
+              <ChevronLeft className="size-4" />
+            )}
           </button>
         </RailTooltip>
-      ) : null}
       </aside>
       <RailTipLayer tip={railTip} />
     </RailTipContext.Provider>
   );
+}
+
+function GlassDivider() {
+  return <div className={GLASS_DIVIDER} aria-hidden />;
 }

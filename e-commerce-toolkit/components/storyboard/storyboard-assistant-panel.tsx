@@ -91,9 +91,11 @@ import { EcomAssistantSendButton } from "@/components/layout/ecom-assistant-send
 import {
   ECOM_ASSISTANT_BUBBLE_CLASS,
   ECOM_ASSISTANT_CHOICE_SHELL_CLASS,
+  ECOM_ASSISTANT_COMPOSER_ROW_CLASS,
   ECOM_ASSISTANT_COMPOSER_SHELL_BASE,
   ECOM_ASSISTANT_COMPOSER_SHELL_COMPACT,
   ECOM_ASSISTANT_COMPOSER_SHELL_EXPANDED_BORDER,
+  ECOM_ASSISTANT_COMPOSER_TEXTAREA_CLASS,
   ECOM_ASSISTANT_MESSAGE_BUBBLE_BASE,
   ECOM_ASSISTANT_USER_BUBBLE_CLASS,
 } from "@/lib/ecom-assistant-chat-styles";
@@ -1082,9 +1084,9 @@ export function StoryboardAssistantPanel({
         ECOM_ASSISTANT_COMPOSER_SHELL_EXPANDED_BORDER,
       )}
     >
-      <div className="flex items-end gap-2">
+      <div className={ECOM_ASSISTANT_COMPOSER_ROW_CLASS}>
         <textarea
-          className="min-h-[2.5rem] flex-1 resize-none rounded-xl border border-[var(--ecom-assistant-input-border)] bg-[var(--ecom-assistant-input-bg)] px-3 py-2 text-sm text-[#1d1d1f] outline-none placeholder:text-[#86868b] focus:border-[var(--ecom-chrome-accent)] disabled:opacity-50"
+          className={cn(ECOM_ASSISTANT_COMPOSER_TEXTAREA_CLASS, "resize-none")}
           rows={2}
           placeholder={
             showSchemePickCards
@@ -1123,9 +1125,9 @@ export function StoryboardAssistantPanel({
 
   const floatingComposerSection = (
     <div className={ECOM_ASSISTANT_COMPOSER_SHELL_COMPACT}>
-      <div className="flex items-end gap-2">
+      <div className={ECOM_ASSISTANT_COMPOSER_ROW_CLASS}>
         <textarea
-          className="min-h-[2.5rem] flex-1 resize-none rounded-xl border border-[var(--ecom-assistant-input-border)] bg-[var(--ecom-assistant-input-bg)] px-3 py-2 text-sm text-[#1d1d1f] outline-none placeholder:text-[#86868b] focus:border-[var(--ecom-chrome-accent)] disabled:opacity-50"
+          className={cn(ECOM_ASSISTANT_COMPOSER_TEXTAREA_CLASS, "resize-none")}
           rows={1}
           placeholder={
             showSchemePickCards

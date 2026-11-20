@@ -139,7 +139,7 @@ export function IpMasterPickDialog({ open, onOpenChange, busy, onConfirm }: Prop
                       className={cn(
                         "flex w-full items-center gap-3 rounded-xl border p-3 text-left transition",
                         selected
-                          ? "border-[#0071e3] bg-[#f0f6ff]"
+                          ? "border-[var(--ecom-outline-border)] bg-[#f0f6ff]"
                           : "border-[#e8e8ed] hover:border-[#d2d2d7]",
                       )}
                       onClick={() => setSelectedId(item.id)}

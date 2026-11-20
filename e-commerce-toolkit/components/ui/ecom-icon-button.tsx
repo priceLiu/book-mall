@@ -27,9 +27,9 @@ function variantClass(variant: Variant): string {
     case "destructive":
       return "border-[#ff3b30]/30 text-[#ff3b30] hover:border-[#ff3b30] hover:bg-[#fff5f5]";
     case "accent":
-      return "border-[var(--ecom-primary)] bg-[#f0f6ff] text-[var(--ecom-primary)]";
+      return "border-[var(--ecom-outline-border)] bg-[var(--ecom-outline-hover-bg)] text-[var(--ecom-outline-text)]";
     default:
-      return "border-[#d2d2d7] text-[var(--ecom-primary)] hover:border-[var(--ecom-primary)] hover:bg-[#f0f6ff]";
+      return "border-[#d2d2d7] text-[var(--ecom-outline-text)] hover:border-[var(--ecom-outline-border)] hover:bg-[var(--ecom-outline-hover-bg)]";
   }
 }
 

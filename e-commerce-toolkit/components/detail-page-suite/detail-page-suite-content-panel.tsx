@@ -937,7 +937,7 @@ function ModuleBlock({
                   className={cn(
                     "rounded-full border px-2 py-0.5 text-[11px]",
                     on
-                      ? "border-[#0071e3] bg-[#f0f6ff] text-[#0071e3]"
+                      ? "border-[var(--ecom-outline-border)] bg-[#f0f6ff] text-[#0071e3]"
                       : "border-[#d2d2d7] text-[#6e6e73]",
                   )}
                   onClick={() => onToggleItem(mod.module_id, item)}

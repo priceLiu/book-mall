@@ -163,7 +163,7 @@ export function EcomPoseLibraryImportDialog({
           </button>
           <button
             type="button"
-            className="rounded-lg bg-[#0071e3] px-3 py-1.5 text-sm text-white disabled:opacity-50"
+            className="rounded-lg bg-[var(--ecom-btn-fill)] px-3 py-1.5 text-sm text-white hover:bg-[var(--ecom-btn-fill-hover)] disabled:opacity-50"
             disabled={busy}
             onClick={() => void submit()}
           >

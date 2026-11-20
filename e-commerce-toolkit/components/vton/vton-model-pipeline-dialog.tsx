@@ -82,7 +82,7 @@ const MODE_COPY: Record<
 
 function metricInputClass(disabled?: boolean): string {
   return cn(
-    "w-full rounded-md border border-[#e8e8ed] px-2 py-1.5 text-[11px] text-[#1d1d1f] outline-none focus:border-[#0071e3]",
+    "w-full rounded-md border border-[#e8e8ed] px-2 py-1.5 text-[11px] text-[#1d1d1f] outline-none focus:border-[var(--ecom-outline-border)]",
     disabled && "cursor-not-allowed bg-[#f5f5f7] opacity-60",
   );
 }
@@ -312,8 +312,8 @@ export function VtonModelPipelineDialog({
                       className={cn(
                         "rounded-full border px-3 py-1 text-[11px] font-medium transition",
                         ageGroup === opt.value
-                          ? "border-[#0071e3] bg-[#f0f6ff] text-[#0071e3]"
-                          : "border-[#e8e8ed] text-[#6e6e73] hover:border-[#0071e3]/40",
+                          ? "border-[var(--ecom-outline-border)] bg-[#f0f6ff] text-[#0071e3]"
+                          : "border-[#e8e8ed] text-[#6e6e73] hover:border-[var(--ecom-outline-border)]",
                       )}
                       onClick={() => setAgeGroup(opt.value)}
                     >
@@ -336,8 +336,8 @@ export function VtonModelPipelineDialog({
                         className={cn(
                           "rounded-lg border px-3 py-2 text-left transition",
                           active
-                            ? "border-[#0071e3] bg-[#f0f6ff]"
-                            : "border-[#e8e8ed] bg-white hover:border-[#0071e3]/30",
+                            ? "border-[var(--ecom-outline-border)] bg-[#f0f6ff]"
+                            : "border-[#e8e8ed] bg-white hover:border-[var(--ecom-outline-border)]",
                         )}
                         onClick={() => setBodyPreset(opt.value)}
                       >
@@ -414,7 +414,7 @@ export function VtonModelPipelineDialog({
                   外貌细节（可选）
                 </label>
                 <input
-                  className="w-full rounded-lg border border-[#e8e8ed] px-3 py-2 text-xs text-[#1d1d1f] outline-none focus:border-[#0071e3]"
+                  className="w-full rounded-lg border border-[#e8e8ed] px-3 py-2 text-xs text-[#1d1d1f] outline-none focus:border-[var(--ecom-outline-border)]"
                   value={featureDetail}
                   disabled={busy}
                   placeholder="例如：眼角有泪痣、自然卷发…"
@@ -425,7 +425,7 @@ export function VtonModelPipelineDialog({
               <div>
                 <p className="mb-2 text-xs font-medium text-[#6e6e73]">{copy.promptLabel}</p>
                 <textarea
-                  className="ecom-scrollbar-thin min-h-[140px] w-full resize-y rounded-lg border border-[#e8e8ed] px-3 py-2.5 text-[13px] leading-relaxed text-[#1d1d1f] focus:border-[#0071e3]/40 focus:outline-none focus:ring-2 focus:ring-[#0071e3]/15 disabled:cursor-not-allowed disabled:bg-[#f5f5f7]"
+                  className="ecom-scrollbar-thin min-h-[140px] w-full resize-y rounded-lg border border-[#e8e8ed] px-3 py-2.5 text-[13px] leading-relaxed text-[#1d1d1f] focus:border-[var(--ecom-outline-border)] focus:outline-none focus:ring-2 focus:ring-[#1d1d1f]/12 disabled:cursor-not-allowed disabled:bg-[#f5f5f7]"
                   value={draftPrompt}
                   disabled={busy}
                   placeholder={
@@ -479,8 +479,8 @@ export function VtonModelPipelineDialog({
                         className={cn(
                           "rounded-xl border px-3 py-3 text-left transition",
                           active
-                            ? "border-[#0071e3] bg-[#f0f6ff]"
-                            : "border-[#e5e5ea] bg-white hover:border-[#0071e3]/40",
+                            ? "border-[var(--ecom-outline-border)] bg-[#f0f6ff]"
+                            : "border-[#e5e5ea] bg-white hover:border-[var(--ecom-outline-border)]",
                         )}
                         onClick={() => {
                           setDraftModelKey(m.modelKey);

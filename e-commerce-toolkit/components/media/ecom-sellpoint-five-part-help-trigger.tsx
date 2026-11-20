@@ -15,7 +15,7 @@ export function EcomSellpointFivePartHelpTrigger({ className }: Props) {
     <span className={cn("group/help relative ml-0.5 inline-flex align-middle", className)}>
       <button
         type="button"
-        className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-[#c7c7cc] text-[10px] font-semibold leading-none text-[#515154] hover:border-[#0071e3] hover:text-[#0071e3] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#0071e3]"
+        className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-[#c7c7cc] text-[10px] font-semibold leading-none text-[#515154] hover:border-[var(--ecom-outline-border)] hover:text-[#0071e3] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#0071e3]"
         aria-label="卖点填写说明"
       >
         ?

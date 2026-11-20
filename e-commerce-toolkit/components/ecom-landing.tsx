@@ -6,7 +6,7 @@ import { getMainSiteOrigin } from "@/lib/site-origin";
 export function EcomLanding() {
   const bookOrigin = getMainSiteOrigin();
   return (
-    <main className="flex h-dvh flex-col overflow-y-auto bg-[#0c0c0e]">
+    <main className="flex h-dvh flex-col overflow-y-auto bg-[var(--ecom-shell-bg)]">
       <EcomPortalTopBar authed={false} bookOrigin={bookOrigin} />
       <EcomLandingHome />
     </main>

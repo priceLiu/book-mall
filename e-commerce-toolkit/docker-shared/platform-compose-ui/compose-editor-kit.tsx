@@ -2635,7 +2635,7 @@ function ComposeClipStrip({
           className={cn(
             "relative w-[72px] shrink-0 cursor-grab active:cursor-grabbing overflow-hidden rounded-md border",
             selectedId === clip.id
-              ? "border-[#0071e3] ring-1 ring-[#0071e3]/40"
+              ? "border-[var(--ecom-outline-border)] ring-1 ring-[#1d1d1f]/15/40"
               : variant === "dark"
                 ? "border-white/15"
                 : "border-[#e8e8ed]",
@@ -4262,7 +4262,7 @@ function AssetGrid({
             type="button"
             className={cn(
               "relative overflow-hidden rounded border text-left",
-              selectedId === c.id ? "border-[#0071e3]" : "border-white/15",
+              selectedId === c.id ? "border-[var(--ecom-outline-border)]" : "border-white/15",
             )}
             title={c.label?.trim() || undefined}
             onClick={() => onPick(c.id)}

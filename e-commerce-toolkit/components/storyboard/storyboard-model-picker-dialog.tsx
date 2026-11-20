@@ -255,7 +255,7 @@ function ModelCard({
       className={cn(
         "group relative flex w-full min-h-[4.75rem] flex-row items-stretch gap-4 rounded-xl border px-4 py-3 text-left transition",
         selected
-          ? "border-[var(--ecom-primary)] bg-[#f0f6ff] shadow-sm"
+          ? "border-[var(--ecom-outline-border)] bg-[#f0f6ff] shadow-sm"
           : "border-[#e8e8ed] bg-white hover:border-[#c7c7cc] hover:bg-[#fafafa]",
         disabled && "cursor-not-allowed opacity-50 hover:border-[#e8e8ed] hover:bg-white",
       )}
@@ -334,7 +334,7 @@ function ModelMediaFilterBar({
             className={cn(
               "rounded-full border px-3 py-1 text-[12px] font-medium transition",
               active
-                ? "border-[var(--ecom-primary)] bg-[#f0f6ff] text-[var(--ecom-primary)]"
+                ? "border-[var(--ecom-outline-border)] bg-[#f0f6ff] text-[var(--ecom-primary)]"
                 : "border-[#e8e8ed] bg-white text-[#6e6e73] hover:border-[#c7c7cc] hover:bg-[#fafafa]",
               tab.id !== "all" && count === 0 && "cursor-not-allowed opacity-40 hover:bg-white",
             )}

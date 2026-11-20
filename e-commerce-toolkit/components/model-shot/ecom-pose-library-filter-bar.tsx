@@ -39,7 +39,7 @@ export function EcomPoseLibraryFilterBar({
               className={cn(
                 "rounded-full border px-2 py-0.5 text-[10px] transition-colors",
                 active
-                  ? "border-[#0071e3] bg-[#f0f6ff] text-[#0071e3]"
+                  ? "border-[var(--ecom-outline-border)] bg-[#f0f6ff] text-[#0071e3]"
                   : "border-[#d2d2d7] bg-white text-[#424245] hover:border-[#86868b]",
               )}
               onClick={() => onGendersChange(toggleValue(selectedGenders, opt.value))}
@@ -69,7 +69,7 @@ export function EcomPoseLibraryFilterBar({
               className={cn(
                 "rounded-full border px-2 py-0.5 text-[10px] transition-colors",
                 active
-                  ? "border-[#0071e3] bg-[#f0f6ff] text-[#0071e3]"
+                  ? "border-[var(--ecom-outline-border)] bg-[#f0f6ff] text-[#0071e3]"
                   : "border-[#d2d2d7] bg-white text-[#424245] hover:border-[#86868b]",
               )}
               onClick={() => onSceneTagsChange(toggleValue(selectedSceneTags, opt.value))}

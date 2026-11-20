@@ -166,7 +166,7 @@ export function FilmPullDock({
             }}
           />
           <textarea
-            className="w-full rounded-lg border border-[#d2d2d7] px-2 py-1.5 text-xs outline-none focus:border-[#0071e3] focus:ring-2 focus:ring-[#0071e3]/20"
+            className="w-full rounded-lg border border-[#d2d2d7] px-2 py-1.5 text-xs outline-none focus:border-[var(--ecom-outline-border)] focus:ring-2 focus:ring-[#1d1d1f]/15"
             rows={2}
             placeholder="角色文字描述（可选）"
             value={characterDescription}

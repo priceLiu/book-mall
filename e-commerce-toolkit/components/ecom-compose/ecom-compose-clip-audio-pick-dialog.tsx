@@ -60,7 +60,7 @@ export function EcomComposeClipAudioPickDialog({
           <button
             type="button"
             disabled={busy}
-            className="mb-3 flex w-full items-center justify-center rounded-xl border border-dashed border-[#0071e3]/40 bg-[#f0f6ff] px-3 py-2.5 text-[13px] font-medium text-[#0071e3] hover:bg-[#e8f2ff] disabled:opacity-50"
+            className="mb-3 flex w-full items-center justify-center rounded-xl border border-dashed border-[var(--ecom-outline-border)] bg-[#f0f6ff] px-3 py-2.5 text-[13px] font-medium text-[#0071e3] hover:bg-[#e8f2ff] disabled:opacity-50"
             onClick={() => {
               if (busy) return;
               onUploadLocal();
@@ -88,9 +88,9 @@ export function EcomComposeClipAudioPickDialog({
                       type="button"
                       disabled={busy}
                       className={cn(
-                        "flex w-full items-start gap-2 rounded-xl border px-3 py-2.5 text-left transition hover:border-[#0071e3]/50 hover:bg-[#fafafa] disabled:opacity-50",
+                        "flex w-full items-start gap-2 rounded-xl border px-3 py-2.5 text-left transition hover:border-[var(--ecom-outline-border)]/50 hover:bg-[#fafafa] disabled:opacity-50",
                         suggested
-                          ? "border-[#0071e3]/60 bg-[#f0f6ff]/60"
+                          ? "border-[var(--ecom-outline-border)] bg-[var(--ecom-outline-hover-bg)]/60"
                           : "border-[#e8e8ed] bg-white",
                       )}
                       onClick={() => onPickTts(opt)}

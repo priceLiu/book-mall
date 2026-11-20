@@ -44,7 +44,7 @@ export function SeedVideoStoryboardDraftEditor({ rows, onChange, disabled }: Pro
               <td className="px-3 py-2 font-medium text-[#1d1d1f]">{row.index}</td>
               <td className="px-3 py-2">
                 <input
-                  className="w-full min-w-[4.5rem] rounded-lg border border-[#e8e8ed] px-2 py-1.5 text-[#1d1d1f] focus:border-[#0071e3] focus:outline-none disabled:opacity-50"
+                  className="w-full min-w-[4.5rem] rounded-lg border border-[#e8e8ed] px-2 py-1.5 text-[#1d1d1f] focus:border-[var(--ecom-outline-border)] focus:outline-none disabled:opacity-50"
                   value={row.duration}
                   disabled={disabled}
                   onChange={(e) => patchRow(row.index, { duration: e.target.value })}
@@ -52,7 +52,7 @@ export function SeedVideoStoryboardDraftEditor({ rows, onChange, disabled }: Pro
               </td>
               <td className="px-3 py-2">
                 <input
-                  className="w-full min-w-[5rem] rounded-lg border border-[#e8e8ed] px-2 py-1.5 text-[#1d1d1f] focus:border-[#0071e3] focus:outline-none disabled:opacity-50"
+                  className="w-full min-w-[5rem] rounded-lg border border-[#e8e8ed] px-2 py-1.5 text-[#1d1d1f] focus:border-[var(--ecom-outline-border)] focus:outline-none disabled:opacity-50"
                   value={row.refLabel}
                   disabled={disabled}
                   onChange={(e) => patchRow(row.index, { refLabel: e.target.value })}
@@ -60,7 +60,7 @@ export function SeedVideoStoryboardDraftEditor({ rows, onChange, disabled }: Pro
               </td>
               <td className="px-3 py-2">
                 <textarea
-                  className="ecom-scrollbar-thin min-h-[3.5rem] w-full resize-y rounded-lg border border-[#e8e8ed] px-2 py-1.5 text-[#1d1d1f] focus:border-[#0071e3] focus:outline-none disabled:opacity-50"
+                  className="ecom-scrollbar-thin min-h-[3.5rem] w-full resize-y rounded-lg border border-[#e8e8ed] px-2 py-1.5 text-[#1d1d1f] focus:border-[var(--ecom-outline-border)] focus:outline-none disabled:opacity-50"
                   value={row.cameraMove}
                   disabled={disabled}
                   placeholder="推镜、慢动作、特写…"
@@ -69,7 +69,7 @@ export function SeedVideoStoryboardDraftEditor({ rows, onChange, disabled }: Pro
               </td>
               <td className="px-3 py-2">
                 <textarea
-                  className="ecom-scrollbar-thin min-h-[3.5rem] w-full resize-y rounded-lg border border-[#e8e8ed] px-2 py-1.5 text-[#1d1d1f] focus:border-[#0071e3] focus:outline-none disabled:opacity-50"
+                  className="ecom-scrollbar-thin min-h-[3.5rem] w-full resize-y rounded-lg border border-[#e8e8ed] px-2 py-1.5 text-[#1d1d1f] focus:border-[var(--ecom-outline-border)] focus:outline-none disabled:opacity-50"
                   value={row.sceneDescription}
                   disabled={disabled}
                   onChange={(e) => patchRow(row.index, { sceneDescription: e.target.value })}
@@ -77,7 +77,7 @@ export function SeedVideoStoryboardDraftEditor({ rows, onChange, disabled }: Pro
               </td>
               <td className="px-3 py-2">
                 <textarea
-                  className="ecom-scrollbar-thin min-h-[3.5rem] w-full resize-y rounded-lg border border-[#e8e8ed] px-2 py-1.5 text-[#1d1d1f] focus:border-[#0071e3] focus:outline-none disabled:opacity-50"
+                  className="ecom-scrollbar-thin min-h-[3.5rem] w-full resize-y rounded-lg border border-[#e8e8ed] px-2 py-1.5 text-[#1d1d1f] focus:border-[var(--ecom-outline-border)] focus:outline-none disabled:opacity-50"
                   value={row.voiceover}
                   disabled={disabled}
                   onChange={(e) => patchRow(row.index, { voiceover: e.target.value })}
@@ -85,7 +85,7 @@ export function SeedVideoStoryboardDraftEditor({ rows, onChange, disabled }: Pro
               </td>
               <td className="px-3 py-2">
                 <textarea
-                  className="ecom-scrollbar-thin min-h-[4rem] w-full resize-y rounded-lg border border-[#e8e8ed] px-2 py-1.5 text-[#1d1d1f] focus:border-[#0071e3] focus:outline-none disabled:opacity-50"
+                  className="ecom-scrollbar-thin min-h-[4rem] w-full resize-y rounded-lg border border-[#e8e8ed] px-2 py-1.5 text-[#1d1d1f] focus:border-[var(--ecom-outline-border)] focus:outline-none disabled:opacity-50"
                   value={row.aiPrompt}
                   disabled={disabled}
                   placeholder="留空则根据画面描述自动生成"

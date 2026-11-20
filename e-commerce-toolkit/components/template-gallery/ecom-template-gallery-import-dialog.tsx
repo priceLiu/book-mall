@@ -263,7 +263,7 @@ export function EcomTemplateGalleryImportDialog({
               className={cn(
                 "rounded-lg border border-dashed px-4 py-5 text-center transition",
                 dragOver
-                  ? "border-[#0071e3] bg-[#f0f6ff]"
+                  ? "border-[var(--ecom-outline-border)] bg-[#f0f6ff]"
                   : "border-[#e8e8ed] bg-[#fafafa]",
               )}
             >
@@ -369,7 +369,7 @@ export function EcomTemplateGalleryImportDialog({
                 className={cn(
                   "rounded-lg border px-2.5 py-1 text-xs",
                   mediaFilter === m
-                    ? "border-[#0071e3] bg-[#f0f6ff] text-[#0071e3]"
+                    ? "border-[var(--ecom-outline-border)] bg-[#f0f6ff] text-[#0071e3]"
                     : "border-[#e8e8ed]",
                 )}
               >
@@ -389,7 +389,7 @@ export function EcomTemplateGalleryImportDialog({
               type="button"
               className={cn(
                 "rounded-lg border px-2.5 py-1 text-xs",
-                preset === "yibaiaigc-demo-card" && "border-[#0071e3] bg-[#f0f6ff]",
+                preset === "yibaiaigc-demo-card" && "border-[var(--ecom-outline-border)] bg-[#f0f6ff]",
               )}
               onClick={() => setPreset("yibaiaigc-demo-card")}
             >
@@ -399,7 +399,7 @@ export function EcomTemplateGalleryImportDialog({
               type="button"
               className={cn(
                 "rounded-lg border px-2.5 py-1 text-xs",
-                preset === "custom" && "border-[#0071e3] bg-[#f0f6ff]",
+                preset === "custom" && "border-[var(--ecom-outline-border)] bg-[#f0f6ff]",
               )}
               onClick={() => setPreset("custom")}
             >

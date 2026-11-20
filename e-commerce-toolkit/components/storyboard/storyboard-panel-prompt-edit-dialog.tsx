@@ -29,7 +29,7 @@ type Props = {
 };
 
 const textareaClass =
-  "w-full min-h-[120px] resize-y rounded-lg border border-[#d2d2d7] bg-white px-3 py-2 text-[13px] leading-relaxed text-[#1d1d1f] outline-none focus:border-[#0071e3] focus:ring-1 focus:ring-[#0071e3]/30";
+  "w-full min-h-[120px] resize-y rounded-lg border border-[#d2d2d7] bg-white px-3 py-2 text-[13px] leading-relaxed text-[#1d1d1f] outline-none focus:border-[var(--ecom-outline-border)] focus:ring-1 focus:ring-[#1d1d1f]/15";
 
 /** 镜头 Prompt 编辑：场景 / 生图 / 生视频 + 分镜表画面内容 */
 export function StoryboardPanelPromptEditDialog({

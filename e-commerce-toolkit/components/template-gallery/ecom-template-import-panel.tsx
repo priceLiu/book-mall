@@ -244,7 +244,7 @@ export function EcomTemplateImportPanel() {
         {resumable ? (
           <button
             type="button"
-            className="flex-1 rounded-lg border border-[#0071e3] px-2 py-1.5 text-xs text-[#0071e3]"
+            className="flex-1 rounded-lg border border-[var(--ecom-outline-border)] px-2 py-1.5 text-xs text-[#0071e3]"
             onClick={() => resumeJob(activeJob.id)}
           >
             {activeJob.cancelled

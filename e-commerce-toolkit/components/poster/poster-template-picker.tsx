@@ -83,7 +83,7 @@ export function PosterTemplatePicker({
             type="button"
             className={cn(
               "overflow-hidden rounded-lg border text-left transition",
-              selected ? "border-[#0071e3] ring-1 ring-[#0071e3]" : "border-[#e8e8ed] hover:border-[#d2d2d7]",
+              selected ? "border-[var(--ecom-outline-border)] ring-1 ring-[#1d1d1f]/15" : "border-[#e8e8ed] hover:border-[#d2d2d7]",
             )}
             onClick={() => onSelect(entry)}
           >

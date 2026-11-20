@@ -112,7 +112,7 @@ function SkillCard({
       onClick={onSelect}
       className={cn(
         "flex items-start gap-3 rounded-xl border-2 p-3 text-left transition-colors",
-        active ? "border-[#0071e3] bg-[#f0f6ff]" : "border-[#e8e8ed] bg-white hover:border-[#d2d2d7]",
+        active ? "border-[var(--ecom-outline-border)] bg-[#f0f6ff]" : "border-[#e8e8ed] bg-white hover:border-[#d2d2d7]",
       )}
     >
       <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-white shadow-sm">

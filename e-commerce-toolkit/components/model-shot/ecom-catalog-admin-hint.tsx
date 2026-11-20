@@ -18,7 +18,7 @@ export function EcomCatalogAdminHint({ adminPath, adminLabel }: EcomCatalogAdmin
   const href = `${getBookOriginClient().replace(/\/$/, "")}${adminPath.startsWith("/") ? adminPath : `/${adminPath}`}`;
 
   return (
-    <div className="mb-4 rounded-xl border border-[#0071e3]/20 bg-[#f0f6ff] px-4 py-3 text-sm text-[#1d1d1f]">
+    <div className="mb-4 rounded-xl border border-[var(--ecom-outline-border)] bg-[#f0f6ff] px-4 py-3 text-sm text-[#1d1d1f]">
       <p>
         你是平台管理员：此页「系统推荐」对所有人只读。要增删改平台推荐条目，请前往 Book 管理后台的
         <Link href={href} className="mx-1 text-[#0071e3] hover:underline" target="_blank" rel="noreferrer">

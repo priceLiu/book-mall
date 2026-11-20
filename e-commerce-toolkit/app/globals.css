@@ -6,8 +6,16 @@
   --ecom-primary: #0066cc;
   --ecom-primary-focus: #0071e3;
   --ecom-primary-on-dark: #2997ff;
+  /** 侧栏 Logo 同款 · 主按钮实心填充 */
+  --ecom-brand-orange: #ff6b3d;
+  --ecom-brand-orange-deep: #e85d2c;
+  /** 描边按钮 / Logo / 选中框：墨黑边 */
+  --ecom-outline-border: #1d1d1f;
+  --ecom-outline-text: #1d1d1f;
+  --ecom-outline-hover-bg: #f5f5f7;
   /* 按钮规范：design/BUTTON.md */
-  --ecom-btn-fill: var(--ecom-primary);
+  --ecom-btn-fill: var(--ecom-brand-orange);
+  --ecom-btn-fill-hover: var(--ecom-brand-orange-deep);
   --ecom-btn-on-fill: #ffffff;
   --ecom-btn-alt-fill: #f4f4f5;
   --ecom-btn-alt-on-fill: #18181b;
@@ -17,7 +25,9 @@
   --ecom-hairline: #e0e0e0;
   --ecom-muted: #7a7a7a;
 
-  /* 左侧导航深色壳（顶栏黑底见 ecom-portal-top-bar） */
+  /** 已登录壳层 / 门户外底（App 网格与 body） */
+  --ecom-shell-bg: #3c3c3c;
+  /* 左侧导航深色壳（顶栏见 ecom-portal-top-bar） */
   --ecom-chrome-bg: #141416;
   --ecom-chrome-border: rgba(255, 255, 255, 0.12);
   --ecom-chrome-border-subtle: rgba(255, 255, 255, 0.08);
@@ -28,6 +38,12 @@
   --ecom-chrome-surface-raised: rgba(255, 255, 255, 0.1);
   --ecom-chrome-hover: rgba(255, 255, 255, 0.08);
   --ecom-chrome-accent: #0071e3;
+
+  /* 玻璃态侧栏（EcomProfileSidebar） */
+  --ecom-glass-bg: rgba(28, 28, 30, 0.52);
+  --ecom-glass-border: rgba(255, 255, 255, 0.14);
+  --ecom-glass-highlight: rgba(255, 255, 255, 0.22);
+  --ecom-glass-inset: rgba(255, 255, 255, 0.06);
 
   /* 工作台主内容 / 助手 / 进度轨 — 白底 */
   --ecom-workspace-bg: #ffffff;
@@ -63,12 +79,12 @@ html,
 body {
   height: 100%;
   overflow: hidden;
-  scrollbar-gutter: stable;
+  scrollbar-gutter: auto;
 }
 
 body {
   color: var(--ecom-ink);
-  background: #0c0c0e;
+  background: var(--ecom-shell-bg);
   -webkit-font-smoothing: antialiased;
 }
 
@@ -221,4 +237,14 @@ body {
   100% {
     background-position: -200% 0;
   }
+}
+
+.ecom-glass-sidebar {
+  background: var(--ecom-glass-bg);
+  border-color: var(--ecom-glass-border);
+  box-shadow:
+    inset 0 1px 0 var(--ecom-glass-highlight),
+    0 12px 40px rgba(0, 0, 0, 0.35);
+  -webkit-backdrop-filter: blur(24px) saturate(1.25);
+  backdrop-filter: blur(24px) saturate(1.25);
 }

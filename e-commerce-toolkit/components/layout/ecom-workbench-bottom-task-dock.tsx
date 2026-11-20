@@ -39,7 +39,7 @@ function EcomWorkbenchBottomTaskDockInner({
   return (
     <div
       className={cn(
-        "w-full overflow-hidden rounded-xl border border-[#0071e3]/25 bg-white shadow-[0_-4px_24px_rgba(0,0,0,0.06)]",
+        "w-full overflow-hidden rounded-xl border border-[var(--ecom-outline-border)] bg-white shadow-[0_-4px_24px_rgba(0,0,0,0.06)]",
         sweep && "ecom-media-generating-sweep",
       )}
     >

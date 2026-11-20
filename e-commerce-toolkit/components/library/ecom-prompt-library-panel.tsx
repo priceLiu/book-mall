@@ -146,7 +146,7 @@ export function EcomPromptLibraryPanel() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="搜索提示词或标题…"
-            className="h-9 w-full rounded-lg border border-[#e8e8ed] bg-[#f5f5f7] pl-9 pr-3 text-sm text-[#1d1d1f] placeholder:text-[#86868b] focus:border-[#0071e3] focus:bg-white focus:outline-none"
+            className="h-9 w-full rounded-lg border border-[#e8e8ed] bg-[#f5f5f7] pl-9 pr-3 text-sm text-[#1d1d1f] placeholder:text-[#86868b] focus:border-[var(--ecom-outline-border)] focus:bg-white focus:outline-none"
           />
         </label>
       </div>

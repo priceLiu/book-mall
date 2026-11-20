@@ -176,7 +176,7 @@ export function StoryboardFullSheetCard({
                   <button
                     type="button"
                     title="生成完整视频"
-                    className={cn(ECOM_STORYBOARD_HOVER_ACTION_BTN_CLASS, "bg-[#0071e3] text-white hover:bg-[#0077ed]")}
+                    className={cn(ECOM_STORYBOARD_HOVER_ACTION_BTN_CLASS, "bg-[var(--ecom-btn-fill)] text-white hover:bg-[var(--ecom-btn-fill-hover)]")}
                     onClick={(e) => {
                       stopClick(e);
                       onGenerateVideo();

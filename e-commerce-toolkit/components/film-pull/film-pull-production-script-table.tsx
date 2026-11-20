@@ -124,7 +124,7 @@ function ScriptTextField({
   if (multiline) {
     return (
       <textarea
-        className={`w-full ${minHeightClass} rounded border border-[#d2d2d7] px-1.5 py-1 text-xs outline-none focus:border-[#0071e3]`}
+        className={`w-full ${minHeightClass} rounded border border-[#d2d2d7] px-1.5 py-1 text-xs outline-none focus:border-[var(--ecom-outline-border)]`}
         rows={2}
         value={value}
         disabled={disabled}
@@ -134,7 +134,7 @@ function ScriptTextField({
   }
   return (
     <input
-      className="w-full rounded border border-[#d2d2d7] px-1.5 py-1 text-xs outline-none focus:border-[#0071e3]"
+      className="w-full rounded border border-[#d2d2d7] px-1.5 py-1 text-xs outline-none focus:border-[var(--ecom-outline-border)]"
       value={value}
       disabled={disabled}
       onChange={(e) => onChange(e.target.value)}

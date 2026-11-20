@@ -185,10 +185,10 @@ export function EcomRefUploadCard({
     <div
       {...dropZoneProps}
       className={cn(
-        "rounded-lg border px-2.5 py-2 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[#0071e3]/30",
-        highlight && "border-[#0071e3] bg-white ring-1 ring-[#0071e3]/30",
-        !highlight && suggested && "border-[#0071e3]/45 bg-white ring-1 ring-[#0071e3]/15",
-        !highlight && !suggested && "border-[#e8e8ed] bg-white hover:border-[#0071e3]/40",
+        "rounded-lg border px-2.5 py-2 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[#1d1d1f]/15",
+        highlight && "border-[var(--ecom-outline-border)] bg-white ring-1 ring-[#1d1d1f]/15",
+        !highlight && suggested && "border-[var(--ecom-outline-border)] bg-white ring-1 ring-[#1d1d1f]/12",
+        !highlight && !suggested && "border-[#e8e8ed] bg-white hover:border-[var(--ecom-outline-border)]",
       )}
       onMouseEnter={() => {
         dropZoneProps.onMouseEnter?.();

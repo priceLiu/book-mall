@@ -25,7 +25,7 @@ export function IpMasterTemplateGeneratingShell({
       className={cn(
         "relative",
         generating && [
-          "ecom-media-generating-sweep rounded-xl border border-[#0071e3]/30 bg-white",
+          "ecom-media-generating-sweep rounded-xl border border-[var(--ecom-outline-border)] bg-white",
           minHeightClass,
         ],
         className,

@@ -108,7 +108,7 @@ export function EcomProjectListDialog({
                     className={cn(
                       "flex items-center gap-3 rounded-xl border-2 p-2.5 text-left transition-colors",
                       active
-                        ? "border-[#0071e3] bg-[#f0f6ff]"
+                        ? "border-[var(--ecom-outline-border)] bg-[#f0f6ff]"
                         : "border-[#e8e8ed] bg-white hover:border-[#d2d2d7]",
                       openingId && !opening ? "opacity-60" : "",
                     )}

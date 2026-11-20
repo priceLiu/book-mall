@@ -143,7 +143,7 @@ export function EcomAppShell({
   }, []);
 
   const sidebarInset = navCollapsed
-    ? "md:grid-cols-[4rem_minmax(0,1fr)]"
+    ? "md:grid-cols-[4.5rem_minmax(0,1fr)]"
     : "md:grid-cols-[21rem_minmax(0,1fr)]";
 
   const collapseNavOnWorkspaceClick = React.useCallback(() => {
@@ -155,10 +155,10 @@ export function EcomAppShell({
   }
 
   return (
-    <div className="relative h-dvh overflow-hidden bg-[#0c0c0e] p-3 md:p-5">
+    <div className="relative box-border flex h-dvh w-full flex-col overflow-hidden bg-[var(--ecom-shell-bg)] px-1.5 py-3 md:px-2.5 md:py-5">
       <div
         className={cn(
-          "grid h-full min-h-0 grid-cols-1 gap-3 overflow-hidden md:gap-4",
+          "grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-hidden md:gap-4",
           sidebarInset,
         )}
       >

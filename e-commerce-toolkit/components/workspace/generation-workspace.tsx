@@ -212,7 +212,7 @@ export function GenerationWorkspace({ module }: { module: EcomModuleDef }) {
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
               rows={8}
-              className="mt-2 min-h-0 flex-1 resize-none rounded-xl border border-[var(--ecom-assistant-input-border)] bg-[var(--ecom-assistant-input-bg)] p-3 text-sm text-[#1d1d1f] outline-none placeholder:text-[#86868b] focus:border-[#0071e3]"
+              className="mt-2 min-h-0 flex-1 resize-none rounded-xl border border-[var(--ecom-assistant-input-border)] bg-[var(--ecom-assistant-input-bg)] p-3 text-sm text-[#1d1d1f] outline-none placeholder:text-[#86868b] focus:border-[var(--ecom-outline-border)]"
               placeholder="描述商品、风格、镜头与卖点…"
             />
             {error ? (

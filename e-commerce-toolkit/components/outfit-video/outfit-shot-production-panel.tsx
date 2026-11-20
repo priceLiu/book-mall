@@ -335,7 +335,7 @@ export function OutfitShotProductionPanel({
       ) : null}
 
       {productionGenerating ? (
-        <div className="flex items-center gap-2 rounded-lg border border-[#0071e3]/25 bg-[#f0f6ff] px-3 py-2 text-xs text-[#0058c7]">
+        <div className="flex items-center gap-2 rounded-lg border border-[var(--ecom-outline-border)] bg-[#f0f6ff] px-3 py-2 text-xs text-[#0058c7]">
           <Loader2 className="h-4 w-4 animate-spin" />
           正在 AI 生成分镜制作表…
         </div>
@@ -365,7 +365,7 @@ export function OutfitShotProductionPanel({
               <button
                 key={item.url}
                 type="button"
-                className="flex items-center gap-1.5 rounded-lg border border-[#e8e8ed] bg-white px-1.5 py-1 text-left transition hover:border-[#0071e3]/35 hover:bg-[#f0f6ff]"
+                className="flex items-center gap-1.5 rounded-lg border border-[#e8e8ed] bg-white px-1.5 py-1 text-left transition hover:border-[var(--ecom-outline-border)] hover:bg-[#f0f6ff]"
                 title={`${item.label} · 点击放大`}
                 onClick={() => openPreview(item.url, item.label, previewGallery)}
               >
@@ -409,7 +409,7 @@ export function OutfitShotProductionPanel({
                     <td className={ecomDataTableTdClass}>
                       <input
                         type="checkbox"
-                        className="size-3.5 rounded border-[#d2d2d7] text-[#0071e3] focus:ring-[#0071e3]/30 disabled:opacity-40"
+                        className="size-3.5 rounded border-[#d2d2d7] text-[#0071e3] focus:ring-[#1d1d1f]/15 disabled:opacity-40"
                         checked={isSelected}
                         disabled={tableBusy || !productionReady}
                         aria-label={`选择镜 ${row.index}`}
@@ -459,7 +459,7 @@ export function OutfitShotProductionPanel({
                         type="button"
                         disabled={tableBusy || productionBusy}
                         className={cn(
-                          "relative flex aspect-[9/16] w-14 items-center justify-center overflow-hidden rounded-md border border-[#e8e8ed] bg-[#fafafa] transition-colors hover:border-[#0071e3]",
+                          "relative flex aspect-[9/16] w-14 items-center justify-center overflow-hidden rounded-md border border-[#e8e8ed] bg-[#fafafa] transition-colors hover:border-[var(--ecom-outline-border)]",
                           fusingIndices?.has(row.index) && "opacity-70",
                         )}
                         aria-label={`镜 ${row.index} 场景设置`}

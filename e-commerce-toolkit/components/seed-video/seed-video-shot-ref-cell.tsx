@@ -61,7 +61,7 @@ export function SeedVideoShotRefCell({
       className={cn(
         "relative min-w-[7.5rem] space-y-1.5 rounded-lg border border-dashed p-1.5 transition-colors",
         dragOver || pasteReady
-          ? "border-[#0071e3] bg-[#f0f6ff]"
+          ? "border-[var(--ecom-outline-border)] bg-[#f0f6ff]"
           : "border-[#e8e8ed] bg-[#fafafa]",
       )}
       {...dropZoneProps}

@@ -113,7 +113,7 @@ function FashionEditableTextCell({
     return (
       <div className="relative z-10 w-full min-w-0 max-w-full space-y-1">
         <textarea
-          className="box-border w-full max-w-full min-w-0 resize-y rounded-lg border border-[#0071e3]/40 bg-white px-2 py-1.5 text-sm text-[#1d1d1f] outline-none ring-2 ring-[#0071e3]/15"
+          className="box-border w-full max-w-full min-w-0 resize-y rounded-lg border border-[var(--ecom-outline-border)] bg-white px-2 py-1.5 text-sm text-[#1d1d1f] outline-none ring-2 ring-[#1d1d1f]/12"
           rows={rows}
           value={draft}
           disabled={saving}
@@ -202,7 +202,7 @@ export function FashionSellpointsTable({
         <p className="text-sm text-[#86868b]">尚未添加卖点，请逐条填写您的核心卖点。</p>
         <button
           type="button"
-          className="rounded-lg border border-[#d2d2d7] bg-white px-3 py-1.5 text-sm text-[#1d1d1f] hover:border-[#0071e3]"
+          className="rounded-lg border border-[#d2d2d7] bg-white px-3 py-1.5 text-sm text-[#1d1d1f] hover:border-[var(--ecom-outline-border)]"
           disabled={saving}
           onClick={handleAddRow}
         >
@@ -253,7 +253,7 @@ export function FashionSellpointsTable({
                 <td className={ecomDataTableTdClass}>
                   {editable ? (
                     <select
-                      className="rounded-lg border border-[#d2d2d7] bg-white px-2 py-1 text-xs outline-none focus:border-[#0071e3]"
+                      className="rounded-lg border border-[#d2d2d7] bg-white px-2 py-1 text-xs outline-none focus:border-[var(--ecom-outline-border)]"
                       value={sp.layer}
                       disabled={saving}
                       onChange={(e) =>

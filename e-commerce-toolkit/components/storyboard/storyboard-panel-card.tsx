@@ -52,7 +52,7 @@ export function StoryboardPanelCard({
     <article
       className={cn(
         "group relative flex shrink-0 flex-col overflow-hidden rounded-xl border bg-white shadow-sm transition",
-        selected ? "border-[var(--ecom-primary)] ring-2 ring-[#0071e3]/25" : "border-[#e8e8ed]",
+        selected ? "border-[var(--ecom-outline-border)] ring-2 ring-[#1d1d1f]/15" : "border-[#e8e8ed]",
       )}
       style={{ width: cardWidth }}
       onClick={

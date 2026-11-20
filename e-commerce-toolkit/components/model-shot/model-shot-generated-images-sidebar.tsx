@@ -46,7 +46,7 @@ export function ModelShotGeneratedImagesSidebar({
                   className={cn(
                     "group block w-full overflow-hidden rounded-md border text-left transition",
                     isActive
-                      ? "border-[#0071e3] ring-1 ring-[#0071e3]/25"
+                      ? "border-[var(--ecom-outline-border)] ring-1 ring-[#1d1d1f]/15"
                       : "border-[#e8e8ed] hover:border-[#d2d2d7]",
                   )}
                   onClick={() => onPreview(entry.url, label)}

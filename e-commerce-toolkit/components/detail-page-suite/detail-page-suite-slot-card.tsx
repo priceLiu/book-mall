@@ -102,9 +102,9 @@ export function DetailPageSuiteSlotCard({
     <article
       className={cn(
         "group relative isolate flex shrink-0 flex-col overflow-hidden rounded-xl border bg-white shadow-sm transition",
-        busy && "ecom-media-generating-sweep border-[#0071e3]/40",
+        busy && "ecom-media-generating-sweep border-[var(--ecom-outline-border)]",
         !busy && selected
-          ? "border-[var(--ecom-primary)] ring-2 ring-[#0071e3]/25"
+          ? "border-[var(--ecom-outline-border)] ring-2 ring-[#1d1d1f]/15"
           : !busy && "border-[#e8e8ed]",
       )}
       style={{ width: cardWidth }}

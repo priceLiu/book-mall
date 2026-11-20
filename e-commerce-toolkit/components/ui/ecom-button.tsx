@@ -36,7 +36,7 @@ function pillSizeClass(size: EcomButtonSize) {
 /** 用于 `<a>` 等不可嵌套 `<button>` 的场景 */
 export function ecomPrimaryLinkClass(size: EcomButtonSize = "sm", className?: string) {
   return cn(
-    "inline-flex w-full max-w-[270px] items-center justify-center rounded-full bg-[var(--ecom-btn-fill)] font-medium text-[var(--ecom-btn-on-fill)] transition-transform hover:scale-105 active:scale-95",
+    "inline-flex w-full max-w-[270px] items-center justify-center rounded-full bg-[var(--ecom-btn-fill)] font-medium text-[var(--ecom-btn-on-fill)] transition-[transform,background-color] hover:scale-105 hover:bg-[var(--ecom-btn-fill-hover)] active:scale-95",
     ecomButtonSizeClass(size),
     className,
   );
@@ -202,9 +202,9 @@ export function EcomButtonSecondary({
       type={type}
       disabled={disabled}
       className={cn(
-        "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full border border-[var(--ecom-primary)] font-medium transition-transform hover:scale-105 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50",
+        "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full border border-[var(--ecom-outline-border)] font-medium text-[var(--ecom-outline-text)] transition-[transform,border-color,background-color] hover:scale-105 hover:border-[var(--ecom-outline-border)] hover:bg-[var(--ecom-outline-hover-bg)] active:scale-95 disabled:cursor-not-allowed disabled:opacity-50",
         ecomButtonSizeClass(size, "secondary"),
-        dark ? "text-[var(--ecom-primary-on-dark,#2997ff)]" : "text-[var(--ecom-primary)]",
+        dark && "text-[var(--ecom-chrome-text)]",
         className,
       )}
       whileTap={disabled ? undefined : { scale: 0.95 }}
@@ -227,9 +227,9 @@ export function EcomButtonSecondaryLink({
   return (
     <a
       className={cn(
-        "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full border border-[var(--ecom-primary)] font-medium transition-transform hover:scale-105 active:scale-95",
+        "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full border border-[var(--ecom-outline-border)] font-medium text-[var(--ecom-outline-text)] transition-[transform,border-color,background-color] hover:scale-105 hover:border-[var(--ecom-outline-border)] hover:bg-[var(--ecom-outline-hover-bg)] active:scale-95",
         ecomButtonSizeClass(size, "secondary"),
-        dark ? "text-[var(--ecom-primary-on-dark,#2997ff)]" : "text-[var(--ecom-primary)]",
+        dark && "text-[var(--ecom-chrome-text)]",
         className,
       )}
       {...rest}

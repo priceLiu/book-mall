@@ -112,7 +112,7 @@ export function OutfitRefSetupPanel({
         <label className="block space-y-1.5">
           <span className="text-xs font-medium text-[#1d1d1f]">全局卖点（选填）</span>
           <textarea
-            className="ecom-scrollbar-overlay min-h-[4.5rem] w-full resize-y rounded-lg border border-[#d2d2d7] px-3 py-2 text-xs text-[#1d1d1f] placeholder:text-[#86868b] focus:border-[#0071e3] focus:outline-none focus:ring-2 focus:ring-[#0071e3]/20 disabled:opacity-50"
+            className="ecom-scrollbar-overlay min-h-[4.5rem] w-full resize-y rounded-lg border border-[#d2d2d7] px-3 py-2 text-xs text-[#1d1d1f] placeholder:text-[#86868b] focus:border-[var(--ecom-outline-border)] focus:outline-none focus:ring-2 focus:ring-[#1d1d1f]/15 disabled:opacity-50"
             placeholder="例如：垂感面料、收腰显高、后背蝴蝶结设计…"
             value={sellDraft}
             disabled={busy}

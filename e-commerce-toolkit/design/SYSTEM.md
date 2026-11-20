@@ -34,7 +34,7 @@ CSS 变量定义：`app/globals.css`。语义表：`COLORS.md`、token 全集：
 | 描边深 | `#e0e0e0` `--ecom-hairline` | Dialog、全局 hairline |
 | 主色 | `#0066cc` `--ecom-primary` | 主按钮填充 |
 | 主色 hover/焦点 | `#0071e3` `--ecom-primary-focus` | 输入 focus、任务条、上传 hover |
-| 外壳深 | `#0c0c0e` | App 外层、侧栏背景 |
+| 外壳深 | `#3c3c3c` `--ecom-shell-bg` | App 外层、body、门户顶栏 |
 | 成功 | `#34c759` | 进度轨完成态（少量） |
 | 错误/删除 | `#dc2626` | destructive 文案/按钮，不替代品牌蓝 |
 
@@ -60,7 +60,7 @@ CSS 变量定义：`app/globals.css`。语义表：`COLORS.md`、token 全集：
 
 详见 `LAYOUT.md`。
 
-- **外壳**：`EcomAppShell` — 深色外框 `#0c0c0e` + 内层圆角工作区 `--ecom-parchment`
+- **外壳**：`EcomAppShell` — 外框 `--ecom-shell-bg`（`#3c3c3c`）+ 内层圆角工作区 `--ecom-parchment`
 - **双栏工作台**：`EcomWorkspaceLayout` — 助手 ~30%（`#fafafa`）+ 可选进度轨 + 内容 ~70%（`#f5f5f7`）
 - **区块卡片**：`rounded-xl border border-[#e8e8ed] bg-white p-5`（`StepSection`）
 - **滚动**：可滚动区加 `ecom-scrollbar-thin`（`globals.css`）

@@ -348,7 +348,7 @@ export function ReplicaProductBriefCard({
           disabled={disabled || saving || recognizing}
           rows={6}
           placeholder="例如：产品：驼色无袖收腰大摆长款连衣裙&#10;品类：女装/连衣裙&#10;材质/工艺：…"
-          className="w-full resize-y rounded-lg border border-[#d2d2d7] bg-[#fafafa] px-3 py-2.5 text-sm leading-relaxed text-[#1d1d1f] outline-none placeholder:text-[#86868b] focus:border-[#0071e3] focus:bg-white focus:ring-2 focus:ring-[#0071e3]/20 disabled:opacity-60"
+          className="w-full resize-y rounded-lg border border-[#d2d2d7] bg-[#fafafa] px-3 py-2.5 text-sm leading-relaxed text-[#1d1d1f] outline-none placeholder:text-[#86868b] focus:border-[var(--ecom-outline-border)] focus:bg-white focus:ring-2 focus:ring-[#1d1d1f]/15 disabled:opacity-60"
           onChange={(e) => onChange(e.target.value)}
         />
         {recognizing ? (
@@ -483,7 +483,7 @@ export function ReplicaSellingPointsCard({
             ? "填写你上传替换产品的卖点；或点 AI 生成卖点"
             : "例如：轻薄透气、莫兰迪配色、通勤百搭（可不填）"
         }
-        className="w-full rounded-lg border border-[#d2d2d7] bg-[#fafafa] px-3 py-2 text-sm text-[#1d1d1f] outline-none placeholder:text-[#86868b] focus:border-[#0071e3] focus:bg-white focus:ring-2 focus:ring-[#0071e3]/20 disabled:opacity-60"
+        className="w-full rounded-lg border border-[#d2d2d7] bg-[#fafafa] px-3 py-2 text-sm text-[#1d1d1f] outline-none placeholder:text-[#86868b] focus:border-[var(--ecom-outline-border)] focus:bg-white focus:ring-2 focus:ring-[#1d1d1f]/15 disabled:opacity-60"
         onChange={(e) => onChange(e.target.value)}
       />
     </div>

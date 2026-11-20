@@ -82,8 +82,8 @@ function PieceSlot({
         <div
           {...(canUpload ? dropZoneProps : {})}
           className={cn(
-            "rounded-md outline-none focus-visible:ring-2 focus-visible:ring-[#0071e3]/30",
-            dragOver && "ring-1 ring-[#0071e3]/30",
+            "rounded-md outline-none focus-visible:ring-2 focus-visible:ring-[#1d1d1f]/15",
+            dragOver && "ring-1 ring-[#1d1d1f]/15",
           )}
         >
           <button
@@ -94,8 +94,8 @@ function PieceSlot({
               onPickFile();
             }}
             className={cn(
-              "flex flex-col items-center justify-center rounded-md border border-dashed bg-white text-[#86868b] transition hover:border-[#0071e3]/50 hover:text-[#0071e3] disabled:opacity-50",
-              dragOver ? "border-[#0071e3] bg-white" : "border-[#c7c7cc]",
+              "flex flex-col items-center justify-center rounded-md border border-dashed bg-white text-[#86868b] transition hover:border-[var(--ecom-outline-border)]/50 hover:text-[#0071e3] disabled:opacity-50",
+              dragOver ? "border-[var(--ecom-outline-border)] bg-white" : "border-[#c7c7cc]",
             )}
             style={{ width: size, height: size }}
             title={emptyLabel}
@@ -284,8 +284,8 @@ export function VtonManualDualSlotRow({
     <div
       {...rowDropZoneProps}
       className={cn(
-        "rounded-lg border bg-white p-2.5 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[#0071e3]/30",
-        rowDragOver ? "border-[#0071e3] ring-1 ring-[#0071e3]/30" : "border-[#e8e8ed]",
+        "rounded-lg border bg-white p-2.5 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[#1d1d1f]/15",
+        rowDragOver ? "border-[var(--ecom-outline-border)] ring-1 ring-[#1d1d1f]/15" : "border-[#e8e8ed]",
       )}
     >
       {garment && onRemove ? (

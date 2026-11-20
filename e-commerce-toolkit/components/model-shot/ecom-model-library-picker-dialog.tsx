@@ -139,8 +139,8 @@ export function EcomModelLibraryPickerDialog({
                   className={cn(
                     "rounded-full border px-3 py-1 text-xs font-medium transition",
                     active
-                      ? "border-[#0071e3] bg-[#f0f6ff] text-[#0071e3]"
-                      : "border-[#e8e8ed] bg-white text-[#424245] hover:border-[#0071e3]/40",
+                      ? "border-[var(--ecom-outline-border)] bg-[#f0f6ff] text-[#0071e3]"
+                      : "border-[#e8e8ed] bg-white text-[#424245] hover:border-[var(--ecom-outline-border)]",
                   )}
                   onClick={() => setGender(opt.value)}
                 >
@@ -171,8 +171,8 @@ export function EcomModelLibraryPickerDialog({
                       className={cn(
                         "relative overflow-hidden rounded-xl border text-left transition",
                         picking
-                          ? "border-[#0071e3] bg-[#f0f6ff]"
-                          : "border-[#e5e5ea] hover:border-[#0071e3]",
+                          ? "border-[var(--ecom-outline-border)] bg-[#f0f6ff]"
+                          : "border-[#e5e5ea] hover:border-[var(--ecom-outline-border)]",
                         busyId != null && !picking && "opacity-60",
                       )}
                       onClick={() => void handlePick(m)}

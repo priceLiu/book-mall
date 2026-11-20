@@ -108,7 +108,7 @@ export function EcomPublishDialog({
               key={p}
               type="button"
               className={`rounded-lg border px-2 py-1 text-xs ${
-                platforms.includes(p) ? "border-[var(--ecom-primary)] bg-blue-50" : ""
+                platforms.includes(p) ? "border-[var(--ecom-outline-border)] bg-blue-50" : ""
               }`}
               onClick={() => toggle(p)}
             >

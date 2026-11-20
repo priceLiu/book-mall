@@ -106,7 +106,7 @@ function MentionOrTextarea({
   }
   return (
     <textarea
-      className={`w-full min-w-[10rem] ${minHeightClass ?? "min-h-[3rem]"} rounded border border-[#d2d2d7] px-1.5 py-1 text-xs outline-none focus:border-[#0071e3]`}
+      className={`w-full min-w-[10rem] ${minHeightClass ?? "min-h-[3rem]"} rounded border border-[#d2d2d7] px-1.5 py-1 text-xs outline-none focus:border-[var(--ecom-outline-border)]`}
       value={value}
       disabled={disabled}
       onChange={(e) => onChange(e.target.value)}

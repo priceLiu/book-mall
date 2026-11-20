@@ -25,9 +25,11 @@ import { StoryboardTaskStatus } from "@/components/storyboard/storyboard-task-st
 import {
   ECOM_ASSISTANT_BUBBLE_CLASS,
   ECOM_ASSISTANT_CHOICE_SHELL_CLASS,
+  ECOM_ASSISTANT_COMPOSER_ROW_CLASS,
   ECOM_ASSISTANT_COMPOSER_SHELL_BASE,
   ECOM_ASSISTANT_COMPOSER_SHELL_COMPACT,
   ECOM_ASSISTANT_COMPOSER_SHELL_EXPANDED_BORDER,
+  ECOM_ASSISTANT_COMPOSER_TEXTAREA_CLASS,
   ECOM_ASSISTANT_MESSAGE_BUBBLE_BASE,
   ECOM_ASSISTANT_USER_BUBBLE_CLASS,
 } from "@/lib/ecom-assistant-chat-styles";
@@ -277,9 +279,9 @@ function useDetailPageSuiteAssistant(props: Props): AssistantContextValue {
               <EcomSellpointFivePartHint className="flex gap-2 rounded-xl border border-[var(--ecom-assistant-input-border)] bg-[var(--ecom-assistant-input-bg)] px-3 py-2 text-[11px] leading-relaxed text-[#515154]" />
             </div>
           ) : null}
-          <div className="flex items-end gap-2">
+          <div className={ECOM_ASSISTANT_COMPOSER_ROW_CLASS}>
             <textarea
-              className="min-h-[2.5rem] flex-1 resize-none rounded-xl border border-[var(--ecom-assistant-input-border)] bg-[var(--ecom-assistant-input-bg)] px-3 py-2 text-sm text-[#1d1d1f] outline-none placeholder:text-[#86868b] focus:border-[var(--ecom-chrome-accent)] disabled:opacity-50"
+              className={cn(ECOM_ASSISTANT_COMPOSER_TEXTAREA_CLASS, "resize-none")}
               rows={compact ? 1 : composerWide ? 4 : 2}
               placeholder={placeholder}
               value={input}
@@ -465,7 +467,7 @@ export function DetailPageSuiteAssistantPanel() {
             })}
 
             {!showChoices && workspaceGuide ? (
-              <div className="rounded-2xl border border-[#0071e3]/25 bg-[#f0f6ff] p-4 shadow-sm">
+              <div className="rounded-2xl border border-[var(--ecom-outline-border)] bg-[#f0f6ff] p-4 shadow-sm">
                 <p className="text-sm font-semibold text-[#1d1d1f]">{workspaceGuide.title}</p>
                 <p className="mt-1 text-xs leading-relaxed text-[#6e6e73]">{workspaceGuide.body}</p>
               </div>
@@ -474,7 +476,7 @@ export function DetailPageSuiteAssistantPanel() {
             {showChoices && liveStep ? (
               <div className="flex flex-col items-start">
                 <div className={ECOM_ASSISTANT_CHOICE_SHELL_CLASS}>
-                  <div className="rounded-2xl border border-[#0071e3]/25 bg-[#f0f6ff] p-4 shadow-sm">
+                  <div className="rounded-2xl border border-[var(--ecom-outline-border)] bg-[#f0f6ff] p-4 shadow-sm">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <p className="text-sm font-semibold text-[#1d1d1f]">

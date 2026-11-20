@@ -762,7 +762,7 @@ export function MaskToolbar({
         className={cn(
           "inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs",
           showTransparentMask
-            ? "border-[#0071e3] bg-[#f0f6ff] text-[#0071e3]"
+            ? "border-[var(--ecom-outline-border)] bg-[#f0f6ff] text-[#0071e3]"
             : "border-[#e5e5ea] text-[#1d1d1f]",
         )}
       >

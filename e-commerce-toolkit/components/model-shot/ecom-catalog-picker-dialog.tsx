@@ -147,7 +147,7 @@ function CatalogPickerRow({
       disabled={busy}
       onClick={() => void onPick()}
       className={cn(
-        "flex w-full gap-3 rounded-xl border border-[#e5e5ea] px-3 py-2 text-left transition hover:border-[#0071e3] hover:bg-[#f0f6ff]",
+        "flex w-full gap-3 rounded-xl border border-[#e5e5ea] px-3 py-2 text-left transition hover:border-[var(--ecom-outline-border)] hover:bg-[#f0f6ff]",
         busy && "opacity-60",
       )}
     >

@@ -257,7 +257,7 @@ export function AiDetailPageConfigSidebar({
           <section
             className={cn(
               "mb-3 rounded-xl border border-[#e8e8ed] bg-white px-3 py-3",
-              busy === "AI 帮写" && "ecom-media-generating-sweep border-[#0071e3]/30",
+              busy === "AI 帮写" && "ecom-media-generating-sweep border-[var(--ecom-outline-border)]",
             )}
           >
             <div className="mb-2 flex items-center justify-between">

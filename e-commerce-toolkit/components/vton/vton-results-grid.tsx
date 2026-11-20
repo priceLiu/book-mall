@@ -97,8 +97,8 @@ export function vtonTryonResultShellClass(opts?: {
 }): string {
   return cn(
     "group/image relative overflow-hidden rounded-lg border bg-[#fafafa]",
-    opts?.running && "ecom-media-generating-sweep border-[#0071e3]/40",
-    opts?.selected && "border-[#0071e3] ring-2 ring-[#0071e3]/30",
+    opts?.running && "ecom-media-generating-sweep border-[var(--ecom-outline-border)]",
+    opts?.selected && "border-[var(--ecom-outline-border)] ring-2 ring-[#1d1d1f]/15",
     !opts?.running && !opts?.selected && "border-[#e8e8ed]",
   );
 }
@@ -111,10 +111,10 @@ function resultCellClass(
   const cellRunning = opts?.cellRunning ?? false;
   return cn(
     "group/image relative overflow-hidden rounded-lg border bg-[#fafafa]",
-    result.status === "success" && selected && "border-[#0071e3] ring-2 ring-[#0071e3]/30",
+    result.status === "success" && selected && "border-[var(--ecom-outline-border)] ring-2 ring-[#1d1d1f]/15",
     result.status === "success" && !selected && "border-[#e8e8ed]",
     result.status === "failed" && "border-[#ff3b30]/40",
-    cellRunning && "ecom-media-generating-sweep border-[#0071e3]/40",
+    cellRunning && "ecom-media-generating-sweep border-[var(--ecom-outline-border)]",
     result.status === "pending" && !cellRunning && "border-dashed border-[#d2d2d7]",
     result.status === "cancelled" && "border-[#86868b]/40 bg-[#f5f5f7]",
   );
@@ -654,7 +654,7 @@ export function VtonResultsGrid({
                     <div
                       className={cn(
                         "relative w-full overflow-hidden rounded-lg border",
-                        isDefault ? "border-[#0071e3]" : "border-[#e8e8ed]",
+                        isDefault ? "border-[var(--ecom-outline-border)]" : "border-[#e8e8ed]",
                       )}
                     >
                       <button

@@ -456,7 +456,7 @@ function TemplateGalleryPageInner() {
                       className={cn(
                         "inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs transition",
                         media === opt.value && opt.enabled
-                          ? "border-[#0071e3] bg-[#f0f6ff] text-[#0071e3]"
+                          ? "border-[var(--ecom-outline-border)] bg-[#f0f6ff] text-[#0071e3]"
                           : opt.enabled
                             ? "border-[#e8e8ed] bg-white text-[#1d1d1f] hover:bg-[#f5f5f7]"
                             : "cursor-not-allowed border-[#e8e8ed] bg-[#f5f5f7] text-[#86868b]",

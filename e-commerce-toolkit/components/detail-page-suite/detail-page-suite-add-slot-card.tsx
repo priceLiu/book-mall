@@ -36,7 +36,7 @@ export function DetailPageSuiteAddSlotCard({
         "group flex shrink-0 flex-col overflow-hidden rounded-xl border border-dashed bg-white text-left shadow-sm transition",
         disabled
           ? "cursor-not-allowed border-[#e8e8ed] opacity-50"
-          : "border-[#d2d2d7] hover:border-[#0071e3] hover:bg-[#fafafa]",
+          : "border-[#d2d2d7] hover:border-[var(--ecom-outline-border)] hover:bg-[#fafafa]",
       )}
       style={{ width: cardWidth }}
       onClick={onClick}

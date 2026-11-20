@@ -36,7 +36,7 @@ export function SeedVideoProductionStrategyDialog({
         <div className="mt-4 space-y-2">
           <button
             type="button"
-            className="w-full rounded-xl border border-[#e8e8ed] bg-[#f5f5f7] px-4 py-3 text-left transition hover:border-[#0071e3]/40 hover:bg-[#f0f6ff]"
+            className="w-full rounded-xl border border-[#e8e8ed] bg-[#f5f5f7] px-4 py-3 text-left transition hover:border-[var(--ecom-outline-border)] hover:bg-[#f0f6ff]"
             onClick={() => {
               onSelect("panel");
               onOpenChange(false);
@@ -49,7 +49,7 @@ export function SeedVideoProductionStrategyDialog({
           </button>
           <button
             type="button"
-            className="w-full rounded-xl border border-[#e8e8ed] bg-[#f5f5f7] px-4 py-3 text-left transition hover:border-[#0071e3]/40 hover:bg-[#f0f6ff]"
+            className="w-full rounded-xl border border-[#e8e8ed] bg-[#f5f5f7] px-4 py-3 text-left transition hover:border-[var(--ecom-outline-border)] hover:bg-[#f0f6ff]"
             onClick={() => {
               onSelect("auto");
               onOpenChange(false);

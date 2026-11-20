@@ -63,7 +63,7 @@ export function VtonFourViewGenerateDialog({ open, onClose, busy, onConfirm }: P
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
           <label className="mb-2 block text-xs font-medium text-[#6e6e73]">生图 Prompt</label>
           <textarea
-            className="ecom-scrollbar-thin min-h-[220px] w-full rounded-lg border border-[#e8e8ed] px-3 py-2 text-xs leading-relaxed text-[#1d1d1f] outline-none focus:border-[#0071e3]"
+            className="ecom-scrollbar-thin min-h-[220px] w-full rounded-lg border border-[#e8e8ed] px-3 py-2 text-xs leading-relaxed text-[#1d1d1f] outline-none focus:border-[var(--ecom-outline-border)]"
             value={draft}
             disabled={busy}
             onChange={(e) => setDraft(e.target.value)}

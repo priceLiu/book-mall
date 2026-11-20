@@ -100,7 +100,7 @@ export function DetailPageSuiteExportTargetsBar({
             <div
               key={t.id}
               className={`flex flex-wrap items-center gap-1.5 rounded-lg border px-2 py-1 text-[11px] ${
-                checked ? "border-[#0071e3] bg-[#f0f6ff]" : "border-[#d2d2d7] bg-white"
+                checked ? "border-[var(--ecom-outline-border)] bg-[#f0f6ff]" : "border-[#d2d2d7] bg-white"
               }`}
             >
               <label className="flex cursor-pointer items-center gap-1 font-medium text-[#1d1d1f]">
@@ -153,7 +153,7 @@ export function DetailPageSuiteExportTargetsBar({
             key={p.platformCode}
             type="button"
             disabled={disabled}
-            className="rounded border border-dashed border-[#d2d2d7] px-2 py-0.5 text-[10px] text-[#6e6e73] hover:border-[#0071e3] hover:text-[#0071e3]"
+            className="rounded border border-dashed border-[#d2d2d7] px-2 py-0.5 text-[10px] text-[#6e6e73] hover:border-[var(--ecom-outline-border)] hover:text-[#0071e3]"
             onClick={() => addPreset(p.platformCode)}
           >
             + {p.label}
@@ -162,7 +162,7 @@ export function DetailPageSuiteExportTargetsBar({
         <button
           type="button"
           disabled={disabled}
-          className="rounded border border-dashed border-[#d2d2d7] px-2 py-0.5 text-[10px] text-[#6e6e73] hover:border-[#0071e3] hover:text-[#0071e3]"
+          className="rounded border border-dashed border-[#d2d2d7] px-2 py-0.5 text-[10px] text-[#6e6e73] hover:border-[var(--ecom-outline-border)] hover:text-[#0071e3]"
           onClick={addCustom}
         >
           + 自定义

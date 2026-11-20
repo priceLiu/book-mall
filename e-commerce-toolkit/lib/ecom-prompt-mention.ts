@@ -63,8 +63,8 @@ export function createEcomImageRefBadge(
   badge.setAttribute("draggable", "false");
   const tokenOnly = opts?.variant === "token-only";
   badge.className = tokenOnly
-    ? "mention-inline-badge align-middle inline-flex min-h-[1.15em] max-w-[160px] shrink-0 cursor-help select-none items-center rounded-md border border-[#0071e3]/30 bg-[#f0f6ff] px-1 py-[1px] text-[1em] leading-none text-[#0071e3] font-medium"
-    : "mention-inline-badge align-middle inline-flex min-h-[1.15em] max-w-[220px] shrink-0 cursor-help select-none items-center gap-1 rounded-lg border border-[#0071e3]/35 bg-[#f0f6ff] px-1 py-[1px] text-[1em] leading-none text-[#1d1d1f]";
+    ? "mention-inline-badge align-middle inline-flex min-h-[1.15em] max-w-[160px] shrink-0 cursor-help select-none items-center rounded-md border border-[var(--ecom-outline-border)] bg-[#f0f6ff] px-1 py-[1px] text-[1em] leading-none text-[#0071e3] font-medium"
+    : "mention-inline-badge align-middle inline-flex min-h-[1.15em] max-w-[220px] shrink-0 cursor-help select-none items-center gap-1 rounded-lg border border-[var(--ecom-outline-border)] bg-[var(--ecom-outline-hover-bg)] px-1 py-[1px] text-[1em] leading-none text-[#1d1d1f]";
   badge.style.marginInline = "1px";
   badge.style.verticalAlign = "middle";
 

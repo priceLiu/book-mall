@@ -46,7 +46,7 @@ function OptionRow({
       <span
         className={cn(
           "flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border",
-          selected ? "border-[#0071e3] bg-[#0071e3]" : "border-[#c7c7cc]",
+          selected ? "border-[var(--ecom-outline-border)] bg-[#0071e3]" : "border-[#c7c7cc]",
         )}
       >
         {selected ? <span className="h-1.5 w-1.5 rounded-full bg-white" /> : null}
@@ -85,7 +85,7 @@ export function EcomDetailTemplateSelect({ value, onChange, disabled, className 
         disabled={disabled}
         className={cn(
           "flex w-full items-center justify-between rounded-lg border bg-[#fafafa] px-2.5 py-2 text-[11px]",
-          open ? "border-[#0071e3]" : "border-[#e8e8ed]",
+          open ? "border-[var(--ecom-outline-border)]" : "border-[#e8e8ed]",
           disabled && "opacity-50",
         )}
         onClick={() => !disabled && setOpen((o) => !o)}

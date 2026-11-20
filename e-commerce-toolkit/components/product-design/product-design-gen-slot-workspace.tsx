@@ -139,6 +139,31 @@ function emptyPlanItem(index: number, target: "main" | "detail"): ImageGenPlanIt
   };
 }
 
+function buildPlanItemsFromRows(
+  nextRows: GenSlotRow[],
+  label: string,
+  plan: ReturnType<typeof getImageGenPlan>,
+): ImageGenPlanItem[] | null {
+  const styleSliceByIndex = new Map(
+    plan?.items.map((item) => [item.index, item.styleSliceOssUrl]) ?? [],
+  );
+  const items: ImageGenPlanItem[] = [];
+  for (const row of nextRows) {
+    const prompt = row.prompt.trim();
+    if (!prompt) continue;
+    const item: ImageGenPlanItem = {
+      index: row.index,
+      title: row.title.trim() || `${label} ${row.index}`,
+      purpose: row.purpose?.trim() || undefined,
+      prompt,
+    };
+    const slice = styleSliceByIndex.get(row.index);
+    if (slice) item.styleSliceOssUrl = slice;
+    items.push(item);
+  }
+  return items.length > 0 ? items : null;
+}
+
 
 export function ProductDesignGenSlotWorkspace({
   project,
@@ -184,12 +209,18 @@ export function ProductDesignGenSlotWorkspace({
 
   const saveRows = useCallback(
     async (nextRows: GenSlotRow[], opts?: { quiet?: boolean }) => {
-      const items: ImageGenPlanItem[] = nextRows.map((row, i) => ({
-        index: i + 1,
-        title: row.title.trim() || `${label} ${i + 1}`,
-        purpose: row.purpose?.trim() || undefined,
-        prompt: row.prompt,
-      }));
+      const plan = getImageGenPlan(project, target);
+      const items = buildPlanItemsFromRows(nextRows, label, plan);
+      if (!items) {
+        if (!opts?.quiet) {
+          await alert({
+            title: "无法保存",
+            message: "至少需要 1 条非空生图 Prompt。",
+            variant: "error",
+          });
+        }
+        return;
+      }
       if (!opts?.quiet) setBusy("正在保存…");
       try {
         await patchProductDesignImagePlan(project.id, { target, items });
@@ -209,7 +240,7 @@ export function ProductDesignGenSlotWorkspace({
         if (!opts?.quiet) setBusy(null);
       }
     },
-    [alert, label, onProjectChange, project.id, target],
+    [alert, label, onProjectChange, project, target],
   );
 
   const runDerive = useCallback(async () => {

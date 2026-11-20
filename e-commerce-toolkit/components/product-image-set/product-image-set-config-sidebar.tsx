@@ -242,7 +242,7 @@ export function ProductImageSetConfigSidebar({
           <section
             className={cn(
               "mb-3 rounded-xl border border-[#e8e8ed] bg-white px-3 py-3",
-              aiBriefBusy && "ecom-media-generating-sweep border-[#0071e3]/30",
+              aiBriefBusy && "ecom-media-generating-sweep border-[var(--ecom-outline-border)]",
             )}
           >
             <div className="mb-2 flex items-center justify-between">
@@ -409,7 +409,7 @@ export function ProductImageSetConfigSidebar({
                         className={cn(
                           "rounded-lg border px-2 py-2 text-left text-[10px]",
                           selected
-                            ? "border-[#1d1d1f] bg-[#fafafa] ring-2 ring-[#0071e3]/25"
+                            ? "border-[#1d1d1f] bg-[#fafafa] ring-2 ring-[#1d1d1f]/15"
                             : "border-[#e8e8ed]",
                         )}
                         onClick={() => {

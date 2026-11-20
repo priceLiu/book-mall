@@ -16,8 +16,8 @@ export const ECOM_WORKSPACE_RESULT_COLUMN_CLASS = "flex min-w-0 flex-col gap-2";
 export function ecomWorkspaceResultShellClass(opts?: { running?: boolean; selected?: boolean }): string {
   return cn(
     "group/image relative overflow-hidden rounded-lg border bg-[#fafafa]",
-    opts?.running && "ecom-media-generating-sweep border-[#0071e3]/40",
-    opts?.selected && "border-[#0071e3] ring-2 ring-[#0071e3]/30",
+    opts?.running && "ecom-media-generating-sweep border-[var(--ecom-outline-border)]",
+    opts?.selected && "border-[var(--ecom-outline-border)] ring-2 ring-[#1d1d1f]/15",
     !opts?.running && !opts?.selected && "border-[#e8e8ed]",
   );
 }

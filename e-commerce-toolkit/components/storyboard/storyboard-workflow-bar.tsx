@@ -153,7 +153,7 @@ export function StoryboardWorkflowBar({
           <button
             key={q}
             type="button"
-            className="rounded-full border border-[#d2d2d7] bg-[#fafafa] px-2.5 py-1 text-[11px] text-[#1d1d1f] hover:border-[#0071e3] hover:text-[#0071e3]"
+            className="rounded-full border border-[#d2d2d7] bg-[#fafafa] px-2.5 py-1 text-[11px] text-[#1d1d1f] hover:border-[var(--ecom-outline-border)] hover:text-[#0071e3]"
             onClick={() => onQuickReply(q)}
           >
             {q}

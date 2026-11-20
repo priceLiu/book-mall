@@ -20,7 +20,7 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="zh-CN">
-      <body className="bg-[#0c0c0e] font-sans antialiased">
+      <body className="bg-[var(--ecom-shell-bg)] font-sans antialiased">
         <DialogProvider>
           <EcomGlobalAssetLibraryRoot>
             <EcomSiteNavGuard />

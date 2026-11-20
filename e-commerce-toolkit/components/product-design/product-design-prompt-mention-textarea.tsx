@@ -531,7 +531,7 @@ export function ProductDesignPromptMentionTextarea({
         suppressContentEditableWarning
         spellCheck={false}
         className={cn(
-          "w-full whitespace-pre-wrap break-words rounded-lg border border-[#e8e8ed] px-3 py-2 text-[12px] leading-relaxed outline-none focus-visible:ring-2 focus-visible:ring-[#0071e3]/25",
+          "w-full whitespace-pre-wrap break-words rounded-lg border border-[#e8e8ed] px-3 py-2 text-[12px] leading-relaxed outline-none focus-visible:ring-2 focus-visible:ring-[#1d1d1f]/15",
           minHeightClass,
           className,
         )}
@@ -565,7 +565,7 @@ export function ProductDesignPromptMentionTextarea({
               tabIndex={disabled ? -1 : 0}
               aria-disabled={disabled || undefined}
               className={cn(
-                "inline-flex cursor-pointer items-center gap-1 rounded-lg border border-[#e8e8ed] bg-white px-1.5 py-0.5 text-[10px] text-[#6e6e73] hover:border-[#0071e3]/35 hover:bg-[#f0f6ff]",
+                "inline-flex cursor-pointer items-center gap-1 rounded-lg border border-[#e8e8ed] bg-white px-1.5 py-0.5 text-[10px] text-[#6e6e73] hover:border-[var(--ecom-outline-border)] hover:bg-[#f0f6ff]",
                 disabled && "pointer-events-none opacity-50",
               )}
               title={`插入 ${item.token}`}

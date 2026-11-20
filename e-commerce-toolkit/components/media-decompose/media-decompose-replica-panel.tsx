@@ -1133,7 +1133,7 @@ export function MediaDecomposeReplicaPanel({
 
         {anyGenerating ? (
           <div
-            className="flex flex-wrap items-center gap-3 rounded-xl border border-[#0071e3]/25 bg-[#f0f6ff] px-3 py-2.5"
+            className="flex flex-wrap items-center gap-3 rounded-xl border border-[var(--ecom-outline-border)] bg-[#f0f6ff] px-3 py-2.5"
             role="status"
             aria-live="polite"
           >

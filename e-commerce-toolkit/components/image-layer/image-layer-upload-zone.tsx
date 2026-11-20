@@ -42,8 +42,8 @@ export function ImageLayerUploadZone({
         "flex flex-1 flex-col items-center justify-center rounded-2xl border border-dashed outline-none transition-colors",
         "min-h-[min(420px,50vh)] w-full cursor-pointer",
         dragOver
-          ? "border-[#0071e3] bg-[#f0f6ff] ring-2 ring-[#0071e3]/20"
-          : "border-[#d2d2d7] bg-[#fafafa] hover:border-[#0071e3]/50 hover:bg-white",
+          ? "border-[var(--ecom-outline-border)] bg-[#f0f6ff] ring-2 ring-[#1d1d1f]/15"
+          : "border-[#d2d2d7] bg-[#fafafa] hover:border-[var(--ecom-outline-border)]/50 hover:bg-white",
         className,
       )}
       onClick={(e) => {
@@ -86,8 +86,8 @@ export function ImageLayerUploadZone({
         className={cn(
           "flex h-16 w-16 items-center justify-center rounded-full border transition-colors sm:h-20 sm:w-20",
           dragOver
-            ? "border-[#0071e3] bg-[#0071e3] text-white"
-            : "border-[#d2d2d7] bg-white text-[#6e6e73] hover:border-[#0071e3] hover:text-[#0071e3]",
+            ? "border-[var(--ecom-outline-border)] bg-[#0071e3] text-white"
+            : "border-[#d2d2d7] bg-white text-[#6e6e73] hover:border-[var(--ecom-outline-border)] hover:text-[#0071e3]",
           busy && "opacity-60",
         )}
         aria-label="选择图片文件"

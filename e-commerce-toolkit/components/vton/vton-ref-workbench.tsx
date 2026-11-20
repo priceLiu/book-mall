@@ -179,7 +179,7 @@ function modeButtonClass(active: boolean): string {
   return cn(
     "rounded-lg border px-3 py-2 text-left text-xs transition-colors",
     active
-      ? "border-[#0071e3] bg-[#f0f6ff] text-[#1d1d1f]"
+      ? "border-[var(--ecom-outline-border)] bg-[#f0f6ff] text-[#1d1d1f]"
       : "border-[#e8e8ed] bg-white text-[#6e6e73] hover:border-[#d2d2d7]",
   );
 }
@@ -522,7 +522,7 @@ export function VtonRefWorkbench({
             className={cn(
               "rounded-full border px-3 py-1 text-[11px]",
               isTwoPiece
-                ? "border-[#0071e3] bg-[#f0f6ff] text-[#0071e3]"
+                ? "border-[var(--ecom-outline-border)] bg-[#f0f6ff] text-[#0071e3]"
                 : "border-[#e8e8ed] text-[#6e6e73]",
             )}
             disabled={busy || tryonBusy || refsLocked}
@@ -535,7 +535,7 @@ export function VtonRefWorkbench({
             className={cn(
               "rounded-full border px-3 py-1 text-[11px]",
               !isTwoPiece
-                ? "border-[#0071e3] bg-[#f0f6ff] text-[#0071e3]"
+                ? "border-[var(--ecom-outline-border)] bg-[#f0f6ff] text-[#0071e3]"
                 : "border-[#e8e8ed] text-[#6e6e73]",
             )}
             disabled={busy || tryonBusy || refsLocked}
@@ -1011,7 +1011,7 @@ function VtonExpandFullBodyDialog({
           将当前模特图扩展为全身照（{fusionDisplayName}）。可追加补充描述，留空则使用默认 Prompt。
         </p>
         <textarea
-          className="mt-3 min-h-[88px] w-full rounded-lg border border-[#e8e8ed] px-3 py-2 text-xs text-[#1d1d1f] outline-none focus:border-[#0071e3]"
+          className="mt-3 min-h-[88px] w-full rounded-lg border border-[#e8e8ed] px-3 py-2 text-xs text-[#1d1d1f] outline-none focus:border-[var(--ecom-outline-border)]"
           placeholder="可选：补充姿态、背景等描述"
           value={prompt}
           onChange={(e) => onPromptChange(e.target.value)}

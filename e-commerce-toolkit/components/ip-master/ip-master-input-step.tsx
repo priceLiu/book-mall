@@ -75,7 +75,7 @@ export function IpMasterInputStep({
               className={cn(
                 "flex cursor-pointer gap-2 rounded-xl border px-3 py-2.5 text-sm transition",
                 inputMode === opt.id
-                  ? "border-[#0071e3] bg-[#f0f6ff]"
+                  ? "border-[var(--ecom-outline-border)] bg-[#f0f6ff]"
                   : "border-[#e8e8ed] bg-white hover:border-[#d2d2d7]",
               )}
             >

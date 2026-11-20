@@ -139,7 +139,7 @@ export function StoryboardSchemePanelsTable({
                 <td className="px-3 py-2">
                   <button
                     type="button"
-                    className="inline-flex items-center gap-1 rounded-md border border-[#d2d2d7] px-2 py-1 text-[11px] text-[#1d1d1f] hover:border-[#0071e3] hover:text-[#0071e3]"
+                    className="inline-flex items-center gap-1 rounded-md border border-[#d2d2d7] px-2 py-1 text-[11px] text-[#1d1d1f] hover:border-[var(--ecom-outline-border)] hover:text-[#0071e3]"
                     onClick={() => onEditPanel?.(p.index)}
                   >
                     <Pencil className="h-3 w-3" />

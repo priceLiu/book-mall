@@ -127,7 +127,7 @@ export function ImageGenerativeSettings({
               className={cn(
                 "rounded-lg border px-3 py-2 text-xs font-medium",
                 aspect === a
-                  ? "border-[#0071e3] bg-[#f0f6ff] text-[#0071e3]"
+                  ? "border-[var(--ecom-outline-border)] bg-[#f0f6ff] text-[#0071e3]"
                   : "border-[#e5e5ea] bg-white text-[#1d1d1f]",
               )}
             >

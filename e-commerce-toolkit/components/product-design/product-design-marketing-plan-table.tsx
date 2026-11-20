@@ -130,7 +130,7 @@ function EditableField({
     return (
       <div className="space-y-1.5" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
         <textarea
-          className="w-full rounded-lg border border-[#0071e3]/40 bg-white px-2.5 py-2 text-[11px] leading-relaxed text-[#1d1d1f] outline-none ring-2 ring-[#0071e3]/15"
+          className="w-full rounded-lg border border-[var(--ecom-outline-border)] bg-white px-2.5 py-2 text-[11px] leading-relaxed text-[#1d1d1f] outline-none ring-2 ring-[#1d1d1f]/12"
           rows={3}
           value={draft}
           disabled={saving}
@@ -232,7 +232,7 @@ export function ProductDesignMarketingPlanTable({
         selected
           ? "border-[var(--ecom-chrome-accent)] ring-2 ring-[var(--ecom-chrome-accent)]/25"
           : selectable
-            ? "cursor-pointer border-[#e8e8ed] hover:border-[var(--ecom-chrome-accent)]/50 hover:shadow-md"
+            ? "cursor-pointer border-[#e8e8ed] hover:border-[var(--ecom-outline-border)]/50 hover:shadow-md"
             : "border-[#e8e8ed]",
       )}
     >

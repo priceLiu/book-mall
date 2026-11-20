@@ -4,7 +4,7 @@ import { Loader2, Send } from "lucide-react";
 import { motion } from "framer-motion";
 
 import {
-  ECOM_ASSISTANT_CONTROL_ICON_CLASS,
+  ECOM_ASSISTANT_SEND_ICON_CLASS,
   ECOM_ASSISTANT_SEND_SIZE_CLASS,
 } from "@/components/layout/ecom-assistant-icon-button";
 import { cn } from "@/lib/utils";
@@ -40,9 +40,9 @@ export function EcomAssistantSendButton({
       onClick={onClick}
     >
       {busy ? (
-        <Loader2 className={cn(ECOM_ASSISTANT_CONTROL_ICON_CLASS, "animate-spin")} />
+        <Loader2 className={cn(ECOM_ASSISTANT_SEND_ICON_CLASS, "animate-spin")} />
       ) : (
-        <Send className={ECOM_ASSISTANT_CONTROL_ICON_CLASS} />
+        <Send className={ECOM_ASSISTANT_SEND_ICON_CLASS} />
       )}
     </motion.button>
   );

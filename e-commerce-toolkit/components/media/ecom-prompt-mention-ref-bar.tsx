@@ -78,7 +78,7 @@ export function EcomPromptMentionRefBar({
               <button
                 key={ref.token}
                 type="button"
-                className="flex items-center gap-1.5 rounded-lg border border-[#e8e8ed] bg-white px-1.5 py-1 text-left transition hover:border-[#0071e3]/35 hover:bg-[#f0f6ff]"
+                className="flex items-center gap-1.5 rounded-lg border border-[#e8e8ed] bg-white px-1.5 py-1 text-left transition hover:border-[var(--ecom-outline-border)] hover:bg-[#f0f6ff]"
                 title={`${ref.label} · 点击放大`}
                 onClick={() => onPreviewImage(ref.url, ref.label)}
               >

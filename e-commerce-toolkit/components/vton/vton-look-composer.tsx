@@ -385,7 +385,7 @@ export function VtonLookComposer({
             className={cn(
               "flex flex-wrap items-center gap-3 rounded-lg border px-3 py-2.5",
               selectedSet.has(look.id)
-                ? "border-[#0071e3]/40 bg-[#f0f6ff]"
+                ? "border-[var(--ecom-outline-border)] bg-[#f0f6ff]"
                 : "border-[#e8e8ed] bg-[#fafafa]",
             )}
           >
@@ -394,8 +394,8 @@ export function VtonLookComposer({
               className={cn(
                 "flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-colors",
                 selectedSet.has(look.id)
-                  ? "border-[#0071e3] bg-[#0071e3] text-white"
-                  : "border-[#c7c7cc] bg-white text-transparent hover:border-[#0071e3]",
+                  ? "border-[var(--ecom-outline-border)] bg-[#0071e3] text-white"
+                  : "border-[#c7c7cc] bg-white text-transparent hover:border-[var(--ecom-outline-border)]",
                 (busy || disabled) && "pointer-events-none opacity-40",
               )}
               disabled={busy || disabled}
@@ -487,7 +487,7 @@ function GarmentPreviewThumbs({ garment, alt }: { garment: VtonGarmentItem; alt:
   const urls = garmentPreviewThumbUrls(garment);
   if (urls.length === 0) return null;
 
-  const thumbClass = cn("rounded-lg [&>div]:rounded-lg [&>div]:border-[#0071e3]");
+  const thumbClass = cn("rounded-lg [&>div]:rounded-lg [&>div]:border-[var(--ecom-outline-border)]");
 
   if (urls.length === 1) {
     return (

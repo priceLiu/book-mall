@@ -1948,7 +1948,7 @@ function DetailPageSuiteStudioInner() {
             <label className="block text-sm text-[#6e6e73]">
               拍摄对象
               <input
-                className="mt-1 w-full rounded-lg border border-[#d2d2d7] px-3 py-2 text-sm outline-none focus:border-[#0071e3]"
+                className="mt-1 w-full rounded-lg border border-[#d2d2d7] px-3 py-2 text-sm outline-none focus:border-[var(--ecom-outline-border)]"
                 value={addItemDialog.value}
                 autoFocus
                 onChange={(e) =>

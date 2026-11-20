@@ -302,7 +302,7 @@ export function VtonModelWorkbenchPanel({
         className={cn(
           "flex items-start gap-3 rounded-xl border bg-[#fafafa] p-3 outline-none transition-colors",
           dragOver
-            ? "border-[#0071e3] bg-[#f0f6ff] ring-1 ring-[#0071e3]/30"
+            ? "border-[var(--ecom-outline-border)] bg-[#f0f6ff] ring-1 ring-[#1d1d1f]/15"
             : "border-[#e8e8ed]",
         )}
       >

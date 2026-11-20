@@ -46,7 +46,7 @@ export function ProDimensionSearchSelect({
           disabled={disabled}
           placeholder={`搜索${label}…`}
           onChange={(e) => setQuery(e.target.value)}
-          className="w-full rounded-xl border border-[#d2d2d7] bg-white py-2.5 pl-9 pr-3 text-sm text-[#1d1d1f] outline-none ring-[#0071e3] placeholder:text-[#86868b] focus:border-[#0071e3] focus:ring-2"
+          className="w-full rounded-xl border border-[#d2d2d7] bg-white py-2.5 pl-9 pr-3 text-sm text-[#1d1d1f] outline-none ring-[#0071e3] placeholder:text-[#86868b] focus:border-[var(--ecom-outline-border)] focus:ring-2"
         />
       </div>
       {showMoreHint ? (

@@ -70,7 +70,7 @@ export function ProductDesignEditableField({
             "w-full rounded-lg border px-2 py-1.5 text-[11px] outline-none",
             isDark
               ? "border-[var(--ecom-chrome-accent)]/50 bg-[var(--ecom-chrome-surface-raised)] text-[var(--ecom-chrome-text)] ring-2 ring-[var(--ecom-chrome-accent)]/20"
-              : "border-[#0071e3]/40 bg-white text-[#1d1d1f] ring-2 ring-[#0071e3]/15",
+              : "border-[var(--ecom-outline-border)] bg-white text-[#1d1d1f] ring-2 ring-[#1d1d1f]/12",
           )}
           value={draft}
           rows={multiline ? rows : undefined}

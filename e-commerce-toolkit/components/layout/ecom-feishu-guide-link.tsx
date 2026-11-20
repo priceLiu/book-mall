@@ -21,7 +21,7 @@ export function EcomFeishuGuideLink({
     variant === "button"
       ? "inline-flex items-center gap-1.5 rounded-lg border border-[var(--ecom-chrome-border-subtle)] px-3 py-2 text-xs font-medium text-[var(--ecom-chrome-text)] transition-colors hover:bg-[var(--ecom-chrome-hover)]"
       : variant === "chip"
-        ? "inline-flex items-center gap-1.5 rounded-full border border-zinc-200 bg-zinc-50 px-3 py-1 text-xs font-medium text-zinc-700 transition hover:border-[var(--ecom-primary)]/40 hover:bg-white hover:text-[var(--ecom-primary)]"
+        ? "inline-flex items-center gap-1.5 rounded-full border border-zinc-200 bg-zinc-50 px-3 py-1 text-xs font-medium text-zinc-700 transition hover:border-[var(--ecom-outline-border)]/40 hover:bg-white hover:text-[var(--ecom-primary)]"
         : "inline-flex items-center gap-1 text-xs font-medium text-[var(--ecom-primary)] transition hover:underline";
 
   return (

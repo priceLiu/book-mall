@@ -60,7 +60,7 @@ export function FilmPullReplaceSetupPanel({
         </label>
         <textarea
           id="film-pull-character-desc"
-          className="w-full resize-y rounded-lg border border-[#d2d2d7] bg-[#fafafa] px-3 py-2.5 text-sm leading-relaxed outline-none placeholder:text-[#86868b] focus:border-[#0071e3] focus:bg-white focus:ring-2 focus:ring-[#0071e3]/20 disabled:opacity-60"
+          className="w-full resize-y rounded-lg border border-[#d2d2d7] bg-[#fafafa] px-3 py-2.5 text-sm leading-relaxed outline-none placeholder:text-[#86868b] focus:border-[var(--ecom-outline-border)] focus:bg-white focus:ring-2 focus:ring-[#1d1d1f]/15 disabled:opacity-60"
           rows={4}
           placeholder="例如：25 岁亚裔女性，黑色短发，休闲白 T，气质阳光…"
           value={characterDescription}

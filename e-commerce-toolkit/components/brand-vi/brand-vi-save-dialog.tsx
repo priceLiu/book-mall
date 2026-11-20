@@ -103,7 +103,7 @@ export function BrandViSaveDialog({
         <label className="block space-y-1.5">
           <span className="text-xs font-medium text-[#6e6e73]">IP 名</span>
           <input
-            className="w-full rounded-lg border border-[#e8e8ed] px-3 py-2 text-sm text-[#1d1d1f] focus:border-[#0071e3]/40 focus:outline-none focus:ring-2 focus:ring-[#0071e3]/15"
+            className="w-full rounded-lg border border-[#e8e8ed] px-3 py-2 text-sm text-[#1d1d1f] focus:border-[var(--ecom-outline-border)] focus:outline-none focus:ring-2 focus:ring-[#1d1d1f]/12"
             value={name}
             autoFocus
             disabled={busy}

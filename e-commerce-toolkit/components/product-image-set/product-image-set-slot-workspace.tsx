@@ -526,9 +526,9 @@ function SlotCard({
     <article
       className={cn(
         "group relative isolate flex shrink-0 flex-col overflow-hidden rounded-xl border bg-white shadow-sm transition",
-        generating && "ecom-media-generating-sweep border-[#0071e3]/40",
+        generating && "ecom-media-generating-sweep border-[var(--ecom-outline-border)]",
         !generating && selected
-          ? "border-[var(--ecom-primary)] ring-2 ring-[#0071e3]/25"
+          ? "border-[var(--ecom-outline-border)] ring-2 ring-[#1d1d1f]/15"
           : !generating && "border-[#e8e8ed]",
       )}
       style={{ width: cardWidth }}

@@ -162,7 +162,7 @@ export function MediaDecomposeReplicaImageShotTable({
                   {shot.imageUrl?.trim() ? (
                     <button
                       type="button"
-                      className="block w-full overflow-hidden rounded-lg border border-[#0071e3]/35 bg-[#f0f6ff] p-1 text-left"
+                      className="block w-full overflow-hidden rounded-lg border border-[var(--ecom-outline-border)] bg-[var(--ecom-outline-hover-bg)] p-1 text-left"
                       title="生视频首帧参考"
                       onClick={() =>
                         onPreviewImage?.(shot.imageUrl!, `镜 ${shot.index} · 生视频首帧`)
