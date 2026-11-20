@@ -92,6 +92,8 @@ export async function publishModelCreditPrice(input: {
   displayName: string;
   marginM?: number;
   publishedBy?: string;
+  /** 空 = 仅发布无 tier 的默认成本档 */
+  tierRaw?: string | null;
 }): Promise<PublishResult> {
   const config = await loadPricingConfig();
   const now = new Date();
@@ -108,7 +110,17 @@ export async function publishModelCreditPrice(input: {
     throw new Error(`未找到生效中的成本档：${input.canonicalModelKey}`);
   }
 
-  const chosen = pickActiveCostProfile(profiles);
+  const wantTier = normalizeModelCreditTierRaw(input.tierRaw);
+  const scoped = profiles.filter(
+    (p) => normalizeModelCreditTierRaw(p.tierRaw) === wantTier,
+  );
+  if (scoped.length === 0) {
+    throw new Error(
+      `未找到生效中的成本档：${input.canonicalModelKey}${wantTier ? ` · tier ${wantTier}` : ""}`,
+    );
+  }
+
+  const chosen = pickActiveCostProfile(scoped);
   if (!chosen) {
     throw new Error(`未找到生效中的成本档：${input.canonicalModelKey}`);
   }
@@ -255,6 +267,40 @@ export async function publishModelCreditPrice(input: {
     baseMarginRate: toNum(saved.baseMarginRate),
     netCostYuan: toNum(saved.netCostYuan),
   };
+}
+
+/** 为同一 canonical 下每个 tier 成本档分别发布 ModelCreditPrice（如 Seedream 2K/4K 像素档）。 */
+export async function publishAllModelCreditPriceTiers(input: {
+  canonicalModelKey: string;
+  displayName: string;
+  publishedBy?: string;
+}): Promise<PublishResult[]> {
+  const now = new Date();
+  const profiles = await prisma.modelCostProfile.findMany({
+    where: {
+      canonicalModelKey: input.canonicalModelKey,
+      active: true,
+      effectiveFrom: { lte: now },
+      OR: [{ effectiveTo: null }, { effectiveTo: { gte: now } }],
+    },
+    select: { tierRaw: true },
+  });
+  const tiers = [
+    ...new Set(profiles.map((p) => normalizeModelCreditTierRaw(p.tierRaw))),
+  ];
+  const out: PublishResult[] = [];
+  for (const tier of tiers) {
+    const label = tier ? `${input.displayName} · ${tier}` : input.displayName;
+    out.push(
+      await publishModelCreditPrice({
+        canonicalModelKey: input.canonicalModelKey,
+        displayName: label,
+        tierRaw: tier || undefined,
+        publishedBy: input.publishedBy,
+      }),
+    );
+  }
+  return out;
 }
 
 /** 成本档晚于积分报价发布 → 视为过期，生成前应重发报价 */
