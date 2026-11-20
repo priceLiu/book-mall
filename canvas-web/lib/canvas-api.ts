@@ -1441,6 +1441,9 @@ export type CanvasWorkRecord = {
   nodeId: string;
   model: string;
   ossUrl: string;
+  mediaKind?: "image" | "video";
+  posterUrl?: string | null;
+  thumbnailUrl?: string | null;
   completedAt: string | null;
   createdAt: string;
   project: { id: string; name: string } | null;
@@ -2480,6 +2483,8 @@ export async function listProjectAssets(
     q?: string;
     limit?: number;
     cursor?: string | null;
+    /** 首屏分页列表建议 false，避免合并旧版资产全表扫描 */
+    includeLegacy?: boolean;
   },
 ): Promise<{
   assets: import("@/lib/canvas/project-asset-types").ProjectAssetRecord[];
@@ -2494,6 +2499,7 @@ export async function listProjectAssets(
   if (opts?.q) sp.set("q", opts.q);
   if (opts?.limit != null) sp.set("limit", String(opts.limit));
   if (opts?.cursor) sp.set("cursor", opts.cursor);
+  if (opts?.includeLegacy === false) sp.set("includeLegacy", "0");
   const q = sp.toString();
   const j = await call<{
     assets: import("@/lib/canvas/project-asset-types").ProjectAssetRecord[];

@@ -41,6 +41,10 @@ export const STYLE_LIBRARY_CARD_SUBTITLE = "mt-1 text-[12px] text-[#888]";
 export const STYLE_LIBRARY_GRID_CLASS =
   "grid w-full grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5";
 
+/** 风格库 / 分镜 / 项目资产 · 悬停圆形操作钮（32px） */
+export const STYLE_LIBRARY_HOVER_ACTION_BTN =
+  "pointer-events-auto flex h-8 w-8 items-center justify-center rounded-full bg-white/95 text-[#1d1d1f] shadow-md transition hover:scale-105 hover:bg-white";
+
 export function styleLibraryGridClass(compact?: boolean): string {
   return cn(
     compact

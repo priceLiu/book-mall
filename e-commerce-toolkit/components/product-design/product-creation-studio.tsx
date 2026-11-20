@@ -681,6 +681,12 @@ export function ProductCreationStudio({ module }: StudioProps) {
           chatModels={chatModels}
           chatModelKey={chatModelKey}
           visionModelKey={visionModelKey}
+          onChatModelKeyChange={(key) => {
+            setChatModelKey(key);
+            void updateProductDesignProject(project.id, {
+              settings: { chatModelKey: key },
+            }).catch(() => undefined);
+          }}
           composerWide={assistantWide}
           onComposerWideChange={setAssistantWide}
           collapsed={assistantCollapsed}

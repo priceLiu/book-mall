@@ -13,6 +13,7 @@ import {
   canvasProjectHasCollaboration,
   type CanvasProjectEdition,
 } from "@/lib/canvas/canvas-story-edition";
+import { isHiddenDevCanvasListProject } from "@/lib/canvas/canvas-dev-list-hide";
 import {
   isRetiredLegacyPro2Canvas,
   isRetiredLegacyPro2FromListHints,
@@ -364,6 +365,7 @@ function isVisibleListRow(
   row: CanvasProjectListRow,
   nodeTypes: Iterable<string> | null | undefined,
 ): boolean {
+  if (isHiddenDevCanvasListProject(row)) return false;
   return !isRetiredLegacyPro2FromListHints(row.meta, nodeTypes);
 }
 

@@ -8,10 +8,10 @@ import { cn } from "@/lib/utils";
 /** 「我的画布」内页 · tab 导航 */
 export function ProjectsSubNav({
   className,
-  align = "center",
+  align = "start",
 }: {
   className?: string;
-  /** center：页顶居中；start：标题下方左对齐 */
+  /** start：与画布列表一致左对齐；center：居中 */
   align?: "center" | "start";
 }) {
   const pathname = usePathname();
@@ -27,6 +27,7 @@ export function ProjectsSubNav({
     >
       <Link
         href="/projects"
+        scroll={false}
         className={cn(
           "rounded-full px-4 py-1.5 text-sm transition-colors",
           pathname === "/projects"
@@ -43,6 +44,7 @@ export function ProjectsSubNav({
           <Link
             key={item.href}
             href={item.href}
+            scroll={false}
             className={cn(
               "rounded-full px-4 py-1.5 text-sm transition-colors",
               active

@@ -19,14 +19,19 @@ export const CANVAS_ADMIN_SUB_NAV: CanvasNavItem[] = [
   { href: "/admin/templates", label: "模板管理" },
 ];
 
-/** 「我的画布」内页居中子导航（原顶栏二级入口） */
+/** 顶栏一级 · 项目资产说明（在「管理中心」右侧） */
+export const CANVAS_ASSET_GUIDE_NAV: CanvasNavItem = {
+  href: "/guides/project-assets",
+  label: "资产指南",
+};
+
+/** 顶栏「我的画布」下拉子入口（画布列表仍点主按钮进 /projects） */
 export const CANVAS_PROJECTS_SUB_NAV: CanvasNavItem[] = [
   { href: "/assets", label: "我的资产" },
   { href: "/characters", label: "角色库" },
   { href: "/scripts", label: "脚本" },
   { href: "/storyboards", label: "分镜" },
   { href: "/style-library", label: "风格库" },
-  { href: "/guides/project-assets", label: "资产指南" },
 ];
 
 export function getCanvasWebOrigin(): string {

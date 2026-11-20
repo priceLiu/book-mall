@@ -330,6 +330,13 @@ export async function startGenLoadTest(input?: { userId?: string }) {
   const project = await createCanvasProjectForUser(user.userId, {
     name: `[全链路并发] ${new Date().toISOString().slice(11, 19)}`,
     description: "5 文本 + 5 电商生图 + 5 一键复刻短视频",
+    canvas: {
+      schemaVersion: 1,
+      nodes: [],
+      edges: [],
+      viewport: { x: 0, y: 0, zoom: 1 },
+      meta: { devGenLoadTest: true },
+    },
   });
 
   const [textIds, imageIds, videoIds] = await Promise.all([

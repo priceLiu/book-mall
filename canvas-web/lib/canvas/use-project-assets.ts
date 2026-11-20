@@ -28,6 +28,13 @@ export function useProjectAssets(
     projectId?: string | null;
     kind?: ProjectAssetKind | null;
     scope?: "all" | "project" | "library";
+    /** 每页条数；默认侧栏 20 */
+    pageSize?: number;
+    /** 服务端搜索（分页模式下用 q，勿仅前端过滤已加载列表） */
+    search?: string;
+    /** 全页懒加载：不走侧栏 SWR 缓存、默认跳过 legacy 合并 */
+    scrollPaginate?: boolean;
+    includeLegacy?: boolean;
   },
 ) {
   const [assets, setAssets] = useState<ProjectAssetRecord[]>([]);
@@ -38,6 +45,19 @@ export function useProjectAssets(
   const cursorRef = useRef<string | null>(null);
   const hasMoreRef = useRef(false);
 
+  const pageSize = opts?.pageSize ?? CANVAS_TOOLBAR_SIDE_PANEL_PAGE_SIZE;
+  const searchQ = opts?.search?.trim() || undefined;
+
+  const resolveIncludeLegacy = useCallback(
+    (cursor?: string | null) => {
+      if (opts?.includeLegacy !== undefined) return opts.includeLegacy;
+      /** 全页首屏仍合并 legacy（与改版前可见性一致）；翻页不带 legacy 减轻压力 */
+      if (opts?.scrollPaginate) return !cursor;
+      return true;
+    },
+    [opts?.includeLegacy, opts?.scrollPaginate],
+  );
+
   const fetchPage = useCallback(
     async (cursor?: string | null) => {
       if (!base) {
@@ -47,11 +67,21 @@ export function useProjectAssets(
         projectId: opts?.projectId,
         kind: opts?.kind ?? undefined,
         scope: opts?.scope ?? "all",
-        limit: CANVAS_TOOLBAR_SIDE_PANEL_PAGE_SIZE,
+        limit: pageSize,
         cursor,
+        q: searchQ,
+        includeLegacy: resolveIncludeLegacy(cursor),
       });
     },
-    [base, opts?.projectId, opts?.kind, opts?.scope],
+    [
+      base,
+      opts?.projectId,
+      opts?.kind,
+      opts?.scope,
+      pageSize,
+      searchQ,
+      resolveIncludeLegacy,
+    ],
   );
 
   const refresh = useCallback(async (loadOpts?: { force?: boolean }) => {
@@ -63,6 +93,35 @@ export function useProjectAssets(
       hasMoreRef.current = false;
       return;
     }
+    const applyPage = (page: {
+      assets: ProjectAssetRecord[];
+      hasMore: boolean;
+      nextCursor: string | null;
+    }) => {
+      setAssets(page.assets);
+      setHasMore(page.hasMore);
+      hasMoreRef.current = page.hasMore;
+      cursorRef.current = page.nextCursor;
+      setError(null);
+    };
+
+    if (opts?.scrollPaginate) {
+      setLoading(true);
+      try {
+        const page = await fetchPage(null);
+        applyPage(page);
+      } catch (e) {
+        setAssets([]);
+        setHasMore(false);
+        hasMoreRef.current = false;
+        cursorRef.current = null;
+        setError(e instanceof Error ? e.message : String(e));
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
     const cacheKey = toolbarPanelCacheKey("project-assets", {
       projectId: opts?.projectId ?? "",
       kind: opts?.kind ?? "",
@@ -81,11 +140,7 @@ export function useProjectAssets(
       },
       onLoading: setLoading,
       onData: (cached) => {
-        setAssets(cached.assets);
-        setHasMore(cached.hasMore);
-        hasMoreRef.current = cached.hasMore;
-        cursorRef.current = cached.nextCursor;
-        setError(null);
+        applyPage(cached);
       },
       onError: (e) => {
         if (e == null) return;
@@ -96,7 +151,14 @@ export function useProjectAssets(
         setError(e instanceof Error ? e.message : String(e));
       },
     });
-  }, [base, fetchPage, opts?.projectId, opts?.kind, opts?.scope]);
+  }, [
+    base,
+    fetchPage,
+    opts?.projectId,
+    opts?.kind,
+    opts?.scope,
+    opts?.scrollPaginate,
+  ]);
 
   const loadMore = useCallback(async () => {
     if (!base || !hasMoreRef.current || !cursorRef.current || loadingMore) return;

@@ -4,10 +4,8 @@ import { AudioLines, ImagePlus, ScrollText } from "lucide-react";
 
 import type { ProjectAssetKind } from "@/lib/canvas/project-asset-types";
 import { isProjectAssetVideoUrl } from "@/lib/canvas/project-asset-preview";
+import { STYLE_LIBRARY_HOVER_ACTION_BTN } from "@/lib/canvas/style-library-card-chrome";
 import { cn } from "@/lib/utils";
-
-const HOVER_INSERT_BTN =
-  "pointer-events-auto flex h-8 w-8 items-center justify-center rounded-full bg-white/95 text-[#1d1d1f] shadow-md transition hover:scale-105 hover:bg-white";
 
 function ProjectAssetEmptyPreview({ assetKind }: { assetKind?: ProjectAssetKind }) {
   if (assetKind === "AUDIO") {
@@ -215,7 +213,7 @@ export function ProjectAssetGridCard({
           <div className="pointer-events-none absolute inset-0 z-[2] flex items-center justify-center bg-black/0 opacity-0 transition duration-150 group-hover/media:bg-black/45 group-hover/media:opacity-100">
             <button
               type="button"
-              className={HOVER_INSERT_BTN}
+              className={STYLE_LIBRARY_HOVER_ACTION_BTN}
               aria-label="插入画布"
               title="插入画布"
               disabled={insertBusy}

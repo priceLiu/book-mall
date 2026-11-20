@@ -137,6 +137,17 @@ export function StoryboardStudio() {
     [assistantCollapsed, assistantStreaming],
   );
 
+  const handleChatModelKeyChange = useCallback(
+    (key: string) => {
+      setSettings((s) => ({ ...s, chatModelKey: key }));
+      if (!project) return;
+      void updateStoryboardProject(project.id, {
+        settings: { ...project.settings, chatModelKey: key },
+      }).catch(() => undefined);
+    },
+    [project],
+  );
+
   const applyProject = useCallback((p: StoryboardProject) => {
     setProject(p);
     writeEcomLastProjectId(PROJECT_STORAGE_KEY, p.id);
@@ -642,6 +653,7 @@ export function StoryboardStudio() {
               collapsed={assistantCollapsed}
               onCollapsedChange={setAssistantCollapsed}
               onStreamingChange={setAssistantStreaming}
+              onChatModelKeyChange={handleChatModelKeyChange}
               onOpenSettings={() => setSettingsOpen(true)}
               onDeliverableReady={async (updated) => {
                 if (updated) applyProject(updated);
@@ -670,6 +682,7 @@ export function StoryboardStudio() {
               collapsed={assistantCollapsed}
               onCollapsedChange={setAssistantCollapsed}
               onStreamingChange={setAssistantStreaming}
+              onChatModelKeyChange={handleChatModelKeyChange}
               onOpenSettings={() => setSettingsOpen(true)}
               onDeliverableReady={async (updated) => {
                 if (updated) applyProject(updated);

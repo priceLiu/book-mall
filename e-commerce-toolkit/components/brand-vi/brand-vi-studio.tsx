@@ -505,6 +505,12 @@ export function BrandViStudio() {
           currentStepId={currentStepId}
           chatModels={chatModels}
           chatModelKey={chatModelKey}
+          onChatModelKeyChange={(key) => {
+            setChatModelKey(key);
+            void updateBrandViProject(project.id, {
+              settings: { chatModelKey: key },
+            }).catch(() => undefined);
+          }}
           composerWide={assistantWide}
           onComposerWideChange={setAssistantWide}
           collapsed={assistantCollapsed}

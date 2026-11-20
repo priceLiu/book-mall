@@ -87,6 +87,7 @@ import {
   EcomAssistantIconButton,
   ECOM_ASSISTANT_CONTROL_ICON_CLASS,
 } from "@/components/layout/ecom-assistant-icon-button";
+import { EcomAssistantChatModelControl } from "@/components/layout/ecom-assistant-chat-model-control";
 import { EcomAssistantSendButton } from "@/components/layout/ecom-assistant-send-button";
 import {
   ECOM_ASSISTANT_BUBBLE_CLASS,
@@ -121,6 +122,7 @@ type Props = {
   imageModels: StoryboardGatewayModel[];
   videoModels: StoryboardGatewayModel[];
   settings: StoryboardSettingsValue;
+  onChatModelKeyChange?: (key: string) => void;
   onOpenSettings?: () => void;
   onStreamingChange?: (streaming: boolean) => void;
   onDeliverableReady?: (updated?: StoryboardProject) => void | Promise<void>;
@@ -143,6 +145,7 @@ export function StoryboardAssistantPanel({
   imageModels,
   videoModels,
   settings,
+  onChatModelKeyChange,
   onOpenSettings,
   onStreamingChange,
   onDeliverableReady,
@@ -1173,11 +1176,21 @@ export function StoryboardAssistantPanel({
         onCollapse={onCollapsedChange ? tryCollapse : undefined}
         collapseDisabled={streaming}
         trailing={
-          onOpenSettings ? (
-            <EcomAssistantIconButton title="影片参数" onClick={() => onOpenSettings()}>
-              <Settings2 className={ECOM_ASSISTANT_CONTROL_ICON_CLASS} />
-            </EcomAssistantIconButton>
-          ) : null
+          <>
+            {onChatModelKeyChange ? (
+              <EcomAssistantChatModelControl
+                models={chatModels}
+                value={settings.chatModelKey}
+                onChange={onChatModelKeyChange}
+                disabled={streaming || legacyReadonly}
+              />
+            ) : null}
+            {onOpenSettings ? (
+              <EcomAssistantIconButton title="影片参数" onClick={() => onOpenSettings()}>
+                <Settings2 className={ECOM_ASSISTANT_CONTROL_ICON_CLASS} />
+              </EcomAssistantIconButton>
+            ) : null}
+          </>
         }
       />
 

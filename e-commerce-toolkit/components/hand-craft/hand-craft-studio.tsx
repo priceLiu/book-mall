@@ -489,6 +489,12 @@ export function HandCraftStudio() {
           currentStepId={currentStepId}
           chatModels={chatModels}
           chatModelKey={chatModelKey}
+          onChatModelKeyChange={(key) => {
+            setChatModelKey(key);
+            void updateHandCraftProject(project.id, {
+              settings: { chatModelKey: key },
+            }).catch(() => undefined);
+          }}
           composerWide={assistantWide}
           onComposerWideChange={setAssistantWide}
           collapsed={assistantCollapsed}

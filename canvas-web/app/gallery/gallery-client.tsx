@@ -11,6 +11,7 @@ import {
   type CanvasCharacterRecord,
   type CanvasWorkRecord,
 } from "@/lib/canvas-api";
+import { STYLE_LIBRARY_GRID_CLASS } from "@/lib/canvas/style-library-card-chrome";
 
 function Inner() {
   const base = useBookMallBaseUrl();
@@ -80,7 +81,7 @@ function Inner() {
               <p className="mb-4 text-[12px] text-[var(--canvas-muted)]">
                 从三视图节点保存的角色，可在画布「我的角色」中快速插入图片节点。
               </p>
-              <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+              <ul className={STYLE_LIBRARY_GRID_CLASS}>
                 {characters.map((c) => (
                   <li key={c.id}>
                     <GalleryMediaCard
@@ -106,11 +107,14 @@ function Inner() {
               <p className="mb-4 text-[12px] text-[var(--canvas-muted)]">
                 所有画布运行成功的图像生成结果，按时间倒序展示。
               </p>
-              <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+              <ul className={STYLE_LIBRARY_GRID_CLASS}>
                 {works.map((w) => (
                   <li key={w.id}>
                     <GalleryMediaCard
                       src={w.ossUrl}
+                      mediaKind={w.mediaKind}
+                      posterUrl={w.posterUrl}
+                      thumbnailUrl={w.thumbnailUrl}
                       alt={w.project?.name ?? "画作"}
                       title={w.project?.name ?? "未命名"}
                       subtitle={
@@ -120,7 +124,11 @@ function Inner() {
                           ? new Date(w.completedAt).toLocaleString("zh-CN")
                           : "—")
                       }
-                      downloadName={`canvas-${w.id}.png`}
+                      downloadName={
+                        w.mediaKind === "video"
+                          ? `canvas-${w.id}.mp4`
+                          : `canvas-${w.id}.png`
+                      }
                     />
                   </li>
                 ))}

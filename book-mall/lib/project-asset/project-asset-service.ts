@@ -161,7 +161,9 @@ function buildProjectAssetWhere(
   const andClauses: Prisma.ProjectAssetWhereInput[] = [];
 
   if (filter.scope === "project" && projectId) {
-    base.sourceProjectId = projectId;
+    andClauses.push({
+      OR: [{ sourceProjectId: projectId }, { sourceProjectId: null }],
+    });
   } else if (filter.scope === "library") {
     base.sourceProjectId = null;
   }
@@ -259,9 +261,10 @@ export async function listProjectAssets(
   }
 
   const assets = unified.slice(0, limit);
+  const hasMoreAfterMerge = hasMore || unified.length > limit;
   const last = pageRows[pageRows.length - 1];
   const nextCursor =
-    hasMore && last
+    hasMoreAfterMerge && last
       ? Buffer.from(
           JSON.stringify({
             updatedAt: last.updatedAt.toISOString(),
@@ -270,7 +273,7 @@ export async function listProjectAssets(
         ).toString("base64url")
       : null;
 
-  return { assets, hasMore, nextCursor };
+  return { assets, hasMore: hasMoreAfterMerge, nextCursor };
 }
 
 export async function getProjectAsset(

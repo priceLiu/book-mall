@@ -4,14 +4,13 @@ import { ImagePlus, ZoomIn } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
-const STYLE_HOVER_ACTION_BTN =
-  "pointer-events-auto flex h-8 w-8 items-center justify-center rounded-full bg-white/95 text-[#1d1d1f] shadow-md transition hover:scale-105 hover:bg-white";
 import {
   STYLE_LIBRARY_CARD_FOOTER,
   STYLE_LIBRARY_CARD_SHELL,
   STYLE_LIBRARY_CARD_SUBTITLE,
   STYLE_LIBRARY_CARD_TITLE,
   STYLE_LIBRARY_GRID_CLASS,
+  STYLE_LIBRARY_HOVER_ACTION_BTN,
   STYLE_LIBRARY_HOVER_PROMPT_OVERLAY,
   STYLE_LIBRARY_MEDIA_FRAME,
   STYLE_LIBRARY_PREVIEW_ASPECT,
@@ -239,7 +238,7 @@ function StyleLibraryCard({
             {onPreview && hasImage ? (
               <button
                 type="button"
-                className={cn("nodrag", STYLE_HOVER_ACTION_BTN)}
+                className={cn("nodrag", STYLE_LIBRARY_HOVER_ACTION_BTN)}
                 aria-label="预览"
                 title="预览"
                 onClick={(e) => {
@@ -253,7 +252,7 @@ function StyleLibraryCard({
             {onSelect ? (
               <button
                 type="button"
-                className={cn("nodrag", STYLE_HOVER_ACTION_BTN)}
+                className={cn("nodrag", STYLE_LIBRARY_HOVER_ACTION_BTN)}
                 aria-label={selectLabel}
                 title={selectLabel}
                 onClick={(e) => {

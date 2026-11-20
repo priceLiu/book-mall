@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useDeferredValue } from "react";
 import {
   BookOpen,
   Clapperboard,
@@ -19,6 +19,7 @@ import {
   Users,
 } from "lucide-react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
+import { CanvasListSkeleton } from "@/components/canvas/canvas-list-skeleton";
 import { CanvasPanelShellLoading } from "@/components/canvas/canvas-panel-shell-loading";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import {
@@ -34,9 +35,11 @@ import {
 import type { ProjectAssetKind, ProjectAssetRecord } from "@/lib/canvas/project-asset-types";
 import { useProjectAssets } from "@/lib/canvas/use-project-assets";
 import { usePanelInfiniteScroll } from "@/lib/canvas/use-panel-infinite-scroll";
-import {
-  CANVAS_PANEL_SHELL_SELECT_CLASS,
-} from "@/lib/canvas/canvas-chrome-semantics";
+import { CANVAS_PANEL_SHELL_SELECT_CLASS } from "@/lib/canvas/canvas-chrome-semantics";
+
+/** Hub 全页：无描边输入，减少叠框 */
+const HUB_ASSETS_SEARCH_CLASS =
+  "nodrag min-w-[140px] flex-1 rounded-lg bg-white/[0.04] px-3 py-2 text-xs text-white placeholder:text-white/35 focus:bg-white/[0.06] focus:outline-none";
 import {
   PRO_ASSETS_LINK_CLASS,
   PRO_ASSETS_TAB_ACTIVE_CLASS,
@@ -49,11 +52,15 @@ import {
   isProjectAssetCanvasInsertAvailable,
 } from "@/lib/canvas/spawn-project-asset-on-canvas";
 import {
+  projectAssetHeroUrl,
   projectAssetRefSnapshots,
+  isProjectAssetVideoUrl,
 } from "@/lib/canvas/project-asset-preview";
-import { isProjectAssetVideoUrl } from "@/lib/canvas/project-asset-preview";
+import { PROJECT_ASSETS_FULL_PAGE_SIZE } from "@/lib/canvas/project-assets-pagination";
+import { styleLibraryGridClass } from "@/lib/canvas/style-library-card-chrome";
 import { ProjectAssetHoverPreviewLayer } from "./project-asset-hover-preview";
-import { ProjectAssetGridCard } from "./project-asset-grid-card";
+import { ProjectAssetMediaCard } from "./project-asset-media-card";
+import type { ProjectAssetGalleryItem } from "./project-asset-media-card";
 import { StoryMediaPreviewModal } from "./story-column-media-panel";
 import { StoryProAssetImportIcon } from "./story-pro-asset-import-icon";
 
@@ -80,11 +87,14 @@ export function UnifiedProjectAssetsView({
   projectId,
   initialTab = "all",
   compact = false,
+  scrollPaginate = false,
   onInsertToCanvas,
 }: {
   projectId: string | null | undefined;
   initialTab?: UnifiedProjectAssetTab;
   compact?: boolean;
+  /** /assets 全页：小页 + 滚动追加 + 跳过 legacy 全量合并 */
+  scrollPaginate?: boolean;
   /** 画布页：拖到画布或点「插入画布」 */
   onInsertToCanvas?: (assetId: string) => void;
 }) {
@@ -104,6 +114,7 @@ export function UnifiedProjectAssetsView({
   } | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDeferredValue(search.trim());
 
   const kindFilter = tab === "all" ? null : tab;
   const canvasInsertEnabled =
@@ -111,19 +122,24 @@ export function UnifiedProjectAssetsView({
   const { assets, loading, loadingMore, hasMore, loadMore, error, refresh } = useProjectAssets(base, {
     projectId,
     kind: kindFilter,
+    scrollPaginate,
+    pageSize: scrollPaginate ? PROJECT_ASSETS_FULL_PAGE_SIZE : undefined,
+    search: scrollPaginate ? debouncedSearch : undefined,
+    scope: scrollPaginate && projectId ? "project" : "all",
   });
   const loadMoreSentinelRef = usePanelInfiniteScroll({
-    enabled: !loading && !search.trim(),
+    enabled: !loading,
     hasMore,
     loading,
     loadingMore,
     onLoadMore: loadMore,
+    rootMargin: scrollPaginate ? "480px" : undefined,
   });
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const q = scrollPaginate ? "" : search.trim().toLowerCase();
     let list = assets;
-    if (kindFilter) {
+    if (!scrollPaginate && kindFilter) {
       list = list.filter((a) => a.kind === kindFilter);
     }
     if (kindFilter === "PRIVATE_PORTRAIT") {
@@ -137,7 +153,7 @@ export function UnifiedProjectAssetsView({
         a.displayName.toLowerCase().includes(q) ||
         a.description.toLowerCase().includes(q),
     );
-  }, [assets, search, kindFilter]);
+  }, [assets, search, kindFilter, scrollPaginate]);
 
   const onDelete = async (asset: ProjectAssetRecord) => {
     if (asset.id.startsWith("legacy:")) {
@@ -239,16 +255,19 @@ export function UnifiedProjectAssetsView({
     }
   };
 
+  const hubNeutralChrome = scrollPaginate && !compact;
   const tabChromeClass = cn(
     "space-y-2",
     compact
       ? "sticky top-0 z-10 -mx-3 border-b border-white/10 bg-[var(--canvas-surface)] px-3 pb-2"
-      : "sticky top-0 z-10 -mx-1 border-b border-white/10 bg-cyan-950/95 px-1 pb-3 backdrop-blur-sm",
+      : hubNeutralChrome
+        ? "sticky top-0 z-10 -mx-1 space-y-3 bg-[var(--canvas-page-bg,var(--canvas-surface))] pb-4 pt-0"
+        : "sticky top-0 z-10 -mx-1 border-b border-white/10 bg-cyan-950/95 px-1 pb-3 backdrop-blur-sm",
   );
 
   return (
     <>
-      <div className={compact ? "flex min-h-0 flex-col" : "space-y-4"}>
+      <div className={compact ? "flex min-h-0 flex-col" : hubNeutralChrome ? "" : "space-y-4"}>
         <div className={tabChromeClass}>
           <div className="flex flex-wrap items-center gap-2">
             <input
@@ -256,31 +275,59 @@ export function UnifiedProjectAssetsView({
               placeholder="搜索资产…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className={cn("min-w-[140px] flex-1", CANVAS_PANEL_SHELL_SELECT_CLASS, "py-1.5 text-xs")}
+              className={cn(
+                "min-w-[140px] flex-1 py-1.5 text-xs",
+                hubNeutralChrome ? HUB_ASSETS_SEARCH_CLASS : CANVAS_PANEL_SHELL_SELECT_CLASS,
+              )}
             />
             {!compact ? (
-              <Link href="/guides/project-assets" className={PRO_ASSETS_LINK_CLASS}>
+              <Link
+                href="/guides/project-assets"
+                className={
+                  hubNeutralChrome
+                    ? "shrink-0 rounded-md px-2 py-1.5 text-[11px] text-[var(--canvas-muted)] transition hover:bg-white/5 hover:text-white"
+                    : PRO_ASSETS_LINK_CLASS
+                }
+              >
                 资产指南
               </Link>
             ) : null}
           </div>
 
           <div className="flex flex-wrap gap-1">
-            <TabBtn tab={tab} id="all" label="全部" onTab={setTab} />
+            <TabBtn tab={tab} id="all" label="全部" neutralChrome={hubNeutralChrome} onTab={setTab} />
             {PROJECT_ASSET_TAB_ROW1.map((k) => (
-              <TabBtn key={k} tab={tab} id={k} label={PROJECT_ASSET_KIND_LABELS[k]} onTab={setTab} />
+              <TabBtn
+                key={k}
+                tab={tab}
+                id={k}
+                label={PROJECT_ASSET_KIND_LABELS[k]}
+                neutralChrome={hubNeutralChrome}
+                onTab={setTab}
+              />
             ))}
           </div>
           <div className="flex flex-wrap gap-1">
             {PROJECT_ASSET_TAB_ROW2.map((k) => (
-              <TabBtn key={k} tab={tab} id={k} label={PROJECT_ASSET_KIND_LABELS[k]} onTab={setTab} />
+              <TabBtn
+                key={k}
+                tab={tab}
+                id={k}
+                label={PROJECT_ASSET_KIND_LABELS[k]}
+                neutralChrome={hubNeutralChrome}
+                onTab={setTab}
+              />
             ))}
           </div>
         </div>
 
-        <div className={compact ? "min-h-0 flex-1 pt-2" : "pt-1"}>
-        {loading ? (
-          <CanvasPanelShellLoading />
+        <div className={compact ? "min-h-0 flex-1 pt-2" : hubNeutralChrome ? "" : "pt-1"}>
+        {loading && assets.length === 0 ? (
+          scrollPaginate ? (
+            <CanvasListSkeleton sections={1} cardsPerSection={12} />
+          ) : (
+            <CanvasPanelShellLoading />
+          )
         ) : error ? (
           <p className="text-xs text-rose-300/85">
             加载失败：{error}
@@ -297,21 +344,22 @@ export function UnifiedProjectAssetsView({
         ) : (
           <>
             {canvasInsertEnabled ? (
-              <p className="text-[11px] text-cyan-200/70">
+              <p className="text-[11px] text-white/40">
                 悬停预览区可放大预览；拖到画布空白处继续创作，或悬停点插入图标。
               </p>
-            ) : (
+            ) : scrollPaginate ? null : (
               <p className="text-[11px] text-white/40">
                 悬停卡片可放大预览快照；点击主图全屏查看。
               </p>
             )}
-            <div className="grid grid-cols-3 items-start gap-x-2 gap-y-3">
+            <div className={styleLibraryGridClass(compact)}>
               {filtered.map((asset) => (
                 <ProjectAssetGridItem
                   key={asset.id}
                   asset={asset}
                   busyId={busyId}
                   canvasInsertEnabled={canvasInsertEnabled}
+                  previewViaActionOnly={scrollPaginate}
                   onInsertToCanvas={onInsertToCanvas}
                   onPreview={(url, title) => setPreview({ url, title })}
                   onHoverPreview={(state) => setHoverPreview(state)}
@@ -324,9 +372,17 @@ export function UnifiedProjectAssetsView({
               ))}
             </div>
             {loadingMore ? (
-              <p className="py-2 text-center text-[11px] text-white/45">加载更多…</p>
+              <p className="py-3 text-center text-[11px] text-white/45">加载更多…</p>
+            ) : hasMore && scrollPaginate ? (
+              <p className="py-3 text-center text-[11px] text-white/35">
+                向下滚动自动加载下一页
+              </p>
             ) : null}
-            <div ref={loadMoreSentinelRef} className="h-1" aria-hidden />
+            <div
+              ref={loadMoreSentinelRef}
+              className={scrollPaginate ? "h-8" : "h-1"}
+              aria-hidden
+            />
           </>
         )}
         </div>
@@ -338,22 +394,44 @@ export function UnifiedProjectAssetsView({
           onClose={() => setPreview(null)}
         />
       ) : null}
-      <ProjectAssetHoverPreviewLayer
-        state={
-          hoverPreview
-            ? {
-                url: hoverPreview.url,
-                title: hoverPreview.title,
-                anchorRect: hoverPreview.anchorRect,
-                isVideo: isProjectAssetVideoUrl(
-                  hoverPreview.url,
-                  hoverPreview.mimeType,
-                ),
-              }
-            : null
-        }
-      />
+      {!scrollPaginate ? (
+        <ProjectAssetHoverPreviewLayer
+          state={
+            hoverPreview
+              ? {
+                  url: hoverPreview.url,
+                  title: hoverPreview.title,
+                  anchorRect: hoverPreview.anchorRect,
+                  isVideo: isProjectAssetVideoUrl(
+                    hoverPreview.url,
+                    hoverPreview.mimeType,
+                  ),
+                }
+              : null
+          }
+        />
+      ) : null}
     </>
+  );
+}
+
+function HubAssetMetaLine({ asset }: { asset: ProjectAssetRecord }) {
+  const parts: string[] = [];
+  if (asset.sourceProjectId && asset.visibility === "PRIVATE") {
+    parts.push("本项目");
+  } else if (!asset.sourceProjectId && asset.visibility === "PRIVATE") {
+    parts.push("我的·全账号");
+  } else if (!asset.sourceProjectId && asset.visibility === "TEAM_PUBLIC") {
+    parts.push("租户库");
+  }
+  if (asset.visibility === "TEAM_PUBLIC") parts.push("团队");
+  if (asset.locked) parts.push("锁定");
+  if (asset.editLockUserId) parts.push("编辑中");
+  if (!parts.length) return null;
+  return (
+    <p className="mt-2 text-[10px] leading-snug text-white/40">
+      {parts.join(" · ")}
+    </p>
   );
 }
 
@@ -361,6 +439,7 @@ function ProjectAssetGridItem({
   asset,
   busyId,
   canvasInsertEnabled,
+  previewViaActionOnly = false,
   onInsertToCanvas,
   onPreview,
   onHoverPreview,
@@ -373,6 +452,7 @@ function ProjectAssetGridItem({
   asset: ProjectAssetRecord;
   busyId: string | null;
   canvasInsertEnabled: boolean;
+  previewViaActionOnly?: boolean;
   onInsertToCanvas?: (assetId: string) => void;
   onPreview: (url: string, title: string) => void;
   onHoverPreview: (state: {
@@ -388,14 +468,19 @@ function ProjectAssetGridItem({
   onDelete: () => void;
 }) {
   const snapshots = projectAssetRefSnapshots(asset);
-  const mediaItems = snapshots.map((s) => ({
+  const galleryItems: ProjectAssetGalleryItem[] = snapshots.map((s) => ({
     id: s.id,
     url: s.url,
     label: s.label,
     mimeType: s.mimeType,
   }));
+  const heroUrl = projectAssetHeroUrl(asset);
+  const heroMime = galleryItems[0]?.mimeType;
+  const useGallery = galleryItems.length >= 2;
   const canInsert = canvasInsertEnabled && !asset.id.startsWith("legacy:");
-  const cardTitle = `${PROJECT_ASSET_KIND_LABELS[asset.kind]}: ${asset.displayName}`;
+  const kindLabel = PROJECT_ASSET_KIND_LABELS[asset.kind];
+  const title = asset.displayName;
+  const subtitle = kindLabel;
 
   return (
     <div
@@ -410,74 +495,94 @@ function ProjectAssetGridItem({
         e.dataTransfer.effectAllowed = "copy";
       }}
     >
-      <ProjectAssetGridCard
-        kindLabel={PROJECT_ASSET_KIND_LABELS[asset.kind]}
-        displayName={asset.displayName}
-        assetKind={asset.kind}
-        mediaItems={mediaItems}
+      <ProjectAssetMediaCard
+        compact={false}
+        title={title}
+        subtitle={subtitle}
+        imageUrl={useGallery ? undefined : heroUrl}
+        imageAlt={title}
+        previewMimeType={heroMime}
+        galleryItems={useGallery ? galleryItems : undefined}
+        previewViaActionOnly={previewViaActionOnly}
+        seamlessGallery={previewViaActionOnly}
+        enableHoverZoom={!previewViaActionOnly}
+        onHoverPreviewShow={
+          previewViaActionOnly
+            ? undefined
+            : ({ url, title: t, anchor, mimeType }) =>
+                onHoverPreview({
+                  url,
+                  title: t,
+                  anchorRect: anchor.getBoundingClientRect(),
+                  mimeType,
+                })
+        }
+        onHoverPreviewHide={previewViaActionOnly ? undefined : onHoverPreviewClear}
+        onPreviewHero={
+          heroUrl
+            ? () => onPreview(heroUrl, `${kindLabel}: ${title}`)
+            : undefined
+        }
+        onPreviewGalleryItem={(url, label) =>
+          onPreview(url, `${kindLabel}: ${title} · ${label}`)
+        }
         canInsert={canInsert}
         insertBusy={busyId === asset.id}
         onInsert={() => onInsertToCanvas?.(asset.id)}
-        onHoverMedia={(item, anchor) =>
-          onHoverPreview({
-            url: item.url,
-            title: `${cardTitle} · ${item.label}`,
-            anchorRect: anchor.getBoundingClientRect(),
-            mimeType: item.mimeType,
-          })
+        locked={asset.locked}
+        busy={busyId === asset.id}
+        onToggleLock={
+          asset.id.startsWith("legacy:") ? undefined : onToggleLock
         }
-        onLeaveMedia={onHoverPreviewClear}
-        onPreviewMedia={(item) =>
-          onPreview(item.url, `${cardTitle} · ${item.label}`)
-        }
-        footerMeta={
+        footer={
           <>
-            <div className="mb-1 flex min-h-[14px] flex-wrap gap-1">
-              {asset.sourceProjectId && asset.visibility === "PRIVATE" ? (
-                <span className="rounded bg-slate-500/25 px-1 py-0.5 text-[8px] text-slate-200">
-                  本项目
-                </span>
-              ) : null}
-              {!asset.sourceProjectId && asset.visibility === "PRIVATE" ? (
-                <span className="rounded bg-violet-500/20 px-1 py-0.5 text-[8px] text-violet-200">
-                  我的·全账号
-                </span>
-              ) : null}
-              {!asset.sourceProjectId && asset.visibility === "TEAM_PUBLIC" ? (
-                <span className="rounded bg-cyan-500/20 px-1 py-0.5 text-[8px] text-cyan-200">
-                  租户库
-                </span>
-              ) : null}
-              {asset.visibility === "TEAM_PUBLIC" ? (
-                <span className="rounded bg-emerald-500/20 px-1 py-0.5 text-[8px] text-emerald-200">
-                  团队
-                </span>
-              ) : null}
-              {asset.locked ? (
-                <span className="inline-flex items-center gap-0.5 rounded bg-amber-500/20 px-1 py-0.5 text-[8px] text-amber-100">
-                  <Lock className="size-2" /> 锁定
-                </span>
-              ) : null}
-              {asset.editLockUserId ? (
-                <span className="rounded bg-rose-500/20 px-1 py-0.5 text-[8px] text-rose-100">
-                  编辑中
-                </span>
-              ) : null}
-            </div>
+            {previewViaActionOnly ? (
+              <HubAssetMetaLine asset={asset} />
+            ) : (
+              <div className="mb-1 mt-2 flex min-h-[14px] flex-wrap gap-1">
+                {asset.sourceProjectId && asset.visibility === "PRIVATE" ? (
+                  <span className="rounded bg-white/10 px-1 py-0.5 text-[8px] text-white/65">
+                    本项目
+                  </span>
+                ) : null}
+                {!asset.sourceProjectId && asset.visibility === "PRIVATE" ? (
+                  <span className="rounded bg-white/10 px-1 py-0.5 text-[8px] text-white/65">
+                    我的·全账号
+                  </span>
+                ) : null}
+                {!asset.sourceProjectId && asset.visibility === "TEAM_PUBLIC" ? (
+                  <span className="rounded bg-white/10 px-1 py-0.5 text-[8px] text-white/65">
+                    租户库
+                  </span>
+                ) : null}
+                {asset.visibility === "TEAM_PUBLIC" ? (
+                  <span className="rounded bg-white/10 px-1 py-0.5 text-[8px] text-white/65">
+                    团队
+                  </span>
+                ) : null}
+                {asset.locked ? (
+                  <span className="inline-flex items-center gap-0.5 rounded bg-white/10 px-1 py-0.5 text-[8px] text-white/65">
+                    <Lock className="size-2" /> 锁定
+                  </span>
+                ) : null}
+                {asset.editLockUserId ? (
+                  <span className="rounded bg-white/10 px-1 py-0.5 text-[8px] text-white/65">
+                    编辑中
+                  </span>
+                ) : null}
+              </div>
+            )}
             {!asset.id.startsWith("legacy:") ? (
-              <div className="flex flex-wrap gap-1.5">
-                <button
-                  type="button"
-                  className="text-[9px] text-white/50 hover:text-white/80"
-                  disabled={busyId === asset.id}
-                  onClick={onToggleLock}
-                >
-                  {asset.locked ? "解锁" : "锁定"}
-                </button>
+              <div
+                className={cn(
+                  "flex flex-wrap gap-x-2 gap-y-0.5",
+                  previewViaActionOnly ? "mt-2" : "gap-1.5",
+                )}
+              >
                 {asset.sourceProjectId ? (
                   <button
                     type="button"
-                    className="text-[9px] text-violet-300/80 hover:text-violet-200"
+                    className="text-[9px] text-white/50 hover:text-white/80"
                     disabled={busyId === asset.id}
                     onClick={onPromoteToUserSpace}
                   >
@@ -494,7 +599,7 @@ function ProjectAssetGridItem({
                 </button>
                 <button
                   type="button"
-                  className="text-[9px] text-rose-300/80 hover:text-rose-200"
+                  className="text-[9px] text-white/50 hover:text-red-300/90"
                   disabled={busyId === asset.id}
                   onClick={onDelete}
                 >
@@ -513,21 +618,30 @@ function TabBtn({
   tab,
   id,
   label,
+  neutralChrome = false,
   onTab,
 }: {
   tab: UnifiedProjectAssetTab;
   id: UnifiedProjectAssetTab;
   label: string;
+  neutralChrome?: boolean;
   onTab: (t: UnifiedProjectAssetTab) => void;
 }) {
   const Icon = TAB_ICONS[id];
   const active = tab === id;
+  const activeClass = neutralChrome
+    ? "bg-[var(--canvas-accent)]/20 text-white"
+    : PRO_ASSETS_TAB_ACTIVE_CLASS;
+  const idleClass = neutralChrome
+    ? "text-[var(--canvas-muted)] hover:bg-white/5 hover:text-white"
+    : PRO_ASSETS_TAB_IDLE_CLASS;
   return (
     <button
       type="button"
-      className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] ${
-        active ? PRO_ASSETS_TAB_ACTIVE_CLASS : PRO_ASSETS_TAB_IDLE_CLASS
-      }`}
+      className={cn(
+        "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] transition",
+        active ? activeClass : idleClass,
+      )}
       onClick={() => onTab(id)}
     >
       {Icon ? <Icon className="size-3" /> : null}

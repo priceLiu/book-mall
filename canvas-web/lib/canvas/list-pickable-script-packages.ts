@@ -11,6 +11,39 @@ import type {
 } from "./story-pro-workspace-types";
 
 const MAX_PROJECT_SCAN = 24;
+const HUB_SCAN_CONCURRENCY = 4;
+
+/** 脚本 Tab · 每页条数（资产库分页，不扫画布 JSON） */
+export const SCRIPT_PACKAGE_TAB_PAGE_SIZE = 12;
+
+export async function listScriptPackageAssetPage(
+  base: string,
+  opts?: { cursor?: string | null; limit?: number },
+): Promise<{
+  items: NewProjectScriptPackageAsset[];
+  hasMore: boolean;
+  nextCursor: string | null;
+}> {
+  const limit = opts?.limit ?? SCRIPT_PACKAGE_TAB_PAGE_SIZE;
+  const cursor = opts?.cursor?.trim() || undefined;
+  const page = await listProjectAssets(base, {
+    kind: "SCRIPT_PACKAGE",
+    scope: "all",
+    limit,
+    cursor,
+    includeLegacy: !cursor,
+  });
+  const items: NewProjectScriptPackageAsset[] = (page.assets ?? []).map((a) => ({
+    id: a.id,
+    displayName: a.displayName,
+    payload: (a.payload ?? {}) as Record<string, unknown>,
+  }));
+  return {
+    items,
+    hasMore: page.hasMore,
+    nextCursor: page.nextCursor,
+  };
+}
 
 function assetKeyFromHub(projectId: string, hubNodeId: string): string {
   return `hub:${projectId}:${hubNodeId}`;
@@ -27,7 +60,47 @@ function displayNameForPublishedHub(
   return projectName || "已发布剧本";
 }
 
-/** 新建 / 关联画布 · 可选的已发布剧本（资产库 + 各 Pro2 画布内已发布 hub） */
+function mergeHubDiscoveries(args: {
+  byId: Map<string, NewProjectScriptPackageAsset>;
+  hubKeysFromAssets: Set<string>;
+  project: { id: string; name: string };
+  detail: Awaited<ReturnType<typeof getCanvasProject>>;
+}): void {
+  const nodes = args.detail.canvas?.nodes ?? [];
+  const starter = nodes.find((n) => n.type === "story-pro2-starter");
+  const starterData = (starter?.data ?? {}) as StoryProStarterNodeData;
+
+  for (const node of nodes) {
+    if (node.type !== "story-pro2-script-hub") continue;
+    const hubData = node.data as StoryProScriptHubNodeData;
+    if (hubData.scriptPublished !== true) continue;
+    if (!hubData.crewBulletin?.tasks?.length) continue;
+
+    const key = assetKeyFromHub(args.project.id, node.id);
+    if (args.hubKeysFromAssets.has(key) || args.byId.has(key)) continue;
+
+    const draft = exportScriptPackageDraft({
+      projectId: args.project.id,
+      edition: "pro2",
+      starterId: starter?.id ?? node.id,
+      starterData,
+      hubId: node.id,
+      hubData,
+    });
+
+    args.byId.set(key, {
+      id: key,
+      displayName: displayNameForPublishedHub(hubData, args.project.name),
+      payload: {
+        ...draft.payload,
+        sourceHubProjectId: args.project.id,
+        sourceHubNodeId: node.id,
+      },
+    });
+  }
+}
+
+/** 新建 / 关联画布 · 可选剧本（资产库 + 画布内已发布 hub，hub 并行拉取） */
 export async function listPickableScriptPackages(
   base: string,
 ): Promise<NewProjectScriptPackageAsset[]> {
@@ -38,6 +111,7 @@ export async function listPickableScriptPackages(
     kind: "SCRIPT_PACKAGE",
     scope: "all",
     limit: 100,
+    includeLegacy: true,
   });
 
   for (const a of assets ?? []) {
@@ -62,43 +136,22 @@ export async function listPickableScriptPackages(
     )
     .slice(0, MAX_PROJECT_SCAN);
 
-  for (const project of projects) {
-    let detail;
-    try {
-      detail = await getCanvasProject(base, project.id);
-    } catch {
-      continue;
-    }
-    const nodes = detail.canvas?.nodes ?? [];
-    const starter = nodes.find((n) => n.type === "story-pro2-starter");
-    const starterData = (starter?.data ?? {}) as StoryProStarterNodeData;
-
-    for (const node of nodes) {
-      if (node.type !== "story-pro2-script-hub") continue;
-      const hubData = node.data as StoryProScriptHubNodeData;
-      if (hubData.scriptPublished !== true) continue;
-      if (!hubData.crewBulletin?.tasks?.length) continue;
-
-      const key = assetKeyFromHub(project.id, node.id);
-      if (hubKeysFromAssets.has(key) || byId.has(key)) continue;
-
-      const draft = exportScriptPackageDraft({
-        projectId: project.id,
-        edition: "pro2",
-        starterId: starter?.id ?? node.id,
-        starterData,
-        hubId: node.id,
-        hubData,
-      });
-
-      byId.set(key, {
-        id: key,
-        displayName: displayNameForPublishedHub(hubData, project.name),
-        payload: {
-          ...draft.payload,
-          sourceHubProjectId: project.id,
-          sourceHubNodeId: node.id,
-        },
+  for (let i = 0; i < projects.length; i += HUB_SCAN_CONCURRENCY) {
+    const chunk = projects.slice(i, i + HUB_SCAN_CONCURRENCY);
+    const details = await Promise.all(
+      chunk.map((project) =>
+        getCanvasProject(base, project.id).catch(() => null),
+      ),
+    );
+    for (let j = 0; j < chunk.length; j++) {
+      const detail = details[j];
+      const project = chunk[j];
+      if (!detail || !project) continue;
+      mergeHubDiscoveries({
+        byId,
+        hubKeysFromAssets,
+        project,
+        detail,
       });
     }
   }

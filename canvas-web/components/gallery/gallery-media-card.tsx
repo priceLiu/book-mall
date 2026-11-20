@@ -1,13 +1,23 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { Download, Eye } from "lucide-react";
+import { Download, Play, ZoomIn } from "lucide-react";
 
-import { MediaPreviewLightbox } from "@/components/canvas/media-hover-box";
-
-const ACTION_BTN =
-  "inline-flex min-w-[52px] flex-col items-center gap-1 rounded-xl border border-white/25 bg-black/75 px-3 py-2.5 text-white shadow-xl transition hover:scale-[1.03] hover:border-white/50 hover:bg-black/90";
-const ACTION_ICON = "grid size-11 place-items-center rounded-full bg-white/10";
+import {
+  isVideoMediaUrl,
+  MediaPreviewLightbox,
+} from "@/components/canvas/media-hover-box";
+import {
+  STYLE_LIBRARY_CARD_FOOTER,
+  STYLE_LIBRARY_CARD_SHELL,
+  STYLE_LIBRARY_CARD_SUBTITLE,
+  STYLE_LIBRARY_CARD_TITLE,
+  STYLE_LIBRARY_HOVER_ACTION_BTN,
+  STYLE_LIBRARY_MEDIA_FRAME,
+  STYLE_LIBRARY_PREVIEW_IMG_CLASS,
+  styleLibraryMediaHeightClass,
+} from "@/lib/canvas/style-library-card-chrome";
+import { cn } from "@/lib/utils";
 
 export function GalleryMediaCard({
   src,
@@ -15,14 +25,23 @@ export function GalleryMediaCard({
   title,
   subtitle,
   downloadName,
+  mediaKind,
+  posterUrl,
+  thumbnailUrl,
 }: {
   src: string;
   alt: string;
   title: string;
   subtitle?: string;
   downloadName?: string;
+  mediaKind?: "image" | "video";
+  posterUrl?: string | null;
+  thumbnailUrl?: string | null;
 }) {
   const [previewOpen, setPreviewOpen] = useState(false);
+  const kind = mediaKind ?? (isVideoMediaUrl(src) ? "video" : "image");
+  const poster = posterUrl?.trim() || thumbnailUrl?.trim() || undefined;
+  const thumbSrc = kind === "video" ? poster : poster ?? thumbnailUrl?.trim() ?? src;
 
   const openPreview = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -48,55 +67,76 @@ export function GalleryMediaCard({
 
   return (
     <>
-      <div className="group rounded-xl border border-[var(--canvas-border)] bg-[var(--canvas-surface)] p-2 transition hover:border-[var(--canvas-accent)]/40">
-        <div className="group/media relative aspect-square overflow-hidden rounded-lg bg-black">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={src}
-            alt={alt}
-            className="h-full w-full object-cover transition group-hover/media:scale-[1.02]"
-            loading="lazy"
-          />
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center gap-3 bg-black/0 opacity-0 transition group-hover/media:bg-black/45 group-hover/media:opacity-100">
+      <article className={cn("group/card", STYLE_LIBRARY_CARD_SHELL)}>
+        <div
+          className={cn(
+            STYLE_LIBRARY_MEDIA_FRAME,
+            styleLibraryMediaHeightClass(),
+          )}
+        >
+          {kind === "video" && thumbSrc ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={thumbSrc}
+              alt={alt}
+              className={STYLE_LIBRARY_PREVIEW_IMG_CLASS}
+              loading="lazy"
+            />
+          ) : kind === "video" ? (
+            <video
+              src={src}
+              className={STYLE_LIBRARY_PREVIEW_IMG_CLASS}
+              muted
+              playsInline
+              preload="metadata"
+            />
+          ) : (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={thumbSrc}
+              alt={alt}
+              className={STYLE_LIBRARY_PREVIEW_IMG_CLASS}
+              loading="lazy"
+            />
+          )}
+          {kind === "video" ? (
+            <span className="pointer-events-none absolute bottom-2 right-2 z-10 inline-flex size-7 items-center justify-center rounded-full bg-black/65 text-white">
+              <Play className="size-3.5 fill-current" />
+            </span>
+          ) : null}
+          <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center gap-2 bg-black/0 opacity-0 transition duration-150 group-hover/card:bg-black/45 group-hover/card:opacity-100">
             <button
               type="button"
-              title="预览大图"
+              title="预览"
               onClick={openPreview}
-              className={`${ACTION_BTN} pointer-events-auto`}
+              className={STYLE_LIBRARY_HOVER_ACTION_BTN}
             >
-              <span className={ACTION_ICON}>
-                <Eye className="size-6" strokeWidth={1.75} />
-              </span>
-              <span className="text-[11px] font-medium text-white/90">预览</span>
+              <ZoomIn className="h-4 w-4" strokeWidth={2} />
             </button>
             <button
               type="button"
               title="下载"
               onClick={onDownload}
-              className={`${ACTION_BTN} pointer-events-auto`}
+              className={STYLE_LIBRARY_HOVER_ACTION_BTN}
             >
-              <span className={ACTION_ICON}>
-                <Download className="size-6" strokeWidth={1.75} />
-              </span>
-              <span className="text-[11px] font-medium text-white/90">下载</span>
+              <Download className="h-4 w-4" strokeWidth={2} />
             </button>
           </div>
         </div>
-        <div className="px-1 pb-1 pt-2">
-          <p className="truncate text-xs text-white">{title}</p>
+        <div className={STYLE_LIBRARY_CARD_FOOTER}>
+          <p className={STYLE_LIBRARY_CARD_TITLE}>{title}</p>
           {subtitle ? (
-            <p className="truncate text-[10px] text-[var(--canvas-muted)]">
-              {subtitle}
-            </p>
+            <p className={STYLE_LIBRARY_CARD_SUBTITLE}>{subtitle}</p>
           ) : null}
         </div>
-      </div>
+      </article>
 
       {previewOpen ? (
         <MediaPreviewLightbox
           src={src}
-          kind="image"
+          kind={kind}
           alt={alt}
+          posterUrl={poster}
           onClose={() => setPreviewOpen(false)}
         />
       ) : null}

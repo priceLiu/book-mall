@@ -14,6 +14,7 @@ import { EcomButtonSecondary } from "@/components/ui/ecom-button";
 import { EcomProjectListButton } from "@/components/layout/ecom-project-list-button";
 import { EcomButtonPrimary } from "@/components/ui/ecom-button";
 import { EcomIconButton } from "@/components/ui/ecom-icon-button";
+import { EcomAssistantChatModelControl } from "@/components/layout/ecom-assistant-chat-model-control";
 import { EcomWorkspaceTitleHeading } from "@/components/layout/ecom-workspace-title-heading";
 import { EcomIconToolbar, EcomIconToolbarGroup } from "@/components/ui/ecom-icon-toolbar";
 import {
@@ -155,18 +156,16 @@ export function IpMasterContentPanel({
                 已上传基准图时请选 VL 识图模型（如 Qwen3.8 Max）
               </span>
             ) : null}
-            <select
-              className="ml-2 rounded-lg border border-[#d2d2d7] px-2 py-1.5 text-xs"
-              disabled={modelsLoading || busy}
-              value={chatModelKey}
-              onChange={(e) => onChatModelKeyChange(e.target.value)}
-            >
-              {chatModels.map((m) => (
-                <option key={m.modelKey} value={m.modelKey}>
-                  {m.displayName}
-                </option>
-              ))}
-            </select>
+            <span className="ml-2 inline-flex align-middle">
+              <EcomAssistantChatModelControl
+                variant="button"
+                models={chatModels}
+                value={chatModelKey}
+                onChange={onChatModelKeyChange}
+                disabled={modelsLoading || busy}
+                modelsLoading={modelsLoading}
+              />
+            </span>
           </label>
         </div>
         <IpMasterTemplateGeneratingShell

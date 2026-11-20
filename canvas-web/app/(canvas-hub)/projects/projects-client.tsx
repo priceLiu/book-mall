@@ -91,7 +91,6 @@ import {
   type NewProjectScriptPackageAsset,
 } from "@/lib/canvas/pro2-new-project-script-package";
 import type { CanvasGraph } from "@/lib/canvas/types";
-import { ProjectsSubNav } from "@/components/layout/projects-sub-nav";
 import { PortalSubmitDialog } from "@/components/home/portal-submit-dialog";
 import { cn } from "@/lib/utils";
 
@@ -743,22 +742,17 @@ function Inner({ initialPage }: { initialPage?: CanvasProjectListPage | null }) 
         : proUserTemplates;
 
   return (
-    <div className="canvas-page canvas-page-fill py-6 sm:py-8 lg:py-10">
-      <header className="mb-6">
-        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
-          <ProjectsSubNav align="start" className="min-w-0 max-w-full" />
-          <div className="flex shrink-0 flex-wrap justify-end gap-2">
-            <button
-              type="button"
-              onClick={openPro2CreateDialog}
-              className="twenty-btn-accent text-sm"
-            >
-              <Plus className="mr-2 size-4" />
-              开始我的创作之旅
-            </button>
-          </div>
-        </div>
-      </header>
+  <>
+      <div className="mb-8 flex w-full justify-center">
+        <button
+          type="button"
+          onClick={openPro2CreateDialog}
+          className="twenty-btn-accent text-sm"
+        >
+          <Plus className="mr-2 size-4" />
+          开始我的创作之旅
+        </button>
+      </div>
 
       {error ? (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
@@ -791,7 +785,6 @@ function Inner({ initialPage }: { initialPage?: CanvasProjectListPage | null }) 
             duplicatingId={duplicatingId}
             onPrefetchProject={prefetchProject}
             onRename={onRename}
-            onCreate={openPro2CreateDialog}
             isAdmin={isAdmin}
             portalFeaturedIds={portalFeaturedIds}
             portalCaseIds={portalCaseIds}
@@ -1106,7 +1099,7 @@ function Inner({ initialPage }: { initialPage?: CanvasProjectListPage | null }) 
 
       <CanvasProjectOpeningOverlay visible={Boolean(openingProjectId)} />
       <CanvasCreditsToastHost />
-    </div>
+    </>
   );
 }
 
@@ -1156,7 +1149,6 @@ function ProjectsSection({
   duplicatingId,
   onPrefetchProject,
   onRename,
-  onCreate,
   isAdmin,
   portalFeaturedIds,
   portalCaseIds,
@@ -1176,7 +1168,6 @@ function ProjectsSection({
   duplicatingId: string | null;
   onPrefetchProject: (id: string) => void;
   onRename: (id: string, nextName: string) => void | Promise<void>;
-  onCreate?: () => void;
   isAdmin?: boolean;
   portalFeaturedIds?: Set<string>;
   portalCaseIds?: Set<string>;
@@ -1208,7 +1199,7 @@ function ProjectsSection({
 
   return (
     <section>
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
         <div className="flex min-w-0 shrink-0 flex-wrap items-center gap-2">
           <h2 className="text-xl font-medium text-white">{title}</h2>
           <span
@@ -1218,9 +1209,9 @@ function ProjectsSection({
           </span>
           <span className="text-xs text-[var(--canvas-muted)]">{countLabel}</span>
         </div>
-        <label className="relative mx-auto w-full min-w-0 max-w-md flex-1 sm:px-2">
+        <label className="relative w-full min-w-0 max-w-md shrink-0 sm:ml-auto sm:w-72 md:w-80">
           <Search
-            className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-[var(--canvas-muted)] sm:left-5"
+            className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-[var(--canvas-muted)]"
             aria-hidden
           />
           <input
@@ -1229,7 +1220,7 @@ function ProjectsSection({
             onChange={(e) => setTitleQuery(e.target.value)}
             placeholder="搜索画布标题…"
             aria-label={`${title} · 按标题筛选`}
-            className="w-full rounded-lg border border-white/10 bg-black/25 py-2 pl-9 pr-8 text-sm text-white placeholder:text-white/35 focus:border-[var(--canvas-accent)]/50 focus:outline-none sm:pl-11"
+            className="w-full rounded-lg border border-white/10 bg-black/25 py-2 pl-9 pr-8 text-sm text-white placeholder:text-white/35 focus:border-[var(--canvas-accent)]/50 focus:outline-none"
           />
           {titleQuery ? (
             <button
@@ -1242,16 +1233,6 @@ function ProjectsSection({
             </button>
           ) : null}
         </label>
-        {onCreate ? (
-          <button
-            type="button"
-            onClick={onCreate}
-            className="shrink-0 self-end rounded-full border border-white/15 px-3 py-1.5 text-xs text-white hover:border-white/30 sm:self-center"
-          >
-            <Plus className="mr-1 inline size-3" />
-            新建
-          </button>
-        ) : null}
       </div>
 
       {projects.length === 0 ? (

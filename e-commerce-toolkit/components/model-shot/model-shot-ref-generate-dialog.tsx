@@ -23,6 +23,7 @@ import { fetchModelShotModels } from "@/lib/ecom-model-shot-api";
 import type { ModelShotReferenceRole } from "@/lib/model-shot-types";
 import { pickBoundStoryboardModelKey } from "@/lib/storyboard-model-pick";
 import type { StoryboardGatewayModel } from "@/lib/storyboard-types";
+import { StoryboardModelPickerDialog } from "@/components/storyboard/storyboard-model-picker-dialog";
 import { cn } from "@/lib/utils";
 
 const FALLBACK_SCENE = {
@@ -72,8 +73,6 @@ type Props = {
   busy?: boolean;
   onConfirm: (opts: { prompt: string; modelKey: string }) => void | Promise<void>;
 };
-
-type Panel = "form" | "models";
 
 function PresetPicker({
   role,
@@ -148,7 +147,7 @@ export function ModelShotRefGenerateDialog({
 
   const defaultPrompt = MODEL_SHOT_REF_GEN_DEFAULT_PROMPTS[role];
   const [draft, setDraft] = useState(defaultPrompt);
-  const [panel, setPanel] = useState<Panel>("form");
+  const [modelPickerOpen, setModelPickerOpen] = useState(false);
   const [draftModelKey, setDraftModelKey] = useState(modelKey);
   const [selectedPresetId, setSelectedPresetId] = useState<string | null>(initialPresetId);
   const [localImageModels, setLocalImageModels] = useState<StoryboardGatewayModel[]>([]);
@@ -186,7 +185,7 @@ export function ModelShotRefGenerateDialog({
     if (!open) return;
     setDraft(defaultPrompt);
     setDraftModelKey(modelKey);
-    setPanel("form");
+    setModelPickerOpen(false);
     setSelectedPresetId(initialPresetId);
     setLocalLoadError(null);
   }, [open, defaultPrompt, modelKey, initialPresetId]);
@@ -218,6 +217,7 @@ export function ModelShotRefGenerateDialog({
     draftModelKey;
 
   return createPortal(
+    <>
     <div
       className="fixed inset-0 z-[300] flex items-center justify-center bg-black/45 p-4"
       role="dialog"
@@ -229,17 +229,12 @@ export function ModelShotRefGenerateDialog({
         <EcomDialogCloseButton disabled={busy} onClick={onClose} />
         <div className="border-b border-[#e5e5ea] px-5 py-4 pr-14">
           <h3 id="model-shot-ref-gen-title" className="text-base font-semibold text-[#1d1d1f]">
-            {panel === "models" ? "选择生图模型" : ROLE_TITLE[role]}
+            {ROLE_TITLE[role]}
           </h3>
-          <p className="mt-1 text-xs text-[#86868b]">
-            {panel === "models"
-              ? "选好后返回继续编辑 Prompt。"
-              : ROLE_HINT[role]}
-          </p>
+          <p className="mt-1 text-xs text-[#86868b]">{ROLE_HINT[role]}</p>
         </div>
 
-        {panel === "form" ? (
-          <>
+        <>
             <div className="min-h-0 flex-1 overflow-y-auto p-5">
               <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[#e8e8ed] bg-[#fafafa] px-3 py-2">
                 <span className="text-xs text-[#6e6e73]">生图模型</span>
@@ -248,7 +243,7 @@ export function ModelShotRefGenerateDialog({
                   type="button"
                   disabled={busy || showModelsLoading}
                   className="h-8 max-w-[min(100%,16rem)] truncate text-xs"
-                  onClick={() => setPanel("models")}
+                  onClick={() => setModelPickerOpen(true)}
                 >
                   {showModelsLoading ? "加载模型…" : selectedName || "选择模型"}
                 </EcomButtonSecondary>
@@ -316,59 +311,29 @@ export function ModelShotRefGenerateDialog({
               </EcomButtonPrimary>
             </div>
           </>
-        ) : (
-          <>
-            <div className="ecom-scrollbar-thin min-h-0 flex-1 overflow-y-auto p-4">
-              {showModelsLoading ? (
-                <p className="text-sm text-[#86868b]">正在加载 Gateway 生图模型…</p>
-              ) : effectiveImageModels.length === 0 ? (
-                <div className="space-y-3 text-sm text-[#86868b]">
-                  <p>{localLoadError ?? "暂无可用 IMAGE 模型。"}</p>
-                  <EcomButtonSecondary size="sm" type="button" onClick={() => void refreshModels()}>
-                    重新加载模型
-                  </EcomButtonSecondary>
-                </div>
-              ) : (
-                <div className="grid gap-2 sm:grid-cols-2">
-                  {effectiveImageModels.map((m) => {
-                    const active = m.modelKey === draftModelKey;
-                    return (
-                      <button
-                        key={m.modelKey}
-                        type="button"
-                        className={cn(
-                          "rounded-xl border px-3 py-3 text-left transition",
-                          active
-                            ? "border-[var(--ecom-outline-border)] bg-[#f0f6ff]"
-                            : "border-[#e5e5ea] bg-white hover:border-[var(--ecom-outline-border)]",
-                        )}
-                        onClick={() => {
-                          setDraftModelKey(m.modelKey);
-                          setPanel("form");
-                        }}
-                      >
-                        <p className="text-sm font-medium text-[#1d1d1f]">{m.displayName}</p>
-                        <p className="mt-0.5 truncate text-[11px] text-[#86868b]">{m.modelKey}</p>
-                        {m.description ? (
-                          <p className="mt-1 line-clamp-2 text-[11px] leading-relaxed text-[#6e6e73]">
-                            {m.description}
-                          </p>
-                        ) : null}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-            <div className="flex justify-end border-t border-[#e5e5ea] px-5 py-4">
-              <EcomButtonSecondary type="button" onClick={() => setPanel("form")}>
-                返回
-              </EcomButtonSecondary>
-            </div>
-          </>
-        )}
       </div>
-    </div>,
+    </div>
+      <StoryboardModelPickerDialog
+        open={modelPickerOpen}
+        onOpenChange={setModelPickerOpen}
+        mode="image"
+        selectionOnly
+        hideTypeFilter
+        dialogTitle="选择生图模型"
+        dialogDescription="选好后返回继续编辑 Prompt。"
+        confirmLabel="确定"
+        models={effectiveImageModels}
+        modelsLoading={showModelsLoading}
+        modelsEmptyHint={modelsEmptyHint ?? localLoadError ?? undefined}
+        onRetryLoadModels={onRetryLoadModels ?? refreshModels}
+        value={draftModelKey}
+        onChange={setDraftModelKey}
+        onConfirm={(key) => {
+          setDraftModelKey(key);
+          setModelPickerOpen(false);
+        }}
+      />
+    </>,
     document.body,
   );
 }

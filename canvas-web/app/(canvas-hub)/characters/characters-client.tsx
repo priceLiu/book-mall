@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { Loader2, Trash2, UserRound } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
+import { CanvasListSkeleton } from "@/components/canvas/canvas-list-skeleton";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
-import { ProjectsSubNav } from "@/components/layout/projects-sub-nav";
 import { GalleryMediaCard } from "@/components/gallery/gallery-media-card";
 import {
   deleteCanvasCharacter,
@@ -67,32 +67,15 @@ export function CharactersClient() {
   };
 
   return (
-    <div className="canvas-page canvas-page-fill py-6 sm:py-8 lg:py-10">
-      <div className="mb-6 flex justify-center">
-        <ProjectsSubNav />
-      </div>
-      <header className="mb-8">
-        <p className="twenty-eyebrow">canvas-web · characters</p>
-        <h1 className="canvas-serif mt-2 flex items-center gap-2 text-3xl text-white">
-          <UserRound className="size-8 text-[var(--canvas-accent)]" />
-          角色库
-        </h1>
-        <p className="mt-2 text-sm text-[var(--canvas-muted)]">
-          从三视图节点保存的角色。在画布中打开项目后，可从侧栏插入为图片节点。
-        </p>
-      </header>
-
+    <>
       {error ? (
         <div className="mb-4 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm text-red-200">
           {error}
         </div>
       ) : null}
 
-      {loading ? (
-        <div className="flex items-center gap-2 py-12 text-sm text-[var(--canvas-muted)]">
-          <Loader2 className="size-4 animate-spin" />
-          加载中…
-        </div>
+      {loading && characters.length === 0 ? (
+        <CanvasListSkeleton sections={1} cardsPerSection={10} />
       ) : characters.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-[var(--canvas-border)] p-12 text-center text-sm text-[var(--canvas-muted)]">
           还没有角色。在
@@ -129,6 +112,6 @@ export function CharactersClient() {
           ))}
         </ul>
       )}
-    </div>
+    </>
   );
 }

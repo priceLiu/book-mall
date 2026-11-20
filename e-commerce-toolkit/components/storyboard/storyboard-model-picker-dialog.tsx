@@ -7,7 +7,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Check, Cpu, Image as ImageIcon, Loader2, Video } from "lucide-react";
+import { Cpu, Image as ImageIcon, Loader2, MessageSquare, Video } from "lucide-react";
 
 import {
   Dialog,
@@ -57,9 +57,13 @@ import {
   type StoryboardModelMediaFilter,
 } from "@/lib/storyboard-model-type-filter";
 import { formatStoryboardVideoModelTypeLabel } from "@/lib/storyboard-video-model-type";
-import { formatStoryboardModelRefCountLabel } from "@/lib/storyboard-model-ref-count";
 import type { StoryboardGatewayModel } from "@/lib/storyboard-types";
 import { cn } from "@/lib/utils";
+import {
+  countGatewayModelAdjustableParams,
+  EcomGatewayModelGroupedList,
+  type EcomGatewayPickerMode,
+} from "@/components/storyboard/ecom-gateway-model-picker-ui";
 import {
   ecomModelKeysForTemplate,
   fetchEcomModelTemplateCatalog,
@@ -72,7 +76,7 @@ export const STORYBOARD_MODEL_PICKER_DIALOG_CLASS =
 type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  mode: "image" | "video";
+  mode: EcomGatewayPickerMode;
   models: StoryboardGatewayModel[];
   value: string;
   onChange: (key: string) => void;
@@ -162,192 +166,17 @@ function providerLabel(kind: string): string {
 }
 
 function pickerTitle(
-  mode: "image" | "video",
+  mode: EcomGatewayPickerMode,
   panelIndex?: number | null,
   videoTarget?: "panel" | "fullSheet",
 ) {
+  if (mode === "chat") return "选择助手模型";
   if (mode === "image") {
     return typeof panelIndex === "number" ? `镜头 ${panelIndex} · 重新生图` : "生成全部分镜图";
   }
   if (typeof panelIndex === "number") return `镜头 ${panelIndex} · 生成视频`;
   if (videoTarget === "fullSheet") return "整图成片 · 生成视频";
   return "选择视频模型";
-}
-
-/** 该模型在当前模式下可调参数数量（用于卡片角标） */
-function countAdjustableParams(
-  mode: "image" | "video",
-  modelKey: string,
-  videoTarget: "panel" | "fullSheet",
-  lockedRatio?: boolean,
-): number {
-  if (mode === "image") {
-    if (lockedRatio) return 1;
-    return imagePickerUsesAspectRatioOnly(modelKey) ? 1 : 2;
-  }
-  let n = 2; // 视频分辨率 + 时长
-  const isBailianR2v = isStoryboardBailianR2vModel(modelKey);
-  if (isStoryboardWan30VideoModel(modelKey)) {
-    n += 1; // 画面比例
-    return n;
-  }
-  if (isBailianR2v) {
-    n += 2; // 画布比例 + 随机种子
-    if (isStoryboardWanR2vModel(modelKey)) n += 1; // 智能扩写
-  } else {
-    n += 1; // 画面比例
-  }
-  if (videoModelSupportsGenerateAudio(modelKey)) n += 1;
-  // panel / fullSheet 都各有一个时长控件，已计入
-  void videoTarget;
-  return n;
-}
-
-function roleBadgeTone(role: string): string {
-  switch (role) {
-    case "IMAGE":
-      return "bg-[#fff4e5] text-[#b25e09]";
-    case "VIDEO":
-      return "bg-[#e8f1ff] text-[#0058c7]";
-    default:
-      return "bg-[#eef0f2] text-[#6e6e73]";
-  }
-}
-
-function modelVideoDurationLabel(
-  mode: "image" | "video",
-  modelKey: string,
-  videoTarget: "panel" | "fullSheet",
-): string | null {
-  if (mode !== "video") return null;
-  const range =
-    videoTarget === "panel"
-      ? resolveStoryboardVideoPanelDurationRange(modelKey)
-      : resolveStoryboardVideoFullSheetDurationRange(modelKey);
-  return `时长 ${range.label}`;
-}
-
-function ModelCard({
-  model,
-  selected,
-  paramCount,
-  durationLabel,
-  mode,
-  onSelect,
-}: {
-  model: StoryboardGatewayModel;
-  selected: boolean;
-  paramCount: number;
-  durationLabel?: string | null;
-  mode: "image" | "video";
-  onSelect: () => void;
-}) {
-  const disabled = !model.credentialBound && !model.platformOffering;
-  const typeLabel =
-    mode === "video"
-      ? formatStoryboardVideoModelTypeLabel(model.modelKey)
-      : formatStoryboardImageModelTypeLabel(model.modelKey, model.role);
-  return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={onSelect}
-      className={cn(
-        "group relative flex w-full min-h-[4.75rem] flex-row items-stretch gap-4 rounded-xl border px-4 py-3 text-left transition",
-        selected
-          ? "border-[var(--ecom-outline-border)] bg-[#f0f6ff] shadow-sm"
-          : "border-[#e8e8ed] bg-white hover:border-[#c7c7cc] hover:bg-[#fafafa]",
-        disabled && "cursor-not-allowed opacity-50 hover:border-[#e8e8ed] hover:bg-white",
-      )}
-    >
-      <div className="flex min-w-0 flex-1 flex-col justify-center gap-1 pr-6">
-        <div className="flex flex-wrap items-center gap-2">
-          <p className="text-[13px] font-semibold text-[#1d1d1f]">
-            {model.displayName || model.modelKey}
-          </p>
-          <span
-            className={cn(
-              "shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium",
-              roleBadgeTone(model.role),
-            )}
-            title={typeLabel}
-          >
-            {typeLabel}
-          </span>
-          {model.sourceLabel ? (
-            <span className="shrink-0 rounded bg-[#eef0f2] px-1.5 py-0.5 text-[10px] text-[#6e6e73]">
-              {model.sourceLabel}
-            </span>
-          ) : null}
-        </div>
-        <p className="truncate font-mono text-[11px] text-[#86868b]">{model.modelKey}</p>
-        {model.description ? (
-          <p className="line-clamp-1 text-[11px] leading-relaxed text-[#6e6e73]">
-            {model.description}
-          </p>
-        ) : null}
-      </div>
-      <div className="flex shrink-0 flex-col items-end justify-center gap-1 text-right">
-        <span className="text-[10px] text-[#a1a1a6]">
-          {formatStoryboardModelRefCountLabel(model.modelKey, mode)}
-          {" · "}
-          {durationLabel ? `${durationLabel} · ` : ""}
-          {paramCount > 0 ? `${paramCount} 项可调参数` : "无可调参数"}
-        </span>
-        {disabled ? <span className="text-[10px] text-[#c0392b]">未绑定</span> : null}
-      </div>
-      {selected ? (
-        <span className="absolute right-3 top-1/2 grid size-4 -translate-y-1/2 place-items-center rounded-full bg-[var(--ecom-primary)] text-white">
-          <Check className="h-2.5 w-2.5" />
-        </span>
-      ) : null}
-    </button>
-  );
-}
-
-function ModelMediaFilterBar({
-  mode,
-  models,
-  value,
-  onChange,
-}: {
-  mode: "image" | "video";
-  models: StoryboardGatewayModel[];
-  value: StoryboardModelMediaFilter;
-  onChange: (next: StoryboardModelMediaFilter) => void;
-}) {
-  const tabs = storyboardModelFilterTabsForMode(mode);
-  return (
-    <div className="flex flex-wrap items-center gap-2 border-b border-[#f0f0f2] pb-3">
-      <span className="text-[11px] font-medium text-[#86868b]">类型</span>
-      {tabs.map((tab) => {
-        const count = models.filter((m) =>
-          storyboardModelMatchesMediaFilter(m, mode, tab.id),
-        ).length;
-        const active = value === tab.id;
-        return (
-          <button
-            key={tab.id}
-            type="button"
-            disabled={tab.id !== "all" && count === 0}
-            onClick={() => onChange(tab.id)}
-            className={cn(
-              "rounded-full border px-3 py-1 text-[12px] font-medium transition",
-              active
-                ? "border-[var(--ecom-outline-border)] bg-[#f0f6ff] text-[var(--ecom-primary)]"
-                : "border-[#e8e8ed] bg-white text-[#6e6e73] hover:border-[#c7c7cc] hover:bg-[#fafafa]",
-              tab.id !== "all" && count === 0 && "cursor-not-allowed opacity-40 hover:bg-white",
-            )}
-          >
-            {tab.label}
-            {tab.id !== "all" && count > 0 ? (
-              <span className="ml-1 tabular-nums text-[11px] opacity-80">{count}</span>
-            ) : null}
-          </button>
-        );
-      })}
-    </div>
-  );
 }
 
 /** 点击刷新/视频后弹出：卡片选模型 + 下方动态参数 */
@@ -472,9 +301,12 @@ export function StoryboardModelPickerDialog({
   }, [open, value, nativeOverlay]);
 
   const visibleModels = useMemo(() => {
+    if (mode === "chat") return models;
     const typed = hideTypeFilter
       ? models
-      : models.filter((m) => storyboardModelMatchesMediaFilter(m, mode, mediaFilter));
+      : models.filter((m) =>
+          storyboardModelMatchesMediaFilter(m, mode, mediaFilter),
+        );
     return applyStoryboardPickerTemplateFilter(
       typed,
       templateModelKeys,
@@ -663,24 +495,6 @@ export function StoryboardModelPickerDialog({
     if (draftKey !== value) onChange(draftKey);
   }
 
-  const platformFlat = models.some((m) => m.platformOffering);
-
-  // BYOK：按 sourceLabel（优先）或 providerKind 分组；平台代付：flat 去重列表
-  const groups: { kind: string; models: StoryboardGatewayModel[] }[] = [];
-  if (platformFlat) {
-    groups.push({ kind: "platform", models: visibleModels });
-  } else {
-    for (const m of visibleModels) {
-      const kind = m.sourceLabel?.trim() || m.providerKind || "UNKNOWN";
-      let g = groups.find((x) => x.kind === kind);
-      if (!g) {
-        g = { kind, models: [] };
-        groups.push(g);
-      }
-      g.models.push(m);
-    }
-  }
-
   const hasAnyModel = models.length > 0;
   const filterEmpty = hasAnyModel && visibleModels.length === 0;
   const selectedDraftModel = models.find((m) => m.modelKey === draftKey) ?? null;
@@ -690,7 +504,8 @@ export function StoryboardModelPickerDialog({
         (selectedDraftModel.credentialBound || selectedDraftModel.platformOffering),
     ) && !filterEmpty;
 
-  const ModeIcon = mode === "image" ? ImageIcon : Video;
+  const ModeIcon =
+    mode === "image" ? ImageIcon : mode === "video" ? Video : MessageSquare;
   const resolvedTitle = dialogTitle ?? pickerTitle(mode, panelIndex, videoTarget);
   const panelClassName = cn(STORYBOARD_MODEL_PICKER_DIALOG_CLASS, contentClassName);
 
@@ -722,13 +537,21 @@ export function StoryboardModelPickerDialog({
       {modelsLoading && models.length === 0 ? (
         <div className="flex flex-col items-center justify-center gap-3 px-4 py-12 text-center">
           <Loader2 className="h-8 w-8 animate-spin text-[var(--ecom-primary)]" />
-          <p className="text-sm text-[#6e6e73]">正在加载 Gateway 生图模型…</p>
+          <p className="text-sm text-[#6e6e73]">
+            {mode === "chat"
+              ? "正在加载助手模型…"
+              : mode === "video"
+                ? "正在加载视频模型…"
+                : "正在加载 Gateway 生图模型…"}
+          </p>
         </div>
       ) : !hasAnyModel ? (
         <div className="grid place-items-center gap-3 px-4 py-10 text-center text-sm text-[#86868b]">
           <p>
             {modelsEmptyHint ??
-              `暂无可用${mode === "image" ? "生图" : "视频"}模型，请先在 Gateway 绑定凭证。`}
+              (mode === "chat"
+                ? "暂无可用助手模型，请先在 Gateway 绑定凭证。"
+                : `暂无可用${mode === "image" ? "生图" : "视频"}模型，请先在 Gateway 绑定凭证。`)}
           </p>
           {onRetryLoadModels ? (
             <EcomButtonSecondary
@@ -747,49 +570,19 @@ export function StoryboardModelPickerDialog({
             !selectionOnly && "lg:grid-cols-[minmax(0,1fr)_minmax(260px,300px)] lg:items-start",
           )}
         >
-          <div className="space-y-4">
-            {!hideTypeFilter ? (
-              <ModelMediaFilterBar
-                mode={mode}
-                models={models}
-                value={mediaFilter}
-                onChange={setMediaFilter}
-              />
-            ) : null}
-            {filterEmpty ? (
-              <p className="rounded-xl border border-dashed border-[#e8e8ed] px-4 py-10 text-center text-sm text-[#86868b]">
-                当前筛选下暂无模型，请切换类型或选择「全部」。
-              </p>
-            ) : (
-              groups.map((g) => (
-                <section key={g.kind}>
-                  {!platformFlat ? (
-                    <header className="mb-2 flex items-center gap-2">
-                      <h3 className="text-[12px] font-semibold text-[#1d1d1f]">{g.kind}</h3>
-                    </header>
-                  ) : null}
-                  <div className="flex flex-col gap-2">
-                    {g.models.map((m) => (
-                      <ModelCard
-                        key={m.modelKey}
-                        model={m}
-                        mode={mode}
-                        selected={m.modelKey === draftKey}
-                        paramCount={countAdjustableParams(
-                          mode,
-                          m.modelKey,
-                          videoTarget,
-                          Boolean(lockedImageSizeLabel),
-                        )}
-                        durationLabel={modelVideoDurationLabel(mode, m.modelKey, videoTarget)}
-                        onSelect={() => setDraftKey(m.modelKey)}
-                      />
-                    ))}
-                  </div>
-                </section>
-              ))
-            )}
-          </div>
+          <EcomGatewayModelGroupedList
+            mode={mode}
+            models={models}
+            visibleModels={visibleModels}
+            selectedKey={draftKey}
+            onSelect={setDraftKey}
+            hideTypeFilter={hideTypeFilter || mode === "chat"}
+            mediaFilter={mediaFilter}
+            onMediaFilterChange={setMediaFilter}
+            videoTarget={videoTarget}
+            lockedImageSizeLabel={lockedImageSizeLabel}
+            filterEmpty={filterEmpty}
+          />
 
           {!selectionOnly ? (
           <section className="rounded-xl border border-[#e8e8ed] bg-[#fafafa] p-4 lg:sticky lg:top-0">

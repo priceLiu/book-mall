@@ -20,7 +20,7 @@ function isHttpUrl(raw: unknown): raw is string {
   return typeof raw === "string" && /^https?:\/\//.test(raw.trim());
 }
 
-function isLikelyVideoUrl(url: string): boolean {
+export function isLikelyVideoUrl(url: string): boolean {
   const u = url.trim();
   return VIDEO_EXT.test(u) || u.includes("/node-video/");
 }

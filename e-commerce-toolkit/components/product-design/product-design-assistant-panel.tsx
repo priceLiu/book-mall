@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { EcomAssistantCollapsibleLayout } from "@/components/layout/ecom-assistant-collapsible-layout";
 import { EcomAssistantPanelHeader } from "@/components/layout/ecom-assistant-panel-header";
+import { EcomAssistantChatModelControl } from "@/components/layout/ecom-assistant-chat-model-control";
 import { EcomAssistantSendButton } from "@/components/layout/ecom-assistant-send-button";
 import { SeedVideoAssistantChoiceCards } from "@/components/seed-video/seed-video-assistant-choice-cards";
 import { StoryboardMarkdownBlock } from "@/components/storyboard/storyboard-markdown-block";
@@ -179,6 +180,7 @@ type Props = {
   chatModels: StoryboardGatewayModel[];
   chatModelKey: string;
   visionModelKey?: string;
+  onChatModelKeyChange?: (key: string) => void;
   onProjectChange: () => void | Promise<void>;
   onStreamingChange?: (streaming: boolean) => void;
   onRequestGenerateMainImages?: () => void;
@@ -203,6 +205,7 @@ export function ProductDesignAssistantPanel({
   chatModels,
   chatModelKey,
   visionModelKey,
+  onChatModelKeyChange,
   onProjectChange,
   onStreamingChange,
   onRequestGenerateMainImages,
@@ -938,6 +941,16 @@ export function ProductDesignAssistantPanel({
         onComposerWideChange={onComposerWideChange}
         onCollapse={onCollapsedChange ? tryCollapse : undefined}
         collapseDisabled={inputDisabled}
+        trailing={
+          onChatModelKeyChange ? (
+            <EcomAssistantChatModelControl
+              models={chatModels}
+              value={chatModelKey}
+              onChange={onChatModelKeyChange}
+              disabled={inputDisabled}
+            />
+          ) : undefined
+        }
       />
       <div
         ref={scrollRef}

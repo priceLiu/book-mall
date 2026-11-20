@@ -11,6 +11,7 @@ import {
   EcomAssistantIconButton,
   ECOM_ASSISTANT_CONTROL_ICON_CLASS,
 } from "@/components/layout/ecom-assistant-icon-button";
+import { EcomAssistantChatModelControl } from "@/components/layout/ecom-assistant-chat-model-control";
 import { EcomAssistantSendButton } from "@/components/layout/ecom-assistant-send-button";
 import { EcomSellpointFivePartHint } from "@/components/media/ecom-sellpoint-five-part-hint";
 import {
@@ -195,6 +196,7 @@ type Props = {
   project: StoryboardProject;
   chatModels: StoryboardGatewayModel[];
   settings: StoryboardSettingsValue;
+  onChatModelKeyChange?: (key: string) => void;
   onOpenSettings?: () => void;
   onStreamingChange?: (streaming: boolean) => void;
   onDeliverableReady?: (updated?: StoryboardProject) => void | Promise<void>;
@@ -212,6 +214,7 @@ export function FashionAssistantPanel({
   project,
   chatModels,
   settings,
+  onChatModelKeyChange,
   onOpenSettings,
   onStreamingChange,
   onDeliverableReady,
@@ -1342,11 +1345,21 @@ export function FashionAssistantPanel({
         onCollapse={onCollapsedChange ? tryCollapse : undefined}
         collapseDisabled={streaming || isBusy}
         trailing={
-          onOpenSettings ? (
-            <EcomAssistantIconButton title="影片参数" onClick={onOpenSettings}>
-              <Settings2 className={ECOM_ASSISTANT_CONTROL_ICON_CLASS} />
-            </EcomAssistantIconButton>
-          ) : undefined
+          <>
+            {onChatModelKeyChange ? (
+              <EcomAssistantChatModelControl
+                models={chatModels}
+                value={settings.chatModelKey}
+                onChange={onChatModelKeyChange}
+                disabled={streaming || isBusy}
+              />
+            ) : null}
+            {onOpenSettings ? (
+              <EcomAssistantIconButton title="影片参数" onClick={onOpenSettings}>
+                <Settings2 className={ECOM_ASSISTANT_CONTROL_ICON_CLASS} />
+              </EcomAssistantIconButton>
+            ) : null}
+          </>
         }
       />
 

@@ -1,6 +1,4 @@
 import Link from "next/link";
-import { ProjectsSubNav } from "@/components/layout/projects-sub-nav";
-
 export const metadata = {
   title: "项目资产使用说明 · canvas-web",
   description:
@@ -9,26 +7,7 @@ export const metadata = {
 
 export default function ProjectAssetsGuidePage() {
   return (
-    <div className="canvas-page canvas-page-fill max-w-3xl py-8 pb-16 sm:py-10">
-      <div className="mb-6 flex justify-center">
-        <ProjectsSubNav />
-      </div>
-      <header className="mb-10">
-        <p className="twenty-eyebrow">canvas-web · story-pro · 用户指南</p>
-        <h1 className="canvas-serif mt-3 text-3xl text-white">项目资产 · 使用说明</h1>
-        <p className="mt-3 text-sm leading-relaxed text-[var(--canvas-muted)]">
-          本文面向影视专业版操作者，说明「角色四槽」「场景三槽」与分镜 @ 引用的关系与推荐流程。
-        </p>
-        <div className="mt-4 flex flex-wrap gap-2">
-          <Link href="/assets" className="twenty-btn-accent text-sm">
-            打开我的项目资产
-          </Link>
-          <Link href="/projects" className="twenty-btn-ghost text-sm">
-            我的画布
-          </Link>
-        </div>
-      </header>
-
+    <div className="mx-auto max-w-3xl pb-8">
       <GuideSection title="项目资产类别（一致性基础）">
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-left text-sm">

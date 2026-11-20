@@ -16,6 +16,7 @@ import { fetchModelTryonModels, type VtonModelPipelineRequest } from "@/lib/ecom
 import { pickBoundStoryboardModelKey } from "@/lib/storyboard-model-pick";
 import type { StoryboardGatewayModel } from "@/lib/storyboard-types";
 import { coerceVtonModelImageSize, type VtonModelImageSize } from "@/lib/vton-image-quality";
+import { StoryboardModelPickerDialog } from "@/components/storyboard/storyboard-model-picker-dialog";
 import { VTON_MODEL_DEFAULT_PROMPT } from "@/lib/vton-model-prompts";
 import {
   coerceVtonModelAgeGroupId,
@@ -60,8 +61,6 @@ type Props = {
   ) => void | Promise<void>;
 };
 
-type Panel = "form" | "models";
-
 const MODE_COPY: Record<
   VtonModelPipelineDialogMode,
   { title: string; hint: string; promptLabel: string; confirm: string }
@@ -99,7 +98,7 @@ export function VtonModelPipelineDialog({
   onConfirm,
 }: Props) {
   const copy = MODE_COPY[mode];
-  const [panel, setPanel] = useState<Panel>("form");
+  const [modelPickerOpen, setModelPickerOpen] = useState(false);
   const [draftPrompt, setDraftPrompt] = useState("");
   const [imageSize, setImageSize] = useState<VtonModelImageSize>("720*960");
   const [ratio, setRatio] = useState<VtonModelPipelineRatio>("3:4");
@@ -138,7 +137,7 @@ export function VtonModelPipelineDialog({
 
   useEffect(() => {
     if (!open) return;
-    setPanel("form");
+    setModelPickerOpen(false);
     setDraftPrompt(
       mode === "generate"
         ? initial?.prompt?.trim() || VTON_MODEL_DEFAULT_PROMPT
@@ -218,6 +217,7 @@ export function VtonModelPipelineDialog({
   if (!open || typeof document === "undefined") return null;
 
   return createPortal(
+    <>
     <div
       className="fixed inset-0 z-[300] flex items-center justify-center bg-black/45 p-4"
       role="dialog"
@@ -229,16 +229,13 @@ export function VtonModelPipelineDialog({
         <EcomDialogCloseButton disabled={busy} onClick={onClose} />
         <div className="border-b border-[#e8e8ed] px-5 py-4 pr-14">
           <h3 id="vton-model-pipeline-title" className="text-base font-semibold text-[#1d1d1f]">
-            {panel === "models" ? "选择生图模型" : copy.title}
+            {copy.title}
           </h3>
-          <p className="mt-1 text-xs text-[#86868b]">
-            {panel === "models" ? "选好后返回继续编辑参数与 Prompt。" : copy.hint}
-          </p>
+          <p className="mt-1 text-xs text-[#86868b]">{copy.hint}</p>
         </div>
 
-        {panel === "form" ? (
-          <>
-            <div className="ecom-scrollbar-thin min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
+        <>
+          <div className="ecom-scrollbar-thin min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[#e8e8ed] bg-[#fafafa] px-3 py-2.5">
                 <span className="text-xs font-medium text-[#6e6e73]">出图精度</span>
                 <VtonImageQualityPicker
@@ -281,7 +278,7 @@ export function VtonModelPipelineDialog({
                   type="button"
                   disabled={busy || showModelsLoading}
                   className="h-8 max-w-[min(100%,16rem)] truncate text-xs"
-                  onClick={() => setPanel("models")}
+                  onClick={() => setModelPickerOpen(true)}
                 >
                   {showModelsLoading ? "加载模型…" : selectedModelName || "选择模型"}
                 </EcomButtonSecondary>
@@ -456,59 +453,29 @@ export function VtonModelPipelineDialog({
               </EcomButtonPrimary>
             </div>
           </>
-        ) : (
-          <>
-            <div className="ecom-scrollbar-thin min-h-0 flex-1 overflow-y-auto p-4">
-              {showModelsLoading ? (
-                <p className="text-sm text-[#86868b]">正在加载 Gateway 生图模型…</p>
-              ) : effectiveImageModels.length === 0 ? (
-                <div className="space-y-3 text-sm text-[#86868b]">
-                  <p>{localLoadError ?? "暂无可用 IMAGE 模型。"}</p>
-                  <EcomButtonSecondary size="sm" type="button" onClick={() => void refreshModels()}>
-                    重新加载模型
-                  </EcomButtonSecondary>
-                </div>
-              ) : (
-                <div className="grid gap-2 sm:grid-cols-2">
-                  {effectiveImageModels.map((m) => {
-                    const active = m.modelKey === draftModelKey;
-                    return (
-                      <button
-                        key={m.modelKey}
-                        type="button"
-                        className={cn(
-                          "rounded-xl border px-3 py-3 text-left transition",
-                          active
-                            ? "border-[var(--ecom-outline-border)] bg-[#f0f6ff]"
-                            : "border-[#e5e5ea] bg-white hover:border-[var(--ecom-outline-border)]",
-                        )}
-                        onClick={() => {
-                          setDraftModelKey(m.modelKey);
-                          setPanel("form");
-                        }}
-                      >
-                        <p className="text-sm font-medium text-[#1d1d1f]">{m.displayName}</p>
-                        <p className="mt-0.5 truncate text-[11px] text-[#86868b]">{m.modelKey}</p>
-                        {m.description ? (
-                          <p className="mt-1 line-clamp-2 text-[11px] leading-relaxed text-[#6e6e73]">
-                            {m.description}
-                          </p>
-                        ) : null}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-            <div className="flex justify-end border-t border-[#e8e8ed] px-5 py-4">
-              <EcomButtonSecondary type="button" onClick={() => setPanel("form")}>
-                返回
-              </EcomButtonSecondary>
-            </div>
-          </>
-        )}
       </div>
-    </div>,
+    </div>
+      <StoryboardModelPickerDialog
+        open={modelPickerOpen}
+        onOpenChange={setModelPickerOpen}
+        mode="image"
+        selectionOnly
+        hideTypeFilter
+        dialogTitle="选择生图模型"
+        dialogDescription="选好后返回继续编辑参数与 Prompt。"
+        confirmLabel="确定"
+        models={effectiveImageModels}
+        modelsLoading={showModelsLoading}
+        modelsEmptyHint={localLoadError ?? undefined}
+        onRetryLoadModels={refreshModels}
+        value={draftModelKey}
+        onChange={setDraftModelKey}
+        onConfirm={(key) => {
+          setDraftModelKey(key);
+          setModelPickerOpen(false);
+        }}
+      />
+    </>,
     document.body,
   );
 }

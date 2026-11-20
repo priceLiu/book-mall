@@ -8,7 +8,12 @@ import { CanvasShellAuthSlot } from "@/components/layout/canvas-shell-auth-slot"
 import { PlatformTopupNavLink } from "@/lib/platform-billing/platform-topup-nav-link";
 import { useCanvasAdmin } from "@/components/home/use-canvas-admin";
 import { CanvasEditorNavGuard } from "@/components/layout/canvas-editor-nav-guard";
-import { CANVAS_NAV_ITEMS, CANVAS_SITE_BRAND_NAME } from "@/lib/site-config";
+import { MyCanvasNavDropdown } from "@/components/layout/my-canvas-nav-dropdown";
+import {
+  CANVAS_ASSET_GUIDE_NAV,
+  CANVAS_NAV_ITEMS,
+  CANVAS_SITE_BRAND_NAME,
+} from "@/lib/site-config";
 import { cn } from "@/lib/utils";
 
 export function CanvasShell({
@@ -53,6 +58,9 @@ export function CanvasShell({
             aria-label="画布导航"
           >
             {CANVAS_NAV_ITEMS.map(({ href, label }) => {
+              if (href === "/projects") {
+                return <MyCanvasNavDropdown key={href} />;
+              }
               const active =
                 href === "/"
                   ? pathname === "/"
@@ -85,6 +93,18 @@ export function CanvasShell({
                 管理中心
               </Link>
             ) : null}
+            <Link
+              href={CANVAS_ASSET_GUIDE_NAV.href}
+              className={cn(
+                "canvas-sans shrink-0 rounded-full px-2.5 py-1.5 text-xs font-semibold tracking-tight transition sm:px-3 sm:text-sm",
+                pathname === CANVAS_ASSET_GUIDE_NAV.href ||
+                  pathname.startsWith(`${CANVAS_ASSET_GUIDE_NAV.href}/`)
+                  ? "bg-white/12 text-white ring-1 ring-white/15"
+                  : "text-white/70 hover:bg-white/10 hover:text-white",
+              )}
+            >
+              {CANVAS_ASSET_GUIDE_NAV.label}
+            </Link>
           </nav>
 
           <div className="min-w-0 flex-1" aria-hidden />

@@ -1,6 +1,6 @@
 "use client";
 
-import { Lock, LockOpen } from "lucide-react";
+import { ImagePlus, Lock, LockOpen, ZoomIn } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { isProjectAssetVideoUrl } from "@/lib/canvas/project-asset-preview";
 import {
@@ -12,6 +12,7 @@ import {
   STYLE_LIBRARY_CARD_SHELL,
   STYLE_LIBRARY_CARD_SUBTITLE,
   STYLE_LIBRARY_CARD_TITLE,
+  STYLE_LIBRARY_HOVER_ACTION_BTN,
   STYLE_LIBRARY_HOVER_PROMPT_OVERLAY,
   STYLE_LIBRARY_MEDIA_FRAME,
   STYLE_LIBRARY_PREVIEW_ASPECT,
@@ -32,6 +33,8 @@ function ProjectAssetGalleryGrid({
   onHoverPreviewShow,
   onHoverPreviewHide,
   onPreview,
+  previewViaActionOnly = false,
+  seamlessGallery = false,
 }: {
   items: ProjectAssetGalleryItem[];
   title: string;
@@ -43,6 +46,8 @@ function ProjectAssetGalleryGrid({
   }) => void;
   onHoverPreviewHide?: () => void;
   onPreview?: (url: string, label: string) => void;
+  previewViaActionOnly?: boolean;
+  seamlessGallery?: boolean;
 }) {
   const shown = items.slice(0, 4);
   const extra = items.length - shown.length;
@@ -52,7 +57,8 @@ function ProjectAssetGalleryGrid({
     <div
       className={cn(
         STYLE_LIBRARY_PREVIEW_ASPECT,
-        "relative grid gap-px bg-white/10",
+        "relative grid",
+        seamlessGallery ? "gap-0.5 bg-[#1a1a1a]" : "gap-px bg-white/10",
         count === 2 && "grid-cols-2 grid-rows-1",
         count === 3 && "grid-cols-2 grid-rows-2",
         count >= 4 && "grid-cols-2 grid-rows-2",
@@ -76,7 +82,11 @@ function ProjectAssetGalleryGrid({
             })
           }
           onMouseLeave={() => onHoverPreviewHide?.()}
-          onClick={() => onPreview?.(item.url, item.label)}
+          onClick={
+            previewViaActionOnly
+              ? undefined
+              : () => onPreview?.(item.url, item.label)
+          }
         >
           {isProjectAssetVideoUrl(item.url, item.mimeType) ? (
             <video
@@ -127,8 +137,14 @@ export function ProjectAssetMediaCard({
   onToggleLock,
   onPreviewHero,
   onPreviewGalleryItem,
+  canInsert,
+  insertBusy,
+  onInsert,
   footer,
   compact,
+  /** 悬停仅展示操作钮，点击预览图标再放大（/assets 全页） */
+  previewViaActionOnly = false,
+  seamlessGallery = false,
 }: {
   title: string;
   subtitle: string;
@@ -152,13 +168,19 @@ export function ProjectAssetMediaCard({
   onToggleLock?: () => void;
   onPreviewHero?: () => void;
   onPreviewGalleryItem?: (url: string, label: string) => void;
+  canInsert?: boolean;
+  insertBusy?: boolean;
+  onInsert?: () => void;
   footer?: React.ReactNode;
   compact?: boolean;
+  previewViaActionOnly?: boolean;
+  seamlessGallery?: boolean;
 }) {
   const useGallery = (galleryItems?.length ?? 0) >= 2;
   const hasImage = useGallery || Boolean(imageUrl?.trim());
   const hover = (hoverText ?? "").trim();
-  const hoverZoom = enableHoverZoom && hasImage && !useGallery;
+  const hoverZoom =
+    enableHoverZoom && hasImage && !useGallery && !previewViaActionOnly;
   const useExternalHover = Boolean(onHoverPreviewShow);
   const internalHover = useProjectAssetHoverPreview(
     hoverZoom && !useExternalHover,
@@ -166,6 +188,9 @@ export function ProjectAssetMediaCard({
   const showHoverPreview = onHoverPreviewShow ?? internalHover.showHoverPreview;
   const hideHoverPreview = onHoverPreviewHide ?? internalHover.hideHoverPreview;
   const hoverPreview = useExternalHover ? null : internalHover.hoverPreview;
+  const heroIsVideo =
+    Boolean(imageUrl?.trim()) &&
+    isProjectAssetVideoUrl(imageUrl!, previewMimeType);
 
   return (
     <article className={STYLE_LIBRARY_CARD_SHELL}>
@@ -175,22 +200,38 @@ export function ProjectAssetMediaCard({
           !hasImage && STYLE_LIBRARY_PREVIEW_ASPECT,
           styleLibraryMediaHeightClass({ compact }),
           !useGallery &&
+            !previewViaActionOnly &&
             ((onPreviewHero && hasImage) || hoverZoom
               ? "cursor-pointer"
               : undefined),
         )}
         onClick={
-          !useGallery && onPreviewHero && hasImage ? onPreviewHero : undefined
+          !useGallery &&
+          !previewViaActionOnly &&
+          onPreviewHero &&
+          hasImage
+            ? onPreviewHero
+            : undefined
         }
         onKeyDown={(e) => {
-          if (useGallery) return;
+          if (useGallery || previewViaActionOnly) return;
           if (e.key === "Enter" && onPreviewHero && hasImage) onPreviewHero();
         }}
         role={
-          !useGallery && onPreviewHero && hasImage ? "button" : undefined
+          !useGallery &&
+          !previewViaActionOnly &&
+          onPreviewHero &&
+          hasImage
+            ? "button"
+            : undefined
         }
         tabIndex={
-          !useGallery && onPreviewHero && hasImage ? 0 : undefined
+          !useGallery &&
+          !previewViaActionOnly &&
+          onPreviewHero &&
+          hasImage
+            ? 0
+            : undefined
         }
         onMouseEnter={(e) => {
           if (useGallery || !hoverZoom || !imageUrl) return;
@@ -210,20 +251,38 @@ export function ProjectAssetMediaCard({
           <ProjectAssetGalleryGrid
             items={galleryItems}
             title={title}
-            onHoverPreviewShow={onHoverPreviewShow ?? showHoverPreview}
-            onHoverPreviewHide={onHoverPreviewHide ?? hideHoverPreview}
+            onHoverPreviewShow={
+              previewViaActionOnly
+                ? undefined
+                : onHoverPreviewShow ?? showHoverPreview
+            }
+            onHoverPreviewHide={
+              previewViaActionOnly ? undefined : onHoverPreviewHide ?? hideHoverPreview
+            }
             onPreview={onPreviewGalleryItem}
+            previewViaActionOnly={previewViaActionOnly}
+            seamlessGallery={seamlessGallery}
           />
         ) : hasImage ? (
-          // eslint-disable-next-line @next/next/no-img-element -- OSS 外链预览
-          <img
-            src={imageUrl!}
-            alt={imageAlt ?? title}
-            className={STYLE_LIBRARY_PREVIEW_IMG_CLASS}
-            loading="lazy"
-            decoding="async"
-            referrerPolicy="no-referrer"
-          />
+          heroIsVideo ? (
+            <video
+              src={imageUrl!}
+              className={STYLE_LIBRARY_PREVIEW_IMG_CLASS}
+              muted
+              playsInline
+              preload="metadata"
+            />
+          ) : (
+            // eslint-disable-next-line @next/next/no-img-element -- OSS 外链预览
+            <img
+              src={imageUrl!}
+              alt={imageAlt ?? title}
+              className={STYLE_LIBRARY_PREVIEW_IMG_CLASS}
+              loading="lazy"
+              decoding="async"
+              referrerPolicy="no-referrer"
+            />
+          )
         ) : (
           <div className="flex h-full flex-col items-center justify-center gap-2 px-3 text-center">
             <span className="text-[11px] text-white/40">暂无预览图</span>
@@ -237,14 +296,55 @@ export function ProjectAssetMediaCard({
           </div>
         ) : null}
 
+        {(canInsert || (onPreviewHero && (previewViaActionOnly || !useGallery))) &&
+        hasImage ? (
+          <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center gap-2 bg-black/0 opacity-0 transition duration-150 group-hover/card:bg-black/45 group-hover/card:opacity-100">
+            {onPreviewHero ? (
+              <button
+                type="button"
+                className={cn("nodrag", STYLE_LIBRARY_HOVER_ACTION_BTN)}
+                aria-label="预览"
+                title="预览"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onPreviewHero();
+                }}
+              >
+                <ZoomIn className="h-4 w-4" strokeWidth={2} />
+              </button>
+            ) : null}
+            {canInsert ? (
+              <button
+                type="button"
+                className={cn("nodrag", STYLE_LIBRARY_HOVER_ACTION_BTN)}
+                aria-label="插入画布"
+                title="插入画布"
+                disabled={insertBusy}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onInsert?.();
+                }}
+              >
+                <ImagePlus className="h-4 w-4" strokeWidth={2} />
+              </button>
+            ) : null}
+          </div>
+        ) : null}
+
         {onToggleLock ? (
           <button
             type="button"
             className={cn(
-              "nodrag absolute right-2 top-2 z-20 rounded-md border px-1.5 py-0.5 text-[10px] shadow-md backdrop-blur-sm",
-              locked
-                ? "border-amber-400/40 bg-black/70 text-amber-200"
-                : "border-white/20 bg-black/60 text-white/80 hover:border-cyan-400/30",
+              "nodrag absolute right-2 top-2 z-20 rounded-md text-[10px] shadow-md backdrop-blur-sm",
+              previewViaActionOnly
+                ? "bg-black/55 px-1.5 py-0.5 text-white/75 hover:bg-black/70"
+                : cn(
+                    "border px-1.5 py-0.5",
+                    locked
+                      ? "border-amber-400/40 bg-black/70 text-amber-200"
+                      : "border-white/20 bg-black/60 text-white/80 hover:border-cyan-400/30",
+                  ),
+              previewViaActionOnly && locked && "text-amber-100",
             )}
             disabled={busy}
             onClick={(e) => {

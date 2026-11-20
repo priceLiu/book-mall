@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { EcomAssistantCollapsibleLayout } from "@/components/layout/ecom-assistant-collapsible-layout";
 import { EcomAssistantPanelHeader } from "@/components/layout/ecom-assistant-panel-header";
+import { EcomAssistantChatModelControl } from "@/components/layout/ecom-assistant-chat-model-control";
 import { EcomAssistantSendButton } from "@/components/layout/ecom-assistant-send-button";
 import { SeedVideoAssistantChoiceCards } from "@/components/seed-video/seed-video-assistant-choice-cards";
 import { StoryboardMarkdownBlock } from "@/components/storyboard/storyboard-markdown-block";
@@ -63,6 +64,7 @@ type Props = {
   currentStepId: HandCraftStepId;
   chatModels: StoryboardGatewayModel[];
   chatModelKey: string;
+  onChatModelKeyChange?: (key: string) => void;
   composerWide?: boolean;
   onComposerWideChange?: (wide: boolean) => void;
   onStreamingChange?: (streaming: boolean) => void;
@@ -88,6 +90,7 @@ export function HandCraftAssistantPanel({
   currentStepId,
   chatModels,
   chatModelKey,
+  onChatModelKeyChange,
   composerWide,
   onComposerWideChange,
   onStreamingChange,
@@ -487,6 +490,16 @@ export function HandCraftAssistantPanel({
           onComposerWideChange={onComposerWideChange}
           onCollapse={onCollapsedChange ? tryCollapse : undefined}
           collapseDisabled={streaming}
+          trailing={
+            onChatModelKeyChange ? (
+              <EcomAssistantChatModelControl
+                models={chatModels}
+                value={chatModelKey}
+                onChange={onChatModelKeyChange}
+                disabled={streaming || workspaceBusy}
+              />
+            ) : undefined
+          }
         />
 
         <div
