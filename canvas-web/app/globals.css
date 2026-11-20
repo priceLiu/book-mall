@@ -396,7 +396,7 @@ html[data-canvas-modal-open] .libtv-node-toolbar-portal {
 }
 
 /* ----------------------------------------
- * 连线 · 宽命中带 + 悬停 1s 剪断（剪刀 portal 在 body）
+ * 连线 · 宽命中带 + 短暂悬停剪断（剪刀 portal 在 body）
  * ---------------------------------------- */
 .canvas-flow-wrap {
   --canvas-edge-stroke-width: 2.5;

@@ -21,7 +21,7 @@ const FOCUS_STROKE_UP = "#60a5fa";
 const FOCUS_STROKE_DOWN = "#238636";
 
 /**
- * 可删除连线 · 宽命中带；悬停 1s 出剪刀由 FlowCanvas · useCanvasEdgeCutHover 统一处理。
+ * 可删除连线 · 宽命中带；短暂悬停出剪刀由 FlowCanvas · useCanvasEdgeCutHover 统一处理。
  * 选中节点高亮时叠加扫光层（沿路径流动的光带）。
  */
 export function DeletableEdge(props: EdgeProps) {

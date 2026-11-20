@@ -12,8 +12,8 @@ import {
 } from "@/lib/canvas/libtv-node-chrome";
 import { cn } from "@/lib/utils";
 
-const HOVER_REVEAL_MS = 1000;
-/** 鼠标沿连线移动超过此距离才重置 1s 计时 */
+const HOVER_REVEAL_MS = 400;
+/** 鼠标沿连线移动超过此距离才重置悬停计时 */
 const HOVER_RESET_MOVE_PX = 10;
 /** lg + 内图标 40px / 外圆 70px */
 const CUT_ICON_TO_DOT_RATIO = 40 / 70;
@@ -42,7 +42,7 @@ function pointerInCutZone(
 }
 
 /**
- * 连线悬停 1s → 在鼠标处显示剪刀并保持；离开连线后消失；点击剪断。
+ * 连线悬停约 0.4s → 在鼠标处显示剪刀并保持；离开连线后消失；点击剪断。
  * 剪刀层 pointer-events:none，避免挡住连线命中；点击由 document 捕获阶段命中检测。
  */
 export function useCanvasEdgeCutHover() {
