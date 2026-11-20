@@ -38,6 +38,20 @@ import {
 } from "./canvas-gateway-providers";
 import { PLATFORM_OFFERING_PROVIDER_ID } from "./platform-offering-providers";
 
+/** 画布 · 仅走火山方舟，不在选模列表展示 KIE 同名档 */
+const CANVAS_HIDDEN_IMAGE_MODEL_KEYS = new Set(["seedream-5-lite"]);
+
+export function stripCanvasSupersededImageModels(
+  providers: CanvasProviderDto[],
+): CanvasProviderDto[] {
+  return providers.map((p) => ({
+    ...p,
+    models: p.models.filter(
+      (m) => !CANVAS_HIDDEN_IMAGE_MODEL_KEYS.has(m.modelKey),
+    ),
+  }));
+}
+
 type KnownMeta = {
   modelKey: string;
   displayName: string;
@@ -429,15 +443,12 @@ export async function buildCanvasProvidersFromRegistry(
     });
   }
 
-  const canUseVolcengineImage =
-    persona === "PLATFORM_CREDIT" ||
-    isGatewayProviderBound(boundKinds, "VOLCENGINE");
+  // 画布选模：Seedream 5.x 统一走火山方舟；兜底列入 lite/pro/5.5（与是否已绑 VOLCENGINE 无关，调用时仍按凭证校验）
+  providers = mergeKnownVolcengineImageModelsForCanvas(providers, {
+    role: opts?.role,
+  });
 
-  if (canUseVolcengineImage) {
-    providers = mergeKnownVolcengineImageModelsForCanvas(providers, {
-      role: opts?.role,
-    });
-  }
+  providers = stripCanvasSupersededImageModels(providers);
 
   return providers;
 }

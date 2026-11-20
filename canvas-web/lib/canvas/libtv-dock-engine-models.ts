@@ -10,6 +10,9 @@ import {
 import { hideKieVendorLabel } from "@/lib/canvas/gateway-model-role";
 import type { GatewayModelRole } from "@/lib/canvas/gateway-model-role";
 
+/** KIE 旧键；画布统一用 doubao-seedream-5-0-lite（火山方舟） */
+const CANVAS_DOCK_HIDDEN_IMAGE_MODEL_KEYS = new Set(["seedream-5-lite"]);
+
 export type LibtvDockEngineModelEntry = {
   providerId: string;
   provider: CanvasProviderDto;
@@ -73,6 +76,12 @@ export function collectLibtvDockEngineModels(
     if (providerIdSet && !providerIdSet.has(provider.id)) continue;
     for (const model of provider.models) {
       if (!model.enabled) continue;
+      if (
+        opts.role === "IMAGE" &&
+        CANVAS_DOCK_HIDDEN_IMAGE_MODEL_KEYS.has(model.modelKey)
+      ) {
+        continue;
+      }
       if (!modelMatchesDockGatewayRole(model, opts.role, allowedSet)) continue;
       if (!isAllowedDockModelKey(model.modelKey, allowedSet)) continue;
       if (

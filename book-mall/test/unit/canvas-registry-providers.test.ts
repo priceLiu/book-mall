@@ -10,6 +10,7 @@ import {
   mergeKnownBailianImageModelsForCanvas,
   mergeKnownMinimaxSpeechModelsForCanvas,
   mergeKnownVolcengineImageModelsForCanvas,
+  stripCanvasSupersededImageModels,
 } from "@/lib/canvas/canvas-registry-providers";
 
 function shell(id: string): Omit<CanvasProviderDto, "models"> {
@@ -70,6 +71,42 @@ describe("mergeKnownBailianImageModelsForCanvas", () => {
   it("skips merge for non-IMAGE role filter", () => {
     const merged = mergeKnownBailianImageModelsForCanvas([], { role: "VIDEO" });
     expect(merged).toEqual([]);
+  });
+});
+
+describe("stripCanvasSupersededImageModels", () => {
+  it("removes KIE seedream-5-lite from picker payload", () => {
+    const providers: CanvasProviderDto[] = [
+      {
+        ...shell("gateway:kie"),
+        models: [
+          {
+            id: "gateway:kie::seedream-5-lite",
+            modelKey: "seedream-5-lite",
+            displayName: "Seedream 5.0 Lite (KIE)",
+            role: "IMAGE",
+            description: null,
+            paramsSchema: null,
+            defaultParams: null,
+            enabled: true,
+            sortOrder: 0,
+          },
+          {
+            id: "gateway:kie::flux-2-pro",
+            modelKey: "flux-2-pro",
+            displayName: "Flux-2 Pro",
+            role: "IMAGE",
+            description: null,
+            paramsSchema: null,
+            defaultParams: null,
+            enabled: true,
+            sortOrder: 1,
+          },
+        ],
+      },
+    ];
+    const stripped = stripCanvasSupersededImageModels(providers);
+    expect(stripped[0]?.models.map((m) => m.modelKey)).toEqual(["flux-2-pro"]);
   });
 });
 
