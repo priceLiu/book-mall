@@ -6,18 +6,17 @@ import { CanvasShell } from "@/components/layout/canvas-shell";
 import { DialogProvider } from "@/components/dialogs/dialog-provider";
 import { HoverVideoEnlargeProvider } from "@/components/home/hover-video-enlarge-preview";
 import { getBookMallBaseUrlServer } from "@/lib/book-mall-base-url.server";
-import { getBookMallOrigin } from "@/lib/site-config";
+import { CANVAS_SITE_BRAND_NAME, getBookMallOrigin } from "@/lib/site-config";
 import { getMainSiteOrigin } from "@/lib/site-origin";
 import { PlatformAssistant } from "@private/platform-assistant";
 import "./globals.css";
 
 export const metadata: Metadata = {
   title: {
-    default: "ZH 无限画布",
-    template: "%s · ZH 无限画布",
+    default: CANVAS_SITE_BRAND_NAME,
+    template: `%s · ${CANVAS_SITE_BRAND_NAME}`,
   },
-  description:
-    "ZH 无限画布：影视专业版 2.0 节点工作流，拖拽编排、AI 生图生视频，一人即制作室。",
+  description: `${CANVAS_SITE_BRAND_NAME}：影视专业版 2.0 节点工作流，拖拽编排、AI 生图生视频，一人即制作室。`,
 };
 
 export default function RootLayout({

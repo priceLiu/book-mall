@@ -1,6 +1,6 @@
 /** canvas-web 顶部导航 */
 
-export const CANVAS_SITE_BRAND_NAME = "ZH 无限画布";
+export const CANVAS_SITE_BRAND_NAME = "ZX 无限画布";
 
 export type CanvasNavItem = {
   href: string;
