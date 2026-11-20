@@ -341,6 +341,7 @@ export const STORY_PRO_FRAME_IMAGE_MODEL_KEYS = [
   "flux-2-pro",
   "doubao-seedream-5-0-pro",
   "doubao-seedream-5-0-lite",
+  "doubao-seedream-5-5",
   "seedream-5-lite",
   "seedream-4.5",
   "gpt-image-2",

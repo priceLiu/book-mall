@@ -16,7 +16,20 @@ import { ecomGwVolcengineImageEdit } from "@/lib/gateway/ecom-tool-gateway-clien
 import type { SeedreamLayerItem } from "@/lib/gateway/volcengine-image-generations-proxy";
 
 export const ECOM_IMAGE_LAYER_MODEL = "doubao-seedream-5-0-pro";
+export const ECOM_IMAGE_LAYER_MODEL_55 = "doubao-seedream-5-5";
+export const ECOM_IMAGE_LAYER_MODEL_KEYS = [
+  ECOM_IMAGE_LAYER_MODEL,
+  ECOM_IMAGE_LAYER_MODEL_55,
+] as const;
 export const ECOM_IMAGE_LAYER_TOOL_KEY = "ecom-toolkit__image-layer";
+
+export function resolveEcomImageLayerModelKey(modelKey?: string | null): string {
+  const k = modelKey?.trim();
+  if (k && (ECOM_IMAGE_LAYER_MODEL_KEYS as readonly string[]).includes(k)) {
+    return k;
+  }
+  return ECOM_IMAGE_LAYER_MODEL;
+}
 /** 与 Seedream 物体层上限一致 */
 export const ECOM_IMAGE_LAYER_MAX_BBOXES = 16;
 /** 交互编辑不能用 size=auto（仅 layer_decomposition 允许） */
@@ -191,6 +204,7 @@ function buildStackFromLayers(
 
 async function callSeedreamLayerGenerations(opts: {
   userId: string;
+  modelKey: string;
   prompt: string;
   image: string;
   size: string;
@@ -202,7 +216,7 @@ async function callSeedreamLayerGenerations(opts: {
   logId: string;
 }> {
   const { layers, images, logId } = await ecomGwVolcengineImageEdit(opts.userId, {
-    model: ECOM_IMAGE_LAYER_MODEL,
+    model: opts.modelKey,
     prompt: opts.prompt,
     image: opts.image,
     parameters: {
@@ -270,8 +284,10 @@ export async function decomposeImageLayer(opts: {
   sourceImageUrl: string;
   bboxes?: Array<[number, number, number, number]>;
   size?: string;
+  modelKey?: string;
 }): Promise<ImageLayerStack> {
   await assertEcomToolkitGatewayAccess(opts.userId);
+  const layerModel = resolveEcomImageLayerModelKey(opts.modelKey);
   if (opts.bboxes && opts.bboxes.length > ECOM_IMAGE_LAYER_MAX_BBOXES) {
     throw new Error(`最多 ${ECOM_IMAGE_LAYER_MAX_BBOXES} 个拆分框`);
   }
@@ -295,6 +311,7 @@ export async function decomposeImageLayer(opts: {
   try {
     const result = await callSeedreamLayerGenerations({
       userId: opts.userId,
+      modelKey: layerModel,
       prompt,
       image: publicUrl,
       size,
@@ -331,8 +348,10 @@ export async function editImageLayerRegions(opts: {
   userId: string;
   compositeImageUrl: string;
   edits: ImageLayerEditJob[];
+  modelKey?: string;
 }): Promise<ImageLayerEditResult> {
   await assertEcomToolkitGatewayAccess(opts.userId);
+  const layerModel = resolveEcomImageLayerModelKey(opts.modelKey);
   if (opts.edits.length === 0) {
     throw new Error("缺少编辑区域");
   }
@@ -353,7 +372,7 @@ export async function editImageLayerRegions(opts: {
   const editPrompt = buildBatchEditPrompt(opts.edits);
 
   const { images, logId: editLogId } = await ecomGwVolcengineImageEdit(opts.userId, {
-    model: ECOM_IMAGE_LAYER_MODEL,
+    model: layerModel,
     prompt: editPrompt,
     image: publicUrl,
     parameters: {

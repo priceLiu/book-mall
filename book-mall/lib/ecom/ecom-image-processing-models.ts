@@ -17,6 +17,8 @@ export const ECOM_OUTPAINT_MODEL_KEY = "image-out-painting";
 export const ECOM_WANX_PAINTING_MODEL_KEY = "wanx-x-painting";
 export const ECOM_WAN_I2I_MODEL_KEY = "wan2.5-i2i-preview";
 export const ECOM_SEEDREAM_EDITOR_MODEL_KEY = "doubao-seedream-5-0-260128";
+/** 火山方舟 Seedream 5.5 · Gateway 键（上游 doubao-seedream-5-5-261028） */
+export const ECOM_SEEDREAM_55_MODEL_KEY = "doubao-seedream-5-5";
 export const ECOM_KIE_NANO_PRO_MODEL_KEY = "lib-nano-pro";
 /** KIE · NanoBanana Gemini 2.5 Flash Image（文生图 / 图生图） */
 export const ECOM_KIE_GEMINI_FLASH_IMAGE_MODEL_KEY = "google/nano-banana";
@@ -24,6 +26,8 @@ export const ECOM_KIE_GEMINI_FLASH_IMAGE_MODEL_KEY = "google/nano-banana";
 export const ECOM_IMAGE_PROCESSING_MODEL_KEYS = [
   ...ECOM_QWEN_EDIT_MODEL_KEYS,
   "doubao-seedream-5-0-lite",
+  "doubao-seedream-5-0-pro",
+  ECOM_SEEDREAM_55_MODEL_KEY,
   ECOM_SEEDREAM_EDITOR_MODEL_KEY,
   ECOM_KIE_NANO_PRO_MODEL_KEY,
   ECOM_KIE_GEMINI_FLASH_IMAGE_MODEL_KEY,
@@ -74,6 +78,7 @@ export function isSeedreamEditorModelKey(modelKey: string): boolean {
   return (
     modelKey === ECOM_SEEDREAM_EDITOR_MODEL_KEY ||
     modelKey === "doubao-seedream-5-0-lite" ||
+    modelKey === ECOM_SEEDREAM_55_MODEL_KEY ||
     modelKey.includes("doubao-seedream-5")
   );
 }

@@ -121,7 +121,10 @@ async function main() {
   const { updated } = await rebindManagedKeysToPlatformPool();
   console.log(`[ok] 已更新 ${bookUser.email} · 全部 ${volcCreds.length} 条火山凭证（Seedream / 图像编辑）`);
   console.log(`[ok] 平台托管 sk-gw 凭证绑定已刷新: ${updated} 把`);
-  console.log("模型: doubao-seedream-5-0-260128 (canonical: doubao-seedream-5-0-lite)");
+  console.log(
+    "模型: doubao-seedream-5-0-lite / doubao-seedream-5-0-pro / doubao-seedream-5-5（须在方舟开通对应 Model ID）",
+  );
+  console.log("登记: pnpm tsx scripts/seed-gateway-model-registry.ts --confirm");
 }
 
 main()

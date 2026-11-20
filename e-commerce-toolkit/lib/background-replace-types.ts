@@ -6,9 +6,11 @@ export type BackgroundReplaceEdgeDraft = {
 };
 
 export const BACKGROUND_REPLACE_SEEDREAM_MODEL = "doubao-seedream-5-0-pro";
+export const BACKGROUND_REPLACE_SEEDREAM_MODEL_55 = "doubao-seedream-5-5";
 
 export const BACKGROUND_REPLACE_MODEL_KEYS = [
   BACKGROUND_REPLACE_SEEDREAM_MODEL,
+  BACKGROUND_REPLACE_SEEDREAM_MODEL_55,
 ] as const;
 
 export type BackgroundReplaceFormState = {
@@ -43,7 +45,9 @@ export function isSeedreamBackgroundReplaceModel(modelKey: string): boolean {
   const k = modelKey.trim();
   return (
     k === BACKGROUND_REPLACE_SEEDREAM_MODEL ||
-    k === "doubao-seedream-5-0-pro-260628"
+    k === "doubao-seedream-5-0-pro-260628" ||
+    k === BACKGROUND_REPLACE_SEEDREAM_MODEL_55 ||
+    k === "doubao-seedream-5-5-261028"
   );
 }
 

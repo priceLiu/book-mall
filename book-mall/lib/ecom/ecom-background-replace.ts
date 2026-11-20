@@ -6,9 +6,11 @@ import { bboxTag } from "@/lib/ecom/ecom-image-layer-prompt";
 export const WANX_BACKGROUND_GENERATION_MODEL = "wanx-background-generation-v2";
 /** 火山 Seedream 5.0 Pro · 原图整图换景（可框选或纯提示词）。 */
 export const SEEDREAM_BACKGROUND_REPLACE_MODEL = "doubao-seedream-5-0-pro";
+export const SEEDREAM_BACKGROUND_REPLACE_MODEL_55 = "doubao-seedream-5-5";
 
 export const BACKGROUND_REPLACE_MODEL_KEYS = [
   SEEDREAM_BACKGROUND_REPLACE_MODEL,
+  SEEDREAM_BACKGROUND_REPLACE_MODEL_55,
 ] as const;
 
 export type BackgroundReplaceModelKey =
@@ -22,7 +24,9 @@ export function isSeedreamBackgroundReplaceModel(modelKey: string): boolean {
   const k = modelKey.trim().toLowerCase();
   return (
     k === SEEDREAM_BACKGROUND_REPLACE_MODEL ||
-    k === "doubao-seedream-5-0-pro-260628"
+    k === "doubao-seedream-5-0-pro-260628" ||
+    k === SEEDREAM_BACKGROUND_REPLACE_MODEL_55 ||
+    k === "doubao-seedream-5-5-261028"
   );
 }
 
@@ -30,10 +34,16 @@ export function resolveBackgroundReplaceModel(
   modelKey?: string,
 ): BackgroundReplaceModelKey {
   const k = modelKey?.trim() || SEEDREAM_BACKGROUND_REPLACE_MODEL;
-  if (isSeedreamBackgroundReplaceModel(k) || isWanxBackgroundReplaceModel(k)) {
+  if (isSeedreamBackgroundReplaceModel(k)) {
+    return k === SEEDREAM_BACKGROUND_REPLACE_MODEL_55 ||
+      k === "doubao-seedream-5-5-261028"
+      ? SEEDREAM_BACKGROUND_REPLACE_MODEL_55
+      : SEEDREAM_BACKGROUND_REPLACE_MODEL;
+  }
+  if (isWanxBackgroundReplaceModel(k)) {
     return SEEDREAM_BACKGROUND_REPLACE_MODEL;
   }
-  throw new Error("换背景仅支持火山 Seedream 5.0 Pro");
+  throw new Error("换背景仅支持火山 Seedream 5.0 Pro / 5.5");
 }
 
 /** `@图1框选` / `@图2框选`（官方 chip）以及兼容 `@图片1` / `@图片2`。 */

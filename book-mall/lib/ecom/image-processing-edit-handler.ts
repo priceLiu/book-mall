@@ -21,6 +21,7 @@ import {
 import {
   ECOM_OUTPAINT_MODEL_KEY,
   ECOM_QWEN_EDIT_MODEL_KEYS,
+  ECOM_SEEDREAM_55_MODEL_KEY,
   ECOM_SEEDREAM_EDITOR_MODEL_KEY,
   ECOM_WANX_PAINTING_MODEL_KEY,
   isQwenEditModelKey,
@@ -38,6 +39,8 @@ const RETOUCH_MODELS = new Set<string>([
 const RESTORE_FACE_SWAP_MODELS = new Set<string>([
   ...ECOM_QWEN_EDIT_MODEL_KEYS,
   "doubao-seedream-5-0-lite",
+  "doubao-seedream-5-0-pro",
+  ECOM_SEEDREAM_55_MODEL_KEY,
   ECOM_SEEDREAM_EDITOR_MODEL_KEY,
 ]);
 

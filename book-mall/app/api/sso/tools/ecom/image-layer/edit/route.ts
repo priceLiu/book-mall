@@ -56,6 +56,10 @@ export async function POST(req: Request) {
     typeof body.projectId === "string" && body.projectId.trim()
       ? body.projectId.trim()
       : undefined;
+  const modelKey =
+    typeof body.modelKey === "string" && body.modelKey.trim()
+      ? body.modelKey.trim()
+      : undefined;
 
   if (!compositeImageUrl) {
     return ecomJson({ error: "缺少 compositeImageUrl" }, { status: 400 });
@@ -69,6 +73,7 @@ export async function POST(req: Request) {
       userId: auth.userId,
       compositeImageUrl,
       edits,
+      modelKey,
     });
     if (projectId) {
       await saveEcomImageLayerWorkspace(auth.userId, projectId, {

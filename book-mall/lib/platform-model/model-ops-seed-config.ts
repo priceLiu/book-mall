@@ -68,6 +68,7 @@ export const CANVAS_SCENE_MODEL_KEYS = {
     "flux-2-pro",
     "doubao-seedream-5-0-pro",
     "doubao-seedream-5-0-lite",
+    "doubao-seedream-5-5",
     "seedream-5-lite",
     "seedream-4.5",
     "gpt-image-2",
@@ -126,6 +127,7 @@ export const CANVAS_SCENE_MODEL_KEYS = {
     "hunyuan-3d-express",
     "doubao-seedream-5-0-pro",
     "doubao-seedream-5-0-lite",
+    "doubao-seedream-5-5",
     "seedream-4.5",
     "seedream-5-lite",
   ],
@@ -200,6 +202,7 @@ export const ECOM_SCENE_MODEL_KEYS = {
     "image-out-painting",
     "doubao-seedream-5-0-lite",
     "doubao-seedream-5-0-pro",
+    "doubao-seedream-5-5",
   ],
   "ecom-storyboard-chat": [
     "qwen3.8-max",

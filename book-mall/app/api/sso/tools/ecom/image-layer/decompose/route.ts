@@ -43,6 +43,10 @@ export async function POST(req: Request) {
   }
 
   const size = typeof body.size === "string" ? body.size.trim() : undefined;
+  const modelKey =
+    typeof body.modelKey === "string" && body.modelKey.trim()
+      ? body.modelKey.trim()
+      : undefined;
   const bboxes = parseBboxes(body.bboxes);
   if (bboxes && bboxes.length > ECOM_IMAGE_LAYER_MAX_BBOXES) {
     return ecomJson(
@@ -81,6 +85,7 @@ export async function POST(req: Request) {
         sourceImageUrl,
         bboxes,
         size,
+        modelKey,
       });
       return ecomJson(
         { accepted: true, jobId: job.jobId, status: job.status },
@@ -99,6 +104,7 @@ export async function POST(req: Request) {
       sourceImageUrl,
       bboxes,
       size,
+      modelKey,
     });
     return ecomJson({ stack });
   } catch (e) {

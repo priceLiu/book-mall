@@ -121,6 +121,7 @@ function scheduleDecomposeWorker(opts: {
   sourceImageUrl: string;
   bboxes?: Array<[number, number, number, number]>;
   size?: string;
+  modelKey?: string;
 }): void {
   if (inflightProjectIds.has(opts.projectId)) return;
   inflightProjectIds.add(opts.projectId);
@@ -137,6 +138,7 @@ function scheduleDecomposeWorker(opts: {
         sourceImageUrl: opts.sourceImageUrl,
         bboxes: opts.bboxes,
         size: opts.size,
+        modelKey: opts.modelKey,
       });
       const saved = await withLockedImageLayerProject(
         opts.userId,
@@ -240,6 +242,7 @@ export async function startImageLayerDecomposeJob(opts: {
   sourceImageUrl: string;
   bboxes?: Array<[number, number, number, number]>;
   size?: string;
+  modelKey?: string;
 }): Promise<{ jobId: string; status: "running" }> {
   const now = new Date().toISOString();
   const created = await withLockedImageLayerProject(
@@ -275,6 +278,7 @@ export async function startImageLayerDecomposeJob(opts: {
       sourceImageUrl: opts.sourceImageUrl,
       bboxes: opts.bboxes,
       size: opts.size,
+      modelKey: opts.modelKey,
     });
   }
   return { jobId: created.jobId, status: "running" };

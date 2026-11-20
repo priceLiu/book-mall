@@ -235,8 +235,9 @@ export function resolveSeedreamSequentialImageGeneration(
   const isSeedream = resolved.includes("seedream");
   if (!isSeedream) return null;
 
-  const isPro = /seedream-5-0-pro|seedream-5\.0-pro/.test(resolved);
-  if (isPro) return null;
+  const isSingleOutput =
+    /seedream-5-0-pro|seedream-5\.0-pro|seedream-5-5/.test(resolved);
+  if (isSingleOutput) return null;
 
   if (outputCount && outputCount > 1) return "auto";
   return "disabled";

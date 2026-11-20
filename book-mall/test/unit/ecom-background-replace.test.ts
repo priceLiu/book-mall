@@ -21,6 +21,9 @@ describe("resolveBackgroundReplaceModel", () => {
     expect(resolveBackgroundReplaceModel("doubao-seedream-5-0-pro-260628")).toBe(
       "doubao-seedream-5-0-pro",
     );
+    expect(resolveBackgroundReplaceModel("doubao-seedream-5-5")).toBe(
+      "doubao-seedream-5-5",
+    );
   });
 
   it("maps legacy Wanx keys to Seedream", () => {

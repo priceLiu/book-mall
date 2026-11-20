@@ -788,6 +788,32 @@ const CORE_GATEWAY_CANONICAL_REGISTRY: CanonicalModelDef[] = [
     ]),
   },
   {
+    canonicalModelKey: "doubao-seedream-5-5",
+    displayName: "Doubao Seedream 5.5",
+    description:
+      "火山方舟 · 文生图/图生图/交互编辑/图层拆分/RGBA（doubao-seedream-5-5-261028）",
+    mediaKind: "TEXT_TO_IMAGE",
+    role: "IMAGE",
+    requestKind: "IMAGE",
+    appTags: [...VISUAL_APPS],
+    sortOrder: 36.4,
+    primaryVendor: "volcengine",
+    billingKind: "PER_IMAGE",
+    unitLabel: "元/张",
+    routes: dedupeRoutes([
+      {
+        vendor: "volcengine",
+        modelKey: "doubao-seedream-5-5",
+        providerKind: "VOLCENGINE",
+      },
+      {
+        vendor: "volcengine",
+        modelKey: "doubao-seedream-5-5-261028",
+        providerKind: "VOLCENGINE",
+      },
+    ]),
+  },
+  {
     canonicalModelKey: "image-out-painting",
     displayName: "Bailian Out-Painting",
     description: "阿里百炼 image-out-painting · 等比/定向/旋转扩图",
