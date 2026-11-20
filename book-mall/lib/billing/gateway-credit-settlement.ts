@@ -40,11 +40,30 @@ import { recordBillingSettlement } from "./billing-settlement-service";
 import { extractTryonModelKey } from "./gateway-log-classifier";
 import { aiTryonModelLabel } from "@/lib/pricing/ai-tryon-cost";
 import { resolveBillableImageCountFromLog, resolveBillableVideoSecondsFromLog } from "@/lib/gateway/log-billing-metrics";
+import {
+  isDoubaoSeedream55Model,
+  isVolcengineLayerDecomposeRequest,
+  volcengineSeedream55LayerInputSurchargeCredits,
+} from "@/lib/gateway/volcengine-seedream-layer-billing";
 import { parseVideoPricingHints } from "@/lib/gateway/log-pricing-hints";
 import { isUnifiedCreditBillingActive } from "./unified-credit-flag";
 import { isPlatformOperationalApiKey } from "@/lib/gateway/platform-operational-api-key";
 import { recordPlatformAssistantMeterSettlement } from "@/lib/platform-assistant/platform-assistant-billing";
 import { markShareRewardFirstBillable } from "@/lib/share/share-reward-service";
+
+function addVolcengineLayerDecomposeSurcharge(
+  credits: number,
+  log: GatewayRequestLog,
+  costSnap: CostSnapshot,
+  pricePerCreditYuan: number | null,
+): number {
+  if (credits <= 0 || costSnap.unit !== "PER_IMAGE") return credits;
+  if (!isVolcengineLayerDecomposeRequest(log.inputSummary)) return credits;
+  if (!isDoubaoSeedream55Model(log.model, costSnap.canonicalModelKey)) return credits;
+  return (
+    credits + volcengineSeedream55LayerInputSurchargeCredits(1, pricePerCreditYuan)
+  );
+}
 
 export function creditBillingEnabled(): boolean {
   return isUnifiedCreditBillingActive();
@@ -356,15 +375,20 @@ export async function settleSucceededGatewayLog(input: {
         log: input.log,
         snap: costSnap,
         frozen: openFrozen,
-        chargeCredits: computeChargeCredits({
-          snapshot: costSnap,
-          units,
-          pricePerCreditYuan: accountSnap.pricePerCreditYuan,
-          promptTokens: input.metrics.promptTokens,
-          completionTokens: input.metrics.completionTokens,
-          totalTokens: input.metrics.totalTokens,
-          unit: costSnap.unit,
-        }),
+        chargeCredits: addVolcengineLayerDecomposeSurcharge(
+          computeChargeCredits({
+            snapshot: costSnap,
+            units,
+            pricePerCreditYuan: accountSnap.pricePerCreditYuan,
+            promptTokens: input.metrics.promptTokens,
+            completionTokens: input.metrics.completionTokens,
+            totalTokens: input.metrics.totalTokens,
+            unit: costSnap.unit,
+          }),
+          input.log,
+          costSnap,
+          accountSnap.pricePerCreditYuan,
+        ),
         description: platformConsumeDescription(input.log, units),
       });
       if (charged > 0) {
@@ -383,15 +407,20 @@ export async function settleSucceededGatewayLog(input: {
       }
       return charged;
     }
-    const credits = computeChargeCredits({
-      snapshot: costSnap,
-      units,
-      pricePerCreditYuan: accountSnap.pricePerCreditYuan,
-      promptTokens: input.metrics.promptTokens,
-      completionTokens: input.metrics.completionTokens,
-      totalTokens: input.metrics.totalTokens,
-      unit: costSnap.unit,
-    });
+    let credits = addVolcengineLayerDecomposeSurcharge(
+      computeChargeCredits({
+        snapshot: costSnap,
+        units,
+        pricePerCreditYuan: accountSnap.pricePerCreditYuan,
+        promptTokens: input.metrics.promptTokens,
+        completionTokens: input.metrics.completionTokens,
+        totalTokens: input.metrics.totalTokens,
+        unit: costSnap.unit,
+      }),
+      input.log,
+      costSnap,
+      accountSnap.pricePerCreditYuan,
+    );
     if (credits === 0) {
       await recordBillingSettlement({
         log: input.log,

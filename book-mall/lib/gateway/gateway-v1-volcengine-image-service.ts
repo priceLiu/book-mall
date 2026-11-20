@@ -99,6 +99,10 @@ export async function runGatewayV1VolcengineImageGenerations(opts: {
         ...(imageUrlsForLog.length ? { imageUrls: imageUrlsForLog } : {}),
         n: opts.body.parameters?.n ?? 1,
         size: opts.body.parameters?.size,
+        ...(opts.body.parameters?.layer_decomposition === true
+          ? { layerDecomposition: true, layer_decomposition: true }
+          : {}),
+        ...(opts.body.parameters ? { parameters: opts.body.parameters } : {}),
       }),
       ...logMetaToRequestLogFields(opts.logMeta ?? {}),
     });
@@ -136,14 +140,18 @@ export async function runGatewayV1VolcengineImageGenerations(opts: {
       });
       throw new GatewayV1VolcengineImageError(502, result.error, log.id);
     }
+    const layers = parseSeedreamLayerDecomposeResponse(result.raw);
+    const layerDecompose = opts.body.parameters?.layer_decomposition === true;
     await finalizeRequestLog(log.id, {
       status: "SUCCEEDED",
       durationMs: Date.now() - started,
-      resultSummary: buildVolcengineImageLogResultSummary(result.raw, result.images),
+      resultSummary: buildVolcengineImageLogResultSummary(result.raw, result.images, {
+        outputLayerCount: layers.length || undefined,
+        layerDecomposition: layerDecompose,
+      }),
       usage: parseUsageFromUnknown(result.raw),
       model,
     });
-    const layers = parseSeedreamLayerDecomposeResponse(result.raw);
     return {
       images: result.images,
       usage: result.usage,

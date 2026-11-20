@@ -215,13 +215,23 @@ function stripB64ForLog(raw: Record<string, unknown>): Record<string, unknown> {
 export function buildVolcengineImageLogResultSummary(
   raw: Record<string, unknown>,
   images: VolcengineImageGenerationImage[],
+  opts?: { outputLayerCount?: number; layerDecomposition?: boolean },
 ): Record<string, unknown> {
   const imageUrls = images
     .map((i) => i.url?.trim())
     .filter((u): u is string => Boolean(u));
+  const layerCount =
+    opts?.outputLayerCount ??
+    (opts?.layerDecomposition
+      ? parseSeedreamLayerDecomposeResponse(raw).length
+      : undefined);
   return {
     ...stripB64ForLog(raw),
     imageCount: images.length,
+    ...(layerCount != null && layerCount > 0
+      ? { outputLayerCount: layerCount, layerCount }
+      : {}),
+    ...(opts?.layerDecomposition ? { layerDecomposition: true } : {}),
     ...(imageUrls.length ? { imageUrls } : {}),
   };
 }

@@ -60,6 +60,7 @@ import {
 import { inferGatewayFailCode } from "./log-fail-code";
 import { parseVideoPricingHints } from "./log-pricing-hints";
 import { estimateVendorCost } from "./pricing-estimate";
+import { resolveVolcengineLayerPricingTier } from "./volcengine-seedream-layer-billing";
 import {
   resolveBillingCanonicalKey,
   resolveCostSnapshot,
@@ -405,6 +406,7 @@ export async function finalizeRequestLog(
   let costSnapshotYuan: number | null = null;
   let marginSnapshot: number | null = null;
   let costSnapshot: CostSnapshot | null = null;
+  let volcengineLayerTierRaw: string | null = null;
   try {
     if (!canonicalModelKey) {
       canonicalModelKey = await resolveBillingCanonicalKey({
@@ -413,8 +415,17 @@ export async function finalizeRequestLog(
       });
     }
     if (canonicalModelKey) {
+      volcengineLayerTierRaw = resolveVolcengineLayerPricingTier({
+        model: patch.model ?? log.model,
+        canonicalModelKey,
+        inputSummary: log.inputSummary,
+      });
       costSnapshot = await resolveCostSnapshot(canonicalModelKey, {
-        tierRaw: patch.pricingTierRaw ?? videoHints.tierRaw ?? log.pricingTierRaw,
+        tierRaw:
+          patch.pricingTierRaw ??
+          videoHints.tierRaw ??
+          volcengineLayerTierRaw ??
+          log.pricingTierRaw,
       });
       if (costSnapshot) {
         costSnapshotYuan = costSnapshot.netCostYuan;
@@ -480,7 +491,7 @@ export async function finalizeRequestLog(
       vendorRequestId: patch.vendorRequestId,
       completedAt,
       pricingModelKey: estimate.pricingModelKey,
-      pricingTierRaw: estimate.pricingTierRaw,
+      pricingTierRaw: volcengineLayerTierRaw ?? estimate.pricingTierRaw,
       billingKind: estimate.billingKind,
       vendorListUnitCostYuan: estimate.vendorListUnitCostYuan,
       estimatedVendorCostYuan: estimate.estimatedVendorCostYuan,

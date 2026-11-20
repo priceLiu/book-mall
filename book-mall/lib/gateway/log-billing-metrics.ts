@@ -34,11 +34,19 @@ export function imageCountFromInputSummary(inputSummary: unknown): number | null
   );
 }
 
+import { resolveVolcengineLayerOutputBillableCount } from "@/lib/gateway/volcengine-seedream-layer-billing";
+
 /** 试衣/生图：按输入参考图张数；缺省 1 张（含 aitryon-parsing 单图分割）。 */
 export function resolveBillableImageCountFromLog(log: {
   requestKind?: string | null;
   inputSummary?: unknown;
+  resultSummary?: unknown;
+  model?: string | null;
+  canonicalModelKey?: string | null;
 }): number {
+  const layerOutputs = resolveVolcengineLayerOutputBillableCount(log);
+  if (layerOutputs != null) return layerOutputs;
+
   const explicit = imageCountFromInputSummary(log.inputSummary);
   if (explicit != null) return explicit;
 
