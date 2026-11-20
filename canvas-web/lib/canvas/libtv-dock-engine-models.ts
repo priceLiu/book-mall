@@ -11,7 +11,10 @@ import { hideKieVendorLabel } from "@/lib/canvas/gateway-model-role";
 import type { GatewayModelRole } from "@/lib/canvas/gateway-model-role";
 
 /** KIE 旧键；画布统一用 doubao-seedream-5-0-lite（火山方舟） */
-const CANVAS_DOCK_HIDDEN_IMAGE_MODEL_KEYS = new Set(["seedream-5-lite"]);
+const CANVAS_DOCK_HIDDEN_IMAGE_MODEL_KEYS = new Set([
+  "seedream-5-lite",
+  "seedream-4.5",
+]);
 
 export type LibtvDockEngineModelEntry = {
   providerId: string;

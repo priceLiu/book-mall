@@ -7,6 +7,14 @@ import {
 } from "@/lib/gateway/volcengine-chat-models";
 
 describe("Volcengine Seedream 5.0/5.5 canvas routing", () => {
+  it("routes doubao-seedream-4-5 to VOLCENGINE IMAGE", () => {
+    expect(isVolcengineSeedreamImageModelKey("doubao-seedream-4-5")).toBe(true);
+    expect(routeGatewayModel("doubao-seedream-4-5")).toEqual({
+      providerKind: "VOLCENGINE",
+      requestKind: "IMAGE",
+    });
+  });
+
   it("routes doubao-seedream-5-5 to VOLCENGINE IMAGE", () => {
     expect(isVolcengineSeedreamImageModelKey("doubao-seedream-5-5")).toBe(true);
     expect(routeGatewayModel("doubao-seedream-5-5")).toEqual({

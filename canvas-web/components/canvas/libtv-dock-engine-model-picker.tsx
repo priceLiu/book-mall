@@ -7,6 +7,7 @@ import {
   collectLibtvDockEngineModels,
   resolveLibtvDockEngineModelDisplayName,
 } from "@/lib/canvas/libtv-dock-engine-models";
+import { groupLibtvDockEngineModelsByProvider } from "@/lib/canvas/gateway-dock-provider-groups";
 import { hideKieVendorLabel, type GatewayModelRole } from "@/lib/canvas/gateway-model-role";
 import { formatGatewayModelTypeLabelLine } from "@/lib/canvas/gateway-model-type-labels";
 import type { CanvasProviderDto, CanvasProviderModelDto } from "@/lib/canvas-providers-api";
@@ -79,16 +80,15 @@ export function LibtvDockEngineModelPicker({
     return allowedModelKeys;
   }, [sceneTemplateId, catalog, allowedModelKeys]);
 
-  const models = useMemo(
-    () =>
-      collectLibtvDockEngineModels(providers, {
-        role,
-        allowedModelKeys: effectiveAllowed,
-        providerIds,
-        requiredCapabilities,
-      }),
-    [providers, role, effectiveAllowed, providerIds, requiredCapabilities],
-  );
+  const modelGroups = useMemo(() => {
+    const flat = collectLibtvDockEngineModels(providers, {
+      role,
+      allowedModelKeys: effectiveAllowed,
+      providerIds,
+      requiredCapabilities,
+    });
+    return groupLibtvDockEngineModelsByProvider(flat, role);
+  }, [providers, role, effectiveAllowed, providerIds, requiredCapabilities]);
 
   const label = resolveLibtvDockEngineModelDisplayName(modelKey, providers);
   const selectedKey = modelKey.trim();
@@ -123,47 +123,56 @@ export function LibtvDockEngineModelPicker({
         <p className="px-3 pb-1.5 pt-0.5 text-[13px] font-medium text-white/75">
           选择模型
         </p>
-        <div className="space-y-0.5 px-1.5">
-          {models.map(({ providerId: pid, model }) => {
-            const selected =
-              selectedProvider === pid && selectedKey === model.modelKey;
-            const displayName = hideKieVendorLabel(
-              model.displayName || model.modelKey,
-            );
-            return (
-              <button
-                key={`${pid}:${model.modelKey}`}
-                type="button"
-                className={libtvDockModelItemClassName(selected)}
-                onClick={() => {
-                  onSelect({
-                    providerId: pid,
-                    modelKey: model.modelKey,
-                    model,
-                  });
-                  setOpen(false);
-                }}
-              >
-                <span className="grid size-7 shrink-0 place-items-center rounded-md bg-white/[0.06] text-[10px] font-semibold text-white/70">
-                  {displayName.slice(0, 1)}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[13px] font-medium text-white">
-                    {displayName}
-                  </span>
-                  <span className="block truncate text-[10px] text-white/40">
-                    {formatGatewayModelTypeLabelLine({
-                      modelKey: model.modelKey,
-                      role: model.role,
-                    })}
-                  </span>
-                </span>
-                {selected ? (
-                  <Check className={LIBTV_DOCK_PICKER_CHECK_CLASS} />
-                ) : null}
-              </button>
-            );
-          })}
+        <div className="max-h-[min(52vh,420px)] space-y-3 overflow-y-auto px-1.5 pb-1">
+          {modelGroups.map((group) => (
+            <section key={group.providerId}>
+              <p className="sticky top-0 z-[1] bg-[#1c1c1e] px-2 py-1 text-[10px] font-medium tracking-wide text-white/45">
+                {group.label}
+              </p>
+              <div className="space-y-0.5">
+                {group.items.map(({ providerId: pid, model }) => {
+                  const selected =
+                    selectedProvider === pid && selectedKey === model.modelKey;
+                  const displayName = hideKieVendorLabel(
+                    model.displayName || model.modelKey,
+                  );
+                  return (
+                    <button
+                      key={`${pid}:${model.modelKey}`}
+                      type="button"
+                      className={libtvDockModelItemClassName(selected)}
+                      onClick={() => {
+                        onSelect({
+                          providerId: pid,
+                          modelKey: model.modelKey,
+                          model,
+                        });
+                        setOpen(false);
+                      }}
+                    >
+                      <span className="grid size-7 shrink-0 place-items-center rounded-md bg-white/[0.06] text-[10px] font-semibold text-white/70">
+                        {displayName.slice(0, 1)}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-[13px] font-medium text-white">
+                          {displayName}
+                        </span>
+                        <span className="block truncate text-[10px] text-white/40">
+                          {formatGatewayModelTypeLabelLine({
+                            modelKey: model.modelKey,
+                            role: model.role,
+                          })}
+                        </span>
+                      </span>
+                      {selected ? (
+                        <Check className={LIBTV_DOCK_PICKER_CHECK_CLASS} />
+                      ) : null}
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+          ))}
         </div>
       </Sbv1ToolbarDropdown>
     </>

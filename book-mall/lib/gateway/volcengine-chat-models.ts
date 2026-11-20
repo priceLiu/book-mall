@@ -53,6 +53,8 @@ export const VOLCENGINE_MODEL_UPSTREAM: Record<string, string> = {
   /** Seedream 5.5 · 文生图/图生图/图层拆分/RGBA（须在方舟控制台开通） */
   "doubao-seedream-5-5": "doubao-seedream-5-5-261028",
   "Doubao-Seedream-5.5": "doubao-seedream-5-5-261028",
+  "doubao-seedream-4-5": "doubao-seedream-4-5-251128",
+  "Doubao-Seedream-4.5": "doubao-seedream-4-5-251128",
 };
 
 export const VOLCENGINE_SEEDREAM_55_GATEWAY_KEY = "doubao-seedream-5-5";
@@ -196,6 +198,15 @@ export const VOLCENGINE_IMAGE_KNOWN_MODELS: CanvasGatewayListedModel[] = [
     paramsSchema: [],
     defaultParams: {},
   },
+  {
+    modelKey: "doubao-seedream-4-5",
+    displayName: "Doubao Seedream 4.5",
+    role: "IMAGE",
+    description:
+      "火山方舟 · 文生图/图生图（上游 doubao-seedream-4-5-251128）",
+    paramsSchema: [],
+    defaultParams: {},
+  },
 ];
 
 export const VOLCENGINE_ALL_KNOWN_MODELS: CanvasGatewayListedModel[] = [
@@ -232,8 +243,11 @@ export function isVolcengineSeedreamImageModelKey(modelKey: string): boolean {
     m === "doubao-seedream-5-0-260128" ||
     m === "doubao-seedream-5-0-pro" ||
     m === "doubao-seedream-5-0-pro-260628" ||
+    m === "doubao-seedream-4-5" ||
+    m === "doubao-seedream-4-5-251128" ||
     (m.includes("doubao-seedream-5") &&
-      (m.includes("lite") || m.includes("pro")))
+      (m.includes("lite") || m.includes("pro"))) ||
+    (m.includes("doubao-seedream-4") && m.includes("5"))
   );
 }
 

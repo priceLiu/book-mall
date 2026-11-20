@@ -297,8 +297,11 @@ export function routeGatewayModel(model: string): RoutedModel {
     m === "doubao-seedream-5-0-pro-260628" ||
     m === "doubao-seedream-5-5" ||
     m === "doubao-seedream-5-5-261028" ||
+    m === "doubao-seedream-4-5" ||
+    m === "doubao-seedream-4-5-251128" ||
     m.includes("doubao-seedream-5-5") ||
-    (m.includes("doubao-seedream-5") && (m.includes("lite") || m.includes("pro")))
+    (m.includes("doubao-seedream-5") && (m.includes("lite") || m.includes("pro"))) ||
+    (m.includes("doubao-seedream-4") && m.includes("5"))
   ) {
     return { providerKind: "VOLCENGINE", requestKind: "IMAGE" };
   }

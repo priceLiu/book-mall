@@ -39,7 +39,11 @@ import {
 import { PLATFORM_OFFERING_PROVIDER_ID } from "./platform-offering-providers";
 
 /** 画布 · 仅走火山方舟，不在选模列表展示 KIE 同名档 */
-const CANVAS_HIDDEN_IMAGE_MODEL_KEYS = new Set(["seedream-5-lite"]);
+/** KIE 壳 · 画布统一走火山方舟 Doubao Seedream */
+const CANVAS_HIDDEN_IMAGE_MODEL_KEYS = new Set([
+  "seedream-5-lite",
+  "seedream-4.5",
+]);
 
 export function stripCanvasSupersededImageModels(
   providers: CanvasProviderDto[],

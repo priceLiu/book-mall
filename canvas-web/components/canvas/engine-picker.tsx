@@ -24,6 +24,10 @@ import {
   type StoryModelCapability,
 } from "@/lib/canvas/story-model-capabilities";
 import {
+  resolveCanvasProviderGroupLabel,
+  sortEnginePickerProviderGroups,
+} from "@/lib/canvas/gateway-dock-provider-groups";
+import {
   gatewayModelRoleMeta,
   hideKieVendorLabel,
   ENGINE_PICKER_MODAL_BG,
@@ -159,16 +163,15 @@ export function EnginePicker({
     [reqCapsKey],
   );
 
-  const filtered = useMemo(
-    () =>
-      providers
-        .filter(
-          (p) =>
-            p.active && (!providerIdSet || providerIdSet.has(p.id)),
-        )
-        .map((p) => ({
-          provider: p,
-          models: p.models.filter(
+  const filtered = useMemo(() => {
+    const groups = providers
+      .filter(
+        (p) => p.active && (!providerIdSet || providerIdSet.has(p.id)),
+      )
+      .map((p) => ({
+        provider: p,
+        models: p.models
+          .filter(
             (m) =>
               m.enabled &&
               modelMatchesDockGatewayRole(m, role, allowedSet) &&
@@ -176,11 +179,12 @@ export function EnginePicker({
               isAllowedDockModelKey(m.modelKey, allowedSet) &&
               (!stableReqCaps?.length ||
                 modelHasStoryCapabilities(m.modelKey, stableReqCaps)),
-          ),
-        }))
-        .filter((g) => g.models.length > 0),
-    [providers, role, allowedSet, providerIdSet, stableReqCaps],
-  );
+          )
+          .sort((a, b) => a.sortOrder - b.sortOrder),
+      }))
+      .filter((g) => g.models.length > 0);
+  return sortEnginePickerProviderGroups(groups);
+  }, [providers, role, allowedSet, providerIdSet, stableReqCaps]);
 
   const capabilityMismatch = useMemo(() => {
     if (!stableReqCaps?.length || !modelKey.trim()) return null;
@@ -409,6 +413,7 @@ function EnginePickerInlinePanel({
                     models={models}
                     draft={draft}
                     layout="list"
+                    dockRole={role}
                     onSelectModel={(m) => {
                       const same =
                         draft?.provider.id === provider.id &&
@@ -448,6 +453,7 @@ function EnginePickerInlinePanel({
               models={models}
               draft={draft}
               layout={layout}
+              dockRole={role}
               onSelectModel={(m) => {
                 const same =
                   draft?.provider.id === provider.id &&
@@ -586,6 +592,7 @@ function EngineModelModal({
                   provider={provider}
                   models={models}
                   draft={draft}
+                  dockRole={role}
                   onSelectModel={(m) => {
                     userPickedRef.current = true;
                     const same =
@@ -677,17 +684,27 @@ function ProviderGroup({
   models,
   draft,
   layout = "grid",
+  dockRole,
   onSelectModel,
 }: {
   provider: CanvasProviderDto;
   models: CanvasProviderModelDto[];
   draft: DraftSelection | null;
   layout?: "grid" | "list";
+  dockRole?: GatewayModelRole;
   onSelectModel: (m: CanvasProviderModelDto) => void;
 }) {
   const isPlatformOffering = provider.id === "platform:offering";
+  const groupLabel = resolveCanvasProviderGroupLabel(
+    provider.id,
+    provider.alias,
+    dockRole,
+  );
   return (
     <section>
+      <p className="mb-2 text-[11px] font-medium tracking-wide text-white/45">
+        {groupLabel}
+      </p>
       <div
         className={
           layout === "list"

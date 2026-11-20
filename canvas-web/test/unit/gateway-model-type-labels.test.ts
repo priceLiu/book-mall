@@ -88,5 +88,8 @@ describe("SBV1_IMAGE_MODEL_KEYS", () => {
     expect(SBV1_IMAGE_MODEL_KEYS).toContain("doubao-seedream-5-0-lite");
     expect(SBV1_IMAGE_MODEL_KEYS).toContain("doubao-seedream-5-0-pro");
     expect(SBV1_IMAGE_MODEL_KEYS).toContain("doubao-seedream-5-5");
+    expect(SBV1_IMAGE_MODEL_KEYS).toContain("doubao-seedream-4-5");
+    expect(SBV1_IMAGE_MODEL_KEYS).not.toContain("seedream-4.5");
+    expect(SBV1_IMAGE_MODEL_KEYS).not.toContain("seedream-5-lite");
   });
 });

@@ -69,7 +69,7 @@ export const CANVAS_SCENE_MODEL_KEYS = {
     "doubao-seedream-5-0-pro",
     "doubao-seedream-5-0-lite",
     "doubao-seedream-5-5",
-    "seedream-4.5",
+    "doubao-seedream-4-5",
     "gpt-image-2",
     "gpt-image-1",
     "grok-imagine/text-to-image",
@@ -127,7 +127,7 @@ export const CANVAS_SCENE_MODEL_KEYS = {
     "doubao-seedream-5-0-pro",
     "doubao-seedream-5-0-lite",
     "doubao-seedream-5-5",
-    "seedream-4.5",
+    "doubao-seedream-4-5",
   ],
   "sbv1-video": [
     "doubao-seedance-2.0",
