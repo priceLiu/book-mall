@@ -61,6 +61,7 @@ import {
   resolveSbv1DockInputMode,
   sbv1DockRefCornerLabelForModel,
 } from "@/lib/canvas/sbv1-video-model-reference";
+import { buildSbv1VideoFamilyRouteSyncPatch } from "@/lib/canvas/sbv1-video-model-families";
 import { Sbv1VideoDockModeBar } from "./sbv1-video-dock-mode-bar";
 import {
   Sbv1VideoDockModelPicker,
@@ -230,6 +231,21 @@ export const Sbv1VideoEngineChatInput = memo(function Sbv1VideoEngineChatInput({
       return true;
     });
   }, [upstreamTextLinks, extraDockUpstreamLinks]);
+
+  useEffect(() => {
+    if (isHdVideo) return;
+    const patch = buildSbv1VideoFamilyRouteSyncPatch(data);
+    if (patch) onPatch(patch);
+  }, [
+    isHdVideo,
+    data.dockInputMode,
+    data.referenceMode,
+    data.engine?.modelKey,
+    data.engine?.providerId,
+    data.engine?.params?.multi_shots,
+    onPatch,
+    data,
+  ]);
 
   useEffect(() => {
     if (isHdVideo) return;

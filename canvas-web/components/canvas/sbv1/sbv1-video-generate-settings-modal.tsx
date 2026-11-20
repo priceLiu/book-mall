@@ -18,6 +18,7 @@ import {
   PLATFORM_OFFERING_PROVIDER_ID,
 } from "@/lib/canvas/system-providers";
 import { STORY_PRO_VIDEO_MINIMAX_MODEL_KEYS } from "@/lib/canvas/story-prompts";
+import { collapseSbv1DockVideoModelEntries } from "@/lib/canvas/sbv1-video-model-families";
 import { hideKieVendorLabel, ENGINE_PICKER_MODAL_BG } from "@/lib/canvas/gateway-model-role";
 import type { CanvasProviderDto, CanvasProviderModelDto } from "@/lib/canvas-providers-api";
 import { useUserProviders } from "@/lib/canvas/use-user-providers";
@@ -173,7 +174,7 @@ export function collectSbv1DockVideoModels(
       out.push({ providerId: p.id, model: m });
     }
   }
-  return out;
+  return collapseSbv1DockVideoModelEntries(out);
 }
 
 export {

@@ -9,6 +9,10 @@ import {
 } from "@/lib/canvas/story-model-capabilities";
 import { hideKieVendorLabel } from "@/lib/canvas/gateway-model-role";
 import type { GatewayModelRole } from "@/lib/canvas/gateway-model-role";
+import {
+  collapseLibtvDockVideoModelEntries,
+  resolveSbv1VideoFamilyDisplayName,
+} from "@/lib/canvas/sbv1-video-model-families";
 
 /** KIE 旧键；画布统一用 doubao-seedream-5-0-lite（火山方舟） */
 const CANVAS_DOCK_HIDDEN_IMAGE_MODEL_KEYS = new Set([
@@ -103,6 +107,9 @@ export function collectLibtvDockEngineModels(
       out.push({ providerId: provider.id, provider, model });
     }
   }
+  if (opts.role === "VIDEO") {
+    return collapseLibtvDockVideoModelEntries(out);
+  }
   return out;
 }
 
@@ -116,6 +123,8 @@ export function resolveLibtvDockEngineModelDisplayName(
     const model = provider.models.find(
       (m) => m.modelKey.toLowerCase() === key.toLowerCase(),
     );
+    const familyName = resolveSbv1VideoFamilyDisplayName(key);
+    if (familyName) return familyName;
     const name = model?.displayName?.trim();
     if (name) return hideKieVendorLabel(name);
   }

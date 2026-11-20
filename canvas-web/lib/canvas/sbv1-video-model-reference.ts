@@ -11,6 +11,11 @@ import {
   resolveSbv1VariantIdFromEngine,
   SBV1_VOLCENGINE_GATEWAY_MODEL_KEYS,
 } from "./sbv1-video-models";
+import {
+  inferSbv1VideoFamilyDockInputMode,
+  resolveSbv1VideoModelFamily,
+  type Sbv1VideoModelFamily,
+} from "./sbv1-video-model-families";
 
 const DASHSCOPE_T2V_TO_R2V: Record<string, string> = {
   "happyhorse-1.0-t2v": "happyhorse-1.0-r2v",
@@ -219,7 +224,7 @@ const DASHSCOPE_I2V_KEYS = new Set([
   "happyhorse-1.1-i2v",
 ]);
 
-function minimaxH3VideoMode(modelKey: string): string | null {
+export function minimaxH3VideoMode(modelKey: string): string | null {
   const k = modelKey.trim().toLowerCase();
   if (!k.includes("minimax/minimax-h3")) return null;
   if (k.endsWith("-t2v")) return "t2v";
@@ -422,12 +427,31 @@ function chip(
   return { id, label: label ?? def.defaultLabel, referenceMode: def.referenceMode };
 }
 
+function dockChipsForVideoFamily(
+  family: Sbv1VideoModelFamily,
+): Sbv1DockModeChip[] {
+  const omniLabel =
+    family.id === "minimax-h3" || family.id.startsWith("happyhorse")
+      ? "参考生视频"
+      : family.id.startsWith("wan")
+        ? "参考生视频"
+        : undefined;
+  return family.dockInputModes.map((id) => {
+    if (id === "omni") return chip("omni", omniLabel);
+    return chip(id);
+  });
+}
+
 /** 按模型返回 Dock 顶栏可点亮的模式 chip（不可用的不展示） */
 export function getSbv1VideoDockModeChips(
   modelKey: string,
   opts?: { multiShots?: boolean; providerId?: string },
 ): Sbv1DockModeChip[] {
   const k = modelKey.trim();
+  const family = resolveSbv1VideoModelFamily(k);
+  if (family) {
+    return dockChipsForVideoFamily(family);
+  }
   const caps = getSbv1VideoModelRefCaps(k, opts);
 
   if (caps.refApi === "motion_control") {
@@ -545,6 +569,8 @@ export function defaultSbv1DockInputModeForModel(
   modelKey: string,
   opts?: { multiShots?: boolean; providerId?: string },
 ): Sbv1DockInputMode {
+  const familyMode = inferSbv1VideoFamilyDockInputMode(modelKey);
+  if (familyMode) return familyMode;
   const chips = getSbv1VideoDockModeChips(modelKey, opts);
   return chips[0]?.id ?? "omni";
 }

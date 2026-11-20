@@ -142,6 +142,7 @@ export default defineConfig({
       "test/unit/libtv-image-generation-used.test.ts",
       "test/unit/libtv-image-generation-stack-poll.test.ts",
       "test/unit/sbv1-video-model-reference.test.ts",
+      "test/unit/sbv1-video-model-families.test.ts",
       "test/unit/resolve-sbv1-video-engine-inputs.test.ts",
       "test/unit/jianying-from-workspace.test.ts",
       "test/unit/jianying-auto-render-node-size.test.ts",

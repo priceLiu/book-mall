@@ -41,6 +41,10 @@ import {
 } from "@/lib/canvas/libtv-dock-engine-models";
 import { useModelTemplateCatalog } from "@/lib/canvas/use-model-template-catalog";
 import { resolveDockAllowedModelKeys } from "@/lib/canvas/resolve-dock-allowed-model-keys";
+import {
+  collapseEnginePickerVideoGroups,
+  sbv1VideoModelFamilyMatches,
+} from "@/lib/canvas/sbv1-video-model-families";
 
 export type EnginePickerProps = {
   /** 过滤模型 role：LLM / IMAGE / VIDEO / MUSIC / TTS */
@@ -182,7 +186,8 @@ export function EnginePicker({
           .sort((a, b) => a.sortOrder - b.sortOrder),
       }))
       .filter((g) => g.models.length > 0);
-  return sortEnginePickerProviderGroups(groups);
+    const sorted = sortEnginePickerProviderGroups(groups);
+    return role === "VIDEO" ? collapseEnginePickerVideoGroups(sorted) : sorted;
   }, [providers, role, allowedSet, providerIdSet, stableReqCaps]);
 
   const capabilityMismatch = useMemo(() => {
@@ -197,7 +202,10 @@ export function EnginePicker({
   const current = useMemo(() => {
     for (const g of filtered) {
       for (const m of g.models) {
-        if (g.provider.id === providerId && m.modelKey === modelKey) {
+        if (
+          g.provider.id === providerId &&
+          sbv1VideoModelFamilyMatches(m.modelKey, modelKey)
+        ) {
           return { provider: g.provider, model: m };
         }
       }
@@ -666,7 +674,9 @@ function resolveInitialDraft(
   if (!providerId || !modelKey) return null;
   for (const g of groups) {
     if (g.provider.id !== providerId) continue;
-    const m = g.models.find((x) => x.modelKey === modelKey);
+    const m =
+      g.models.find((x) => x.modelKey === modelKey) ??
+      g.models.find((x) => sbv1VideoModelFamilyMatches(x.modelKey, modelKey));
     if (m) {
       return {
         provider: g.provider,
@@ -714,7 +724,7 @@ function ProviderGroup({
         {models.map((m) => {
           const selected =
             draft?.provider.id === provider.id &&
-            draft?.model.modelKey === m.modelKey;
+            sbv1VideoModelFamilyMatches(draft.model.modelKey, m.modelKey);
           return (
             <ModelCard
               key={m.id}

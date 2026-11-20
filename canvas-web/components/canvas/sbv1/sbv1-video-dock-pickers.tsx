@@ -28,6 +28,12 @@ import {
   isSbv1Wan30VideoModel,
   resolveSbv1VideoModelRefLinkBlock,
 } from "@/lib/canvas/sbv1-video-model-reference";
+import {
+  resolveSbv1VideoFamilyDisplayName,
+  resolveSbv1VideoFamilyPickRouteKey,
+  resolveSbv1VideoModelFamily,
+  sbv1VideoModelFamilyMatches,
+} from "@/lib/canvas/sbv1-video-model-families";
 import { getSbv1VideoModelTypeLabels } from "@/lib/canvas/story-model-capabilities";
 import { useLibtvDockToolbarMetrics } from "@/lib/canvas/use-libtv-dock-toolbar-metrics";
 import { cn } from "@/lib/utils";
@@ -70,6 +76,8 @@ function resolveVideoModelDisplayName(
   modelKey: string,
   providers: ReturnType<typeof useUserProviders>["providers"],
 ): string {
+  const familyName = resolveSbv1VideoFamilyDisplayName(modelKey);
+  if (familyName) return familyName;
   for (const p of providers) {
     const gw = p.models.find(
       (m) => m.modelKey.toLowerCase() === modelKey.toLowerCase(),
@@ -248,13 +256,22 @@ export function Sbv1VideoDockModelPicker({
     const all = collectSbv1DockVideoModels(providers);
     const nRefs = Math.max(0, Math.floor(refLinkCount));
     if (nRefs > 0) {
-      return all.filter(
-        (e) =>
-          !resolveSbv1VideoModelRefLinkBlock({
-            modelKey: e.model.modelKey,
-            refLinkCount: nRefs,
-          }).blocked,
-      );
+      return all.filter((e) => {
+        const family = resolveSbv1VideoModelFamily(e.model.modelKey);
+        if (family) {
+          return family.memberKeys.some(
+            (mk) =>
+              !resolveSbv1VideoModelRefLinkBlock({
+                modelKey: mk,
+                refLinkCount: nRefs,
+              }).blocked,
+          );
+        }
+        return !resolveSbv1VideoModelRefLinkBlock({
+          modelKey: e.model.modelKey,
+          refLinkCount: nRefs,
+        }).blocked;
+      });
     }
     const keys = [
       ...modelKeysForTemplate(catalog, "i2v"),
@@ -271,13 +288,18 @@ export function Sbv1VideoDockModelPicker({
   const selectedProvider = normalizeSbv1EngineProviderId(data.engine?.providerId);
 
   const onSelect = (providerId: string, model: CanvasProviderModelDto) => {
+    const routeKey = resolveSbv1VideoFamilyPickRouteKey(
+      model.modelKey,
+      data.dockInputMode,
+      data.referenceMode,
+    );
     const p = { ...(data.engine?.params ?? {}) };
     let referenceMode = data.referenceMode;
     let aspectRatio = data.aspectRatio;
     let durationSec = data.durationSec;
     let resolution = data.resolution;
     let generateAudio = p.generate_audio !== false;
-    syncSbv1UiFromModelParams(model.modelKey, p, {
+    syncSbv1UiFromModelParams(routeKey, p, {
       setAspectRatio: (v) => {
         aspectRatio = v;
       },
@@ -296,19 +318,19 @@ export function Sbv1VideoDockModelPicker({
       providerId,
       currentReferenceMode: data.referenceMode,
     });
-    const caps = getSbv1VideoModelRefCaps(model.modelKey, {
+    const caps = getSbv1VideoModelRefCaps(routeKey, {
       multiShots: p.multi_shots === true,
       providerId,
     });
     referenceMode = clampSbv1ReferenceMode(referenceMode, caps);
-    const defaultMode = defaultSbv1DockInputModeForModel(model.modelKey, {
+    const defaultMode = defaultSbv1DockInputModeForModel(routeKey, {
       multiShots: p.multi_shots === true,
       providerId,
     });
     const modePatch = dockInputModeToPatch(defaultMode);
     patchVideoSettings(data, onPatch, {
       providerId,
-      modelKey: model.modelKey,
+      modelKey: routeKey,
       engineParams: p,
       referenceMode: modePatch.referenceMode,
       aspectRatio,
@@ -353,15 +375,30 @@ export function Sbv1VideoDockModelPicker({
           {models.map(({ providerId, model }) => {
             const selected =
               selectedProvider === providerId &&
-              selectedKey === model.modelKey;
+              sbv1VideoModelFamilyMatches(selectedKey, model.modelKey);
             const displayName = hideKieVendorLabel(
               model.displayName || model.modelKey,
             );
-            const typeLabels = getSbv1VideoModelTypeLabels(model.modelKey);
-            const refBlock = resolveSbv1VideoModelRefLinkBlock({
-              modelKey: model.modelKey,
-              refLinkCount,
-            });
+            const typeLabels = resolveSbv1VideoModelFamily(model.modelKey)
+              ? []
+              : getSbv1VideoModelTypeLabels(model.modelKey);
+            const refBlock = (() => {
+              const family = resolveSbv1VideoModelFamily(model.modelKey);
+              if (family && refLinkCount > 0) {
+                const anyAllowed = family.memberKeys.some(
+                  (mk) =>
+                    !resolveSbv1VideoModelRefLinkBlock({
+                      modelKey: mk,
+                      refLinkCount,
+                    }).blocked,
+                );
+                return { blocked: !anyAllowed, reason: undefined };
+              }
+              return resolveSbv1VideoModelRefLinkBlock({
+                modelKey: model.modelKey,
+                refLinkCount,
+              });
+            })();
             return (
               <button
                 key={`${providerId}:${model.modelKey}`}
@@ -383,7 +420,9 @@ export function Sbv1VideoDockModelPicker({
                       {displayName}
                     </span>
                     <span className="block truncate text-[10px] text-white/40">
-                      {model.modelKey}
+                      {resolveSbv1VideoModelFamily(model.modelKey)
+                        ? "文/图/参考分类 · Dock 切换"
+                        : model.modelKey}
                     </span>
                   </span>
                   {typeLabels.length > 0 ? (

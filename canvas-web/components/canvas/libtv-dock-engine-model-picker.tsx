@@ -19,6 +19,7 @@ import {
 } from "./sbv1/sbv1-toolbar-anchor-popover";
 import { useModelTemplateCatalog } from "@/lib/canvas/use-model-template-catalog";
 import { resolveDockAllowedModelKeys } from "@/lib/canvas/resolve-dock-allowed-model-keys";
+import { sbv1VideoModelFamilyMatches } from "@/lib/canvas/sbv1-video-model-families";
 import {
   LIBTV_DOCK_MODEL_POPOVER_CLASS,
   LIBTV_DOCK_PICKER_CHECK_CLASS,
@@ -134,7 +135,8 @@ export function LibtvDockEngineModelPicker({
               <div className="space-y-0.5">
                 {group.items.map(({ providerId: pid, model }) => {
                   const selected =
-                    selectedProvider === pid && selectedKey === model.modelKey;
+                    selectedProvider === pid &&
+                    sbv1VideoModelFamilyMatches(selectedKey, model.modelKey);
                   const displayName = hideKieVendorLabel(
                     model.displayName || model.modelKey,
                   );
