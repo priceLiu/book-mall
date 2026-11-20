@@ -42,7 +42,7 @@ function sourceLabelForBackgroundReplace(_modelKey: string): string {
   return "火山方舟";
 }
 
-/** 换背景专用清单：仅火山 Seedream 5.0 Pro。 */
+/** 换背景 / 图片分层 Seedream 清单：5.0 Pro 与 5.5（默认 5.0 Pro）。 */
 export function mergeBackgroundReplaceModels(opts: {
   gatewayModels: EcomStoryboardGatewayModel[];
   boundKinds: readonly GatewayProviderKind[];

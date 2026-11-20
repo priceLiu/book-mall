@@ -43,8 +43,13 @@ import {
   waitForImageLayerDecomposeJob,
 } from "@/lib/ecom-image-layer-api";
 import { listAssets } from "@/lib/ecom-api";
-import { replaceEcomBackground } from "@/lib/ecom-background-replace-api";
 import {
+  fetchBackgroundReplaceModels,
+  replaceEcomBackground,
+} from "@/lib/ecom-background-replace-api";
+import {
+  BACKGROUND_REPLACE_MODEL_KEYS,
+  BACKGROUND_REPLACE_SEEDREAM_MODEL,
   DEFAULT_BACKGROUND_REPLACE_FORM,
   type BackgroundReplaceFormState,
 } from "@/lib/background-replace-types";
@@ -129,6 +134,7 @@ function buildWorkspaceSnapshot(args: {
   firstOrigin?: string;
   toolMode: ImageLayerCanvasToolMode;
   bgReplace: BackgroundReplaceFormState;
+  seedreamModelKey: string;
 }): ImageLayerWorkspace {
   return {
     sourceImageUrl: args.sourceUrl ?? args.stack?.sourceImageUrl ?? null,
@@ -143,6 +149,7 @@ function buildWorkspaceSnapshot(args: {
     savedImageIndex: args.savedImageIndex,
     ...(args.firstOrigin ? { firstOrigin: args.firstOrigin } : {}),
     toolMode: args.toolMode,
+    seedreamModelKey: args.seedreamModelKey,
     bgReplace: {
       refPrompt: args.bgReplace.refPrompt,
       refImageUrl: args.bgReplace.refImageUrl,
@@ -190,6 +197,10 @@ function ImageLayerStudioInner() {
   const [bgReplaceForm, setBgReplaceForm] = useState<BackgroundReplaceFormState>(
     DEFAULT_BACKGROUND_REPLACE_FORM,
   );
+  const [seedreamModel, setSeedreamModel] = useState(BACKGROUND_REPLACE_SEEDREAM_MODEL);
+  const [seedreamModels, setSeedreamModels] = useState<StoryboardGatewayModel[]>([]);
+  const [seedreamModelsLoading, setSeedreamModelsLoading] = useState(true);
+  const [seedreamModelsError, setSeedreamModelsError] = useState<string | null>(null);
   const [bgReplaceCandidates, setBgReplaceCandidates] = useState<string[]>([]);
   const [bgReplacePickOpen, setBgReplacePickOpen] = useState(false);
   const [savedImages, setSavedImages] = useState<ImageLayerSavedImage[]>([]);
@@ -263,13 +274,22 @@ function ImageLayerStudioInner() {
     } else {
       setCanvasToolMode(ws.stack ? "layer-view" : "decompose-bbox");
     }
+    const restoredSeedream =
+      ws.seedreamModelKey?.trim() &&
+      (BACKGROUND_REPLACE_MODEL_KEYS as readonly string[]).includes(ws.seedreamModelKey.trim())
+        ? ws.seedreamModelKey.trim()
+        : BACKGROUND_REPLACE_SEEDREAM_MODEL;
+    setSeedreamModel(restoredSeedream);
     if (ws.bgReplace) {
       setBgReplaceForm((prev) => ({
         ...prev,
         refPrompt: ws.bgReplace?.refPrompt ?? prev.refPrompt,
         refImageUrl: ws.bgReplace?.refImageUrl ?? "",
         refBbox: ws.bgReplace?.refBbox ?? null,
+        modelKey: restoredSeedream,
       }));
+    } else {
+      setBgReplaceForm((prev) => ({ ...prev, modelKey: restoredSeedream }));
     }
 
     if (ws.canvasDims?.w && ws.canvasDims?.h) {
@@ -404,6 +424,50 @@ function ImageLayerStudioInner() {
     void loadRetouchModels();
   }, [loadRetouchModels, needLogin, sessionChecked]);
 
+  const loadSeedreamModels = useCallback(async () => {
+    setSeedreamModelsLoading(true);
+    setSeedreamModelsError(null);
+    try {
+      const data = await fetchBackgroundReplaceModels();
+      setSeedreamModels(data.imageModels ?? []);
+      const defaultKey = data.defaultModel?.trim() || BACKGROUND_REPLACE_SEEDREAM_MODEL;
+      setSeedreamModel((prev) => {
+        const keys = new Set(data.imageModels.map((m) => m.modelKey));
+        if (keys.has(prev)) return prev;
+        if (keys.has(defaultKey)) return defaultKey;
+        return data.imageModels[0]?.modelKey ?? defaultKey;
+      });
+      setBgReplaceForm((prev) => ({
+        ...prev,
+        modelKey: (() => {
+          const keys = new Set(data.imageModels.map((m) => m.modelKey));
+          if (keys.has(prev.modelKey)) return prev.modelKey;
+          if (keys.has(defaultKey)) return defaultKey;
+          return data.imageModels[0]?.modelKey ?? defaultKey;
+        })(),
+      }));
+    } catch (e) {
+      setSeedreamModelsError(e instanceof Error ? e.message : "Seedream 模型加载失败");
+    } finally {
+      setSeedreamModelsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!sessionChecked || needLogin) return;
+    void loadSeedreamModels();
+  }, [loadSeedreamModels, needLogin, sessionChecked]);
+
+  const handleSeedreamModelChange = useCallback((modelKey: string) => {
+    setSeedreamModel(modelKey);
+    setBgReplaceForm((prev) => ({ ...prev, modelKey }));
+  }, []);
+
+  const seedreamModelHint = useMemo(() => {
+    const row = seedreamModels.find((m) => m.modelKey === seedreamModel);
+    return row?.displayName ?? seedreamModel;
+  }, [seedreamModel, seedreamModels]);
+
   const loadLibrarySaved = useCallback(async () => {
     const items = await listAssets(IMAGE_LAYER_ASSET_MODULE);
     setLibrarySaved(
@@ -439,9 +503,11 @@ function ImageLayerStudioInner() {
         firstOrigin,
         toolMode: canvasToolMode,
         bgReplace: bgReplaceForm,
+        seedreamModelKey: seedreamModel,
       }),
     [
       bgReplaceForm,
+      seedreamModel,
       canvasDims,
       canvasToolMode,
       displayDims,
@@ -510,6 +576,7 @@ function ImageLayerStudioInner() {
     stack,
     canvasToolMode,
     bgReplaceForm,
+    seedreamModel,
   ]);
 
   const ensureSessionForAi = useCallback(async (): Promise<boolean> => {
@@ -781,7 +848,7 @@ function ImageLayerStudioInner() {
       backgroundGen.registerTask({
         id: taskId,
         label: "AI 图层分离",
-        hint: "Seedream 5.0 Pro · 可能需 1～2 分钟",
+        hint: `${seedreamModelHint} · 可能需 1～2 分钟`,
         startedAt: new Date().toISOString(),
         expectedDurationMs: 120_000,
         poll: async () => ({ status: "running" as const }),
@@ -790,6 +857,7 @@ function ImageLayerStudioInner() {
       const result = await decomposeImageLayers({
         sourceImageUrl: decomposeUrl,
         projectId: project.id,
+        modelKey: seedreamModel,
         ...(pendingBboxes.length ? { bboxes: pendingBboxes } : {}),
       });
       applyStack(result, { pendingBboxes: [...pendingBboxes] });
@@ -825,6 +893,8 @@ function ImageLayerStudioInner() {
     pendingBboxes,
     project?.id,
     promoteAsDecomposeSource,
+    seedreamModel,
+    seedreamModelHint,
     sourceUrl,
     stack,
   ]);
@@ -863,7 +933,7 @@ function ImageLayerStudioInner() {
     handlers.backgroundGen.registerTask({
       id: DECOMPOSE_TASK_ID,
       label: "AI 图层分离",
-      hint: "Seedream 5.0 Pro · 可能需 1～2 分钟",
+      hint: `${seedreamModelHint} · 可能需 1～2 分钟`,
       startedAt: new Date().toISOString(),
       expectedDurationMs: 120_000,
       poll: async () => ({ status: "running" as const }),
@@ -1053,6 +1123,7 @@ function ImageLayerStudioInner() {
         compositeImageUrl,
         edits: jobs.map((j) => ({ bbox: j.bbox, prompt: j.prompt })),
         projectId: project.id,
+        modelKey: seedreamModel,
       });
       await applyFlatEditResult(result.imageUrl);
 
@@ -1085,6 +1156,7 @@ function ImageLayerStudioInner() {
     editEntries,
     ensureSessionForAi,
     project?.id,
+    seedreamModel,
     sourceUrl,
     stack,
     toast,
@@ -2043,15 +2115,15 @@ function ImageLayerStudioInner() {
             busyTitle={generatingLabel}
             busyDetail={
               decomposeBusy
-                ? "Seedream 5.0 Pro · 可能需 1～2 分钟"
+                ? `${seedreamModelHint} · 可能需 1～2 分钟`
                 : editBusy
-                  ? "改层后回到整图"
+                  ? `${seedreamModelHint} · 改层后回到整图`
                   : retouchBusy
                     ? retouchModel
                     : eraseBusy
                       ? "图像擦除补全"
                       : bgReplaceBusy
-                        ? "Seedream 5.0 Pro · 背景与主体"
+                        ? `${seedreamModelHint} · 背景与主体`
                         : uploadBusy
                           ? "正在上传原图至 OSS"
                           : undefined
@@ -2098,6 +2170,12 @@ function ImageLayerStudioInner() {
             onBgReplaceFormChange={setBgReplaceForm}
             onUploadBgReplaceImage={uploadBgReplaceImage}
             onBgReplaceSubmit={() => void runBackgroundReplace()}
+            seedreamModel={seedreamModel}
+            seedreamModels={seedreamModels}
+            seedreamModelsLoading={seedreamModelsLoading}
+            seedreamModelsError={seedreamModelsError}
+            onSeedreamModelChange={handleSeedreamModelChange}
+            onReloadSeedreamModels={() => void loadSeedreamModels()}
           />
         }
         assistantHeader={

@@ -62,6 +62,8 @@ export const imageLayerWorkspaceSchema = z.object({
   toolMode: z
     .enum(["layer-view", "bg-replace", "retouch", "erase", "decompose-bbox"])
     .optional(),
+  /** 图层拆分 / 改层 / 换背景共用的 Seedream Gateway 键（默认 5.0 Pro） */
+  seedreamModelKey: z.string().optional(),
   bgReplace: z
     .object({
       refPrompt: z.string().optional(),

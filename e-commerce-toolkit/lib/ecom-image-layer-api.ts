@@ -93,6 +93,7 @@ export async function decomposeImageLayers(opts: {
   bboxes?: Array<[number, number, number, number]>;
   size?: string;
   projectId?: string;
+  modelKey?: string;
 }): Promise<ImageLayerStack> {
   const data = await ecomBookFetch(`${BASE}/decompose`, {
     method: "POST",
@@ -118,6 +119,7 @@ export async function editImageLayer(opts: {
   compositeImageUrl: string;
   edits: ImageLayerEditInput[];
   projectId?: string;
+  modelKey?: string;
 }): Promise<{ imageUrl: string; logId?: string }> {
   const data = await ecomBookFetch(`${BASE}/edit`, {
     method: "POST",

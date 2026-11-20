@@ -26,6 +26,9 @@ type Props = {
   onSubmitAll: () => void;
   onRemove?: (layerId: string) => void;
   submitCount?: number;
+  seedreamModelKey: string;
+  seedreamModelLabel?: string;
+  onOpenSeedreamModelPicker?: () => void;
   /** 外层 assistantHeader 已展示标题时隐藏本面板标题 */
   hideHeader?: boolean;
 };
@@ -41,6 +44,9 @@ export function ImageLayerEditPanel({
   onPromptChange,
   onSubmitAll,
   submitCount = 0,
+  seedreamModelKey,
+  seedreamModelLabel,
+  onOpenSeedreamModelPicker,
   hideHeader = false,
 }: Props) {
   useEffect(() => {
@@ -160,9 +166,22 @@ export function ImageLayerEditPanel({
 
       {entries.length > 0 ? (
         <div className="shrink-0 border-t border-[#e5e7eb] bg-white p-4">
+          {onOpenSeedreamModelPicker ? (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={onOpenSeedreamModelPicker}
+              className="mb-3 flex w-full items-center justify-between rounded-lg border border-[#e5e7eb] bg-white px-3 py-2 text-left text-sm transition hover:border-[#2563eb]/40 hover:bg-[#f0f6ff]/50 disabled:opacity-60"
+            >
+              <span className="text-[11px] font-medium text-[#6b7280]">Seedream 模型</span>
+              <span className="truncate font-medium text-[#111827]">
+                {seedreamModelLabel ?? seedreamModelKey}
+              </span>
+            </button>
+          ) : null}
           <div className="mb-2 flex justify-end">
             <EcomGenerateCreditsBeside
-              modelKey="doubao-seedream-5-0-pro"
+              modelKey={seedreamModelKey}
               imageCount={1}
               enabled={submitCount > 0 && !busy}
             />

@@ -177,6 +177,12 @@ type Props = {
   onBgReplaceFormChange: (next: BackgroundReplaceFormState) => void;
   onUploadBgReplaceImage: (file: File) => Promise<string>;
   onBgReplaceSubmit: () => void;
+  seedreamModel: string;
+  seedreamModels: StoryboardGatewayModel[];
+  seedreamModelsLoading: boolean;
+  seedreamModelsError?: string | null;
+  onSeedreamModelChange: (modelKey: string) => void;
+  onReloadSeedreamModels: () => void;
 };
 
 export function ImageLayerAssistantPanel({
@@ -226,13 +232,48 @@ export function ImageLayerAssistantPanel({
   onBgReplaceFormChange,
   onUploadBgReplaceImage,
   onBgReplaceSubmit,
+  seedreamModel,
+  seedreamModels,
+  seedreamModelsLoading,
+  seedreamModelsError,
+  onSeedreamModelChange,
+  onReloadSeedreamModels,
 }: Props) {
   const [modelPickerOpen, setModelPickerOpen] = useState(false);
+  const [seedreamPickerOpen, setSeedreamPickerOpen] = useState(false);
 
   const currentRetouchModel = useMemo(
     () => retouchModels.find((m) => m.modelKey === retouchModel),
     [retouchModel, retouchModels],
   );
+
+  const currentSeedreamModel = useMemo(
+    () => seedreamModels.find((m) => m.modelKey === seedreamModel),
+    [seedreamModel, seedreamModels],
+  );
+
+  const seedreamModelPicker = (
+    <StoryboardModelPickerDialog
+      open={seedreamPickerOpen}
+      onOpenChange={setSeedreamPickerOpen}
+      mode="image"
+      selectionOnly
+      dialogTitle="选择 Seedream 模型"
+      models={seedreamModels}
+      modelsLoading={seedreamModelsLoading}
+      modelsEmptyHint={seedreamModelsError ?? undefined}
+      onRetryLoadModels={onReloadSeedreamModels}
+      value={seedreamModel}
+      onChange={onSeedreamModelChange}
+      hideTypeFilter
+      onConfirm={(modelKey) => {
+        onSeedreamModelChange(modelKey);
+        setSeedreamPickerOpen(false);
+      }}
+    />
+  );
+
+  const openSeedreamPicker = () => setSeedreamPickerOpen(true);
 
   const showSelectionTools =
     toolMode === "retouch" || toolMode === "erase" || toolMode === "decompose-bbox";
@@ -271,6 +312,13 @@ export function ImageLayerAssistantPanel({
               onUndoBbox={onUndoBbox}
             />
           </div>
+          <LocalEditModelButton
+            label="Seedream 模型"
+            modelKey={seedreamModel}
+            displayName={currentSeedreamModel?.displayName}
+            busy={busy || bgReplaceBusy}
+            onClick={openSeedreamPicker}
+          />
           <BackgroundReplacePanel
             form={bgReplaceForm}
             busy={busy || bgReplaceBusy}
@@ -283,26 +331,33 @@ export function ImageLayerAssistantPanel({
             onSubmit={onBgReplaceSubmit}
           />
         </div>
+        {seedreamModelPicker}
       </div>
     );
   }
 
   if (toolMode === "layer-view" && hasStack) {
     return (
-      <ImageLayerEditPanel
-        entries={editEntries}
-        selectedLayerId={selectedLayerId}
-        busy={busy}
-        editingLayerId={editingLayerId}
-        busyTitle={busyTitle}
-        busyDetail={busyDetail}
-        onSelectLayer={onSelectLayer}
-        onPromptChange={onPromptChange}
-        onSubmitAll={onSubmitAllEdits}
-        submitCount={editSubmitCount}
-        onRemove={onRemoveEditEntry}
-        hideHeader
-      />
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-[var(--ecom-assistant-bg)]">
+        <ImageLayerEditPanel
+          entries={editEntries}
+          selectedLayerId={selectedLayerId}
+          busy={busy}
+          editingLayerId={editingLayerId}
+          busyTitle={busyTitle}
+          busyDetail={busyDetail}
+          onSelectLayer={onSelectLayer}
+          onPromptChange={onPromptChange}
+          onSubmitAll={onSubmitAllEdits}
+          submitCount={editSubmitCount}
+          onRemove={onRemoveEditEntry}
+          seedreamModelKey={seedreamModel}
+          seedreamModelLabel={currentSeedreamModel?.displayName}
+          onOpenSeedreamModelPicker={openSeedreamPicker}
+          hideHeader
+        />
+        {seedreamModelPicker}
+      </div>
     );
   }
 
@@ -399,10 +454,19 @@ export function ImageLayerAssistantPanel({
           ) : null}
 
           {toolMode === "decompose-bbox" ? (
-            <p className="flex items-center gap-1.5 text-xs text-[#6b7280]">
-              <Layers className="h-3.5 w-3.5 shrink-0" />
-              框选完成后，点击顶栏拆层按钮
-            </p>
+            <>
+              <LocalEditModelButton
+                label="Seedream 模型"
+                modelKey={seedreamModel}
+                displayName={currentSeedreamModel?.displayName}
+                busy={busy}
+                onClick={openSeedreamPicker}
+              />
+              <p className="flex items-center gap-1.5 text-xs text-[#6b7280]">
+                <Layers className="h-3.5 w-3.5 shrink-0" />
+                框选完成后，点击顶栏拆层按钮
+              </p>
+            </>
           ) : null}
 
           {toolMode === "layer-view" && !hasStack ? (
@@ -433,6 +497,7 @@ export function ImageLayerAssistantPanel({
           setModelPickerOpen(false);
         }}
       />
+      {seedreamModelPicker}
     </div>
   );
 }

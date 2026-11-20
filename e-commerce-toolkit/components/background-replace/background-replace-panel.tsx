@@ -87,7 +87,7 @@ export function BackgroundReplacePanel({
     <div className="space-y-3">
       <p className="text-xs leading-relaxed text-[#6b7280]">
         {subjectHint ??
-          "火山 Seedream 5.0 Pro：可在右侧框选再换，也可只写场景；上传参考图则按图 1 + 图 2 编辑。"}
+          "火山 Seedream：可在侧栏切换 5.0 Pro / 5.5；右侧框选再换，或只写场景；上传参考图则按图 1 + 图 2 编辑。"}
       </p>
       <p className="rounded-lg bg-[#f0f6ff] px-2.5 py-1.5 text-[11px] leading-5 text-[#374151]">
         {bboxHint({ hasSubjectBbox, hasRefBbox })}

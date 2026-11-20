@@ -102,6 +102,8 @@ export type ImageLayerWorkspace = {
   editPrompt?: string;
   editEntries?: ImageLayerEditEntry[];
   toolMode?: "layer-view" | "bg-replace" | "retouch" | "erase" | "decompose-bbox";
+  /** 图层拆分 / 改层 / 换背景 · Seedream（默认 doubao-seedream-5-0-pro） */
+  seedreamModelKey?: string;
   bgReplace?: {
     refPrompt?: string;
     refImageUrl?: string;
