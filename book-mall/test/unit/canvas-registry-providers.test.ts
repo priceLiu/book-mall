@@ -4,10 +4,12 @@ import type { CanvasProviderDto } from "@/lib/canvas/canvas-provider-service";
 import {
   GATEWAY_BAILIAN_PROVIDER_ID,
   GATEWAY_MINIMAX_VIDEO_PROVIDER_ID,
+  GATEWAY_VOLCENGINE_PROVIDER_ID,
 } from "@/lib/canvas/canvas-gateway-providers";
 import {
   mergeKnownBailianImageModelsForCanvas,
   mergeKnownMinimaxSpeechModelsForCanvas,
+  mergeKnownVolcengineImageModelsForCanvas,
 } from "@/lib/canvas/canvas-registry-providers";
 
 function shell(id: string): Omit<CanvasProviderDto, "models"> {
@@ -68,6 +70,40 @@ describe("mergeKnownBailianImageModelsForCanvas", () => {
   it("skips merge for non-IMAGE role filter", () => {
     const merged = mergeKnownBailianImageModelsForCanvas([], { role: "VIDEO" });
     expect(merged).toEqual([]);
+  });
+});
+
+describe("mergeKnownVolcengineImageModelsForCanvas", () => {
+  it("appends doubao-seedream-5-5 when registry list omitted it", () => {
+    const providers: CanvasProviderDto[] = [
+      {
+        ...shell(GATEWAY_VOLCENGINE_PROVIDER_ID),
+        models: [
+          {
+            id: `${GATEWAY_VOLCENGINE_PROVIDER_ID}::doubao-seedream-5-0-pro`,
+            modelKey: "doubao-seedream-5-0-pro",
+            displayName: "Doubao Seedream 5.0 Pro",
+            role: "IMAGE",
+            description: null,
+            paramsSchema: null,
+            defaultParams: null,
+            enabled: true,
+            sortOrder: 0,
+          },
+        ],
+      },
+    ];
+
+    const merged = mergeKnownVolcengineImageModelsForCanvas(providers, {
+      role: "IMAGE",
+    });
+    const volc = merged.find((p) => p.id === GATEWAY_VOLCENGINE_PROVIDER_ID);
+    expect(volc?.models.some((m) => m.modelKey === "doubao-seedream-5-5")).toBe(
+      true,
+    );
+    expect(volc?.models.some((m) => m.modelKey === "doubao-seedream-5-0-lite")).toBe(
+      true,
+    );
   });
 });
 

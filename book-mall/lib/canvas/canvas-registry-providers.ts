@@ -12,7 +12,11 @@ import { BAILIAN_IMAGE_KNOWN_MODELS } from "./providers/bailian-image";
 import { BAILIAN_R2V_KNOWN_MODELS } from "./providers/bailian-r2v";
 import { BAILIAN_DASHSCOPE_T2V_KNOWN_MODELS } from "./providers/bailian-dashscope-t2v";
 import { STORY_TTS_GATEWAY_MODELS } from "./providers/story-tts";
-import { VOLCENGINE_ALL_KNOWN_MODELS, VOLCENGINE_VIDEO_KNOWN_MODELS } from "@/lib/gateway/volcengine-chat-models";
+import {
+  VOLCENGINE_ALL_KNOWN_MODELS,
+  VOLCENGINE_IMAGE_KNOWN_MODELS,
+  VOLCENGINE_VIDEO_KNOWN_MODELS,
+} from "@/lib/gateway/volcengine-chat-models";
 import { listHunyuanKnownModels } from "./providers/hunyuan-3d";
 import { TOPAZ_KNOWN_MODELS } from "./providers/topaz";
 import { MINIMAX_VIDEO_KNOWN_MODELS_CANVAS } from "./providers/minimax-video";
@@ -239,6 +243,70 @@ export function mergeKnownBailianImageModelsForCanvas(
   return out;
 }
 
+function knownVolcengineImageToModelDto(
+  providerId: string,
+  meta: (typeof VOLCENGINE_IMAGE_KNOWN_MODELS)[number],
+  sortOrder: number,
+): CanvasProviderDto["models"][0] {
+  return {
+    id: `${providerId}::${meta.modelKey}`,
+    modelKey: meta.modelKey,
+    displayName: meta.displayName,
+    role: meta.role,
+    description: meta.description ?? null,
+    paramsSchema: meta.paramsSchema ?? null,
+    defaultParams: meta.defaultParams ?? null,
+    enabled: true,
+    sortOrder,
+  };
+}
+
+/** 注册表漏项时兜底火山方舟 Seedream（含 5.5），与电商 mergeBackgroundReplaceModels 对齐。 */
+export function mergeKnownVolcengineImageModelsForCanvas(
+  providers: CanvasProviderDto[],
+  opts: { role?: CanvasModelRole },
+): CanvasProviderDto[] {
+  if (opts.role && opts.role !== "IMAGE") return providers;
+
+  const presentKeys = new Set<string>();
+  for (const p of providers) {
+    for (const m of p.models) presentKeys.add(m.modelKey);
+  }
+
+  const missing = VOLCENGINE_IMAGE_KNOWN_MODELS.filter(
+    (m) => m.role === "IMAGE" && !presentKeys.has(m.modelKey),
+  );
+  if (missing.length === 0) return providers;
+
+  const now = new Date().toISOString();
+  const out = providers.map((p) =>
+    p.id === GATEWAY_VOLCENGINE_PROVIDER_ID
+      ? { ...p, models: [...p.models] }
+      : p,
+  );
+  let volc = out.find((p) => p.id === GATEWAY_VOLCENGINE_PROVIDER_ID);
+  if (!volc) {
+    volc = {
+      ...buildProviderShell(GATEWAY_VOLCENGINE_PROVIDER_ID, now),
+      models: [],
+    };
+    out.push(volc);
+  }
+
+  const baseSort = volc.models.length;
+  for (let i = 0; i < missing.length; i++) {
+    volc.models.push(
+      knownVolcengineImageToModelDto(
+        GATEWAY_VOLCENGINE_PROVIDER_ID,
+        missing[i]!,
+        baseSort + i,
+      ),
+    );
+  }
+  volc.models.sort((a, b) => a.sortOrder - b.sortOrder);
+  return out;
+}
+
 function knownMinimaxSpeechToModelDto(
   providerId: string,
   meta: (typeof MINIMAX_SPEECH_KNOWN_MODELS_CANVAS)[number],
@@ -357,6 +425,16 @@ export async function buildCanvasProvidersFromRegistry(
 
   if (canUseMinimaxTts) {
     providers = mergeKnownMinimaxSpeechModelsForCanvas(providers, {
+      role: opts?.role,
+    });
+  }
+
+  const canUseVolcengineImage =
+    persona === "PLATFORM_CREDIT" ||
+    isGatewayProviderBound(boundKinds, "VOLCENGINE");
+
+  if (canUseVolcengineImage) {
+    providers = mergeKnownVolcengineImageModelsForCanvas(providers, {
       role: opts?.role,
     });
   }

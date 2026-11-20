@@ -29,7 +29,6 @@ export const SBV1_IMAGE_MODEL_KEYS = [
   "doubao-seedream-5-0-lite",
   "doubao-seedream-5-5",
   "seedream-4.5",
-  "seedream-5-lite",
 ] as const;
 
 export type Sbv1ImageQuality = "low" | "standard" | "high";
