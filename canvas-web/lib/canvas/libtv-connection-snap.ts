@@ -226,20 +226,79 @@ export function inferLibtvConnectHandleType(
 
 export type ConnectHoverEdge = "left" | "right";
 
-/** 吸附目标节点 · 连线将接触的边（下游入边左倾 / 上游出边右倾） */
+/** 连线落在节点上的 handle → 接触左边框或右边框 */
+export function resolveConnectHandleDockEdge(
+  handleId: string | null | undefined,
+  nodeType?: string,
+): ConnectHoverEdge {
+  const id = (handleId ?? "").trim();
+  if (!id) return "left";
+  if (id === "plus_left" || id.startsWith("in_")) return "left";
+  if (isLibtvSidePlusInHandle(id)) {
+    const base = id.slice(0, -"__in".length);
+    return base === "plus_left" ? "left" : "right";
+  }
+  const map = nodeType ? SIDE_PLUS_BY_TYPE[String(nodeType)] : undefined;
+  if (map?.left === id) return "left";
+  if (map?.right === id) return "right";
+  if (
+    id.startsWith("out_") ||
+    id === "image" ||
+    id === "text" ||
+    id === "style" ||
+    id === "audio"
+  ) {
+    return "right";
+  }
+  return "right";
+}
+
+/** 吸附目标节点 · 按落点 handle 决定左/右边框内倾 */
 export function resolveConnectDragHoverEdge(
   nodes: CanvasFlowNode[],
   flowPoint: { x: number; y: number },
+  fromNodeId: string,
   fromHandleId: string | null,
   hoverNodeId: string | null,
 ): ConnectHoverEdge | null {
-  if (!hoverNodeId) return null;
+  if (!hoverNodeId || !fromNodeId) return null;
+  const hoverNode = nodes.find((n) => n.id === hoverNodeId);
+  if (!hoverNode) return null;
+  const nodeType = String(hoverNode.type ?? "");
+
   const fromHandleType = inferLibtvConnectHandleType(fromHandleId);
-  if (fromHandleType === "source") return "left";
-  if (fromHandleType === "target") return "right";
-  const node = nodes.find((n) => n.id === hoverNodeId);
-  if (!node) return null;
-  const { x, w } = nodeFlowBounds(node, nodes);
+  if (fromHandleType) {
+    const snapped = resolveSnapConnectionOnNodeHit(
+      {
+        isValid: false,
+        fromNodeId,
+        fromHandleId,
+        fromHandleType,
+        toNodeId: hoverNodeId,
+        toHandleId: null,
+      },
+      nodes,
+      flowPoint,
+    );
+    if (snapped) {
+      const handleOnHover =
+        snapped.target === hoverNodeId
+          ? snapped.targetHandle
+          : snapped.source === hoverNodeId
+            ? snapped.sourceHandle
+            : null;
+      if (handleOnHover) {
+        return resolveConnectHandleDockEdge(handleOnHover, nodeType);
+      }
+    }
+  }
+
+  const sideHit = findNearestSidePlusHandle(nodes, flowPoint, fromNodeId);
+  if (sideHit?.node.id === hoverNodeId) {
+    return resolveConnectHandleDockEdge(sideHit.handleId, nodeType);
+  }
+
+  const { x, w } = nodeFlowBounds(hoverNode, nodes);
   return flowPoint.x < x + w / 2 ? "left" : "right";
 }
 

@@ -297,7 +297,7 @@ type CanvasState = {
    * - `connectingFromNodeId`：用户按住源 handle 拖线时该 handle 所属节点
    * - `dragHoverGroupId`：拖动节点过程中，鼠标当前悬停在哪个 group 容器内
    * - `connectionHoverNodeId`：侧栏 + 拖线时指针下可 snap 的目标节点
-   * - `connectionHoverEdge`：吸附侧（左=下游入边 / 右=上游出边）· 连线接触倾斜
+   * - `connectionHoverEdge`：吸附落点边框（left / right）· 连线接触倾斜
    */
   connectingFromNodeId: string | null;
   /** 正在拖线的源 handle id · 拖线中仅该侧 + 保持可见 */

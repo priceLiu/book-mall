@@ -2194,6 +2194,7 @@ function FlowCanvasInner({
         ? resolveConnectDragHoverEdge(
             nodes,
             flowPoint,
+            connectingFromNodeId,
             connectingFromHandleId,
             hoverId,
           )
