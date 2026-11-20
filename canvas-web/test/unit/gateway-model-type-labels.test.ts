@@ -85,5 +85,8 @@ describe("SBV1_IMAGE_MODEL_KEYS", () => {
     expect(SBV1_IMAGE_MODEL_KEYS).toContain("grok-imagine/text-to-image");
     expect(SBV1_IMAGE_MODEL_KEYS).toContain("qwen-text-to-image");
     expect(SBV1_IMAGE_MODEL_KEYS).toContain("hunyuan-3d-pro");
+    expect(SBV1_IMAGE_MODEL_KEYS).toContain("doubao-seedream-5-0-lite");
+    expect(SBV1_IMAGE_MODEL_KEYS).toContain("doubao-seedream-5-0-pro");
+    expect(SBV1_IMAGE_MODEL_KEYS).toContain("doubao-seedream-5-5");
   });
 });

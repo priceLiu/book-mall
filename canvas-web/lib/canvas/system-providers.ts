@@ -236,10 +236,30 @@ function findImageOnProvider(
   return { providerId: provider.id, modelKey: m.modelKey };
 }
 
+const VOLCENGINE_STORY_IMAGE_PREFERRED = [
+  "doubao-seedream-5-0-pro",
+  "doubao-seedream-5-0-lite",
+  "doubao-seedream-5-5",
+] as const;
+
 /** 漫剧分镜图 / 三视图 · 默认 Gateway / 用户 KIE IMAGE 模型 */
 export function pickDefaultStoryImageEngine(
   providers: CanvasProviderDto[],
 ): { providerId: string; modelKey: string } | null {
+  const volc =
+    activeCanvasProviders(providers).find(
+      (p) =>
+        p.id === GATEWAY_VOLCENGINE_PROVIDER_ID ||
+        p.id === GATEWAY_SBV1_VOLCENGINE_PROVIDER_ID,
+    ) ?? undefined;
+  if (volc) {
+    for (const key of VOLCENGINE_STORY_IMAGE_PREFERRED) {
+      if (!(THREE_VIEW_ENGINE_MODEL_KEYS as readonly string[]).includes(key)) continue;
+      const hit = findImageOnProvider(volc, key);
+      if (hit) return hit;
+    }
+  }
+
   const kie = findProviderByKind(providers, "KIE");
   if (kie) {
     for (const key of THREE_VIEW_ENGINE_MODEL_KEYS) {

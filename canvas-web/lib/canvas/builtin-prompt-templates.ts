@@ -41,6 +41,9 @@ export {
 /** 三视图引擎可选模型（EnginePicker 白名单） */
 export const THREE_VIEW_ENGINE_MODEL_KEYS = [
   "nano-banana-pro",
+  "doubao-seedream-5-0-lite",
+  "doubao-seedream-5-0-pro",
+  "doubao-seedream-5-5",
   "hunyuan-3d-pro",
   "hunyuan-3d-express",
 ] as const;

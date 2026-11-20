@@ -74,6 +74,14 @@ export const MISSING_MODEL_COST_SEEDS: ModelCostSeedRow[] = [
 
   // —— CORE · TEXT_TO_IMAGE ——
   { canonicalModelKey: "aitryon-refiner", vendor: "aliyun", unit: "PER_IMAGE", listCostYuan: 0.3, discountRate: ALI },
+  {
+    canonicalModelKey: "doubao-seedream-5-0-lite",
+    vendor: "volcengine",
+    unit: "PER_IMAGE",
+    listCostYuan: 0.18,
+    discountRate: VOLC,
+    note: "方舟 Seedream 5.0 Lite · 与 KIE seedream-5-lite 同档参考价",
+  },
   { canonicalModelKey: "doubao-seedream-5-0-pro", vendor: "volcengine", unit: "PER_IMAGE", listCostYuan: 0.35, discountRate: VOLC },
   {
     canonicalModelKey: "doubao-seedream-5-5",
