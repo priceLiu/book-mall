@@ -26,6 +26,7 @@ import { EcomCreditsBalanceChip } from "@/components/layout/ecom-credits-balance
 import { PlatformTopupNavLink } from "@/lib/platform-billing/platform-topup-nav-link";
 import { ecomPrimaryLinkClass } from "@/components/ui/ecom-button";
 import { unlockEcomDocumentInteraction } from "@/lib/ecom-document-unlock";
+import { syncEcomWorkspaceNavTrapUrl } from "@/lib/ecom-block-browser-nav";
 import { feishuGuideUrlForPathname } from "@/lib/ecom-feishu-guide-urls";
 import { ECOM_SIDEBAR_LOGO_MARK_CLASS } from "@/lib/ecom-outline-ui";
 import { cn } from "@/lib/utils";
@@ -230,6 +231,7 @@ function ExpandedNavLink({
           href={item.href}
           prefetch
           className={linkClass}
+          onPointerDown={() => unlockEcomDocumentInteraction()}
           onClick={() => unlockEcomDocumentInteraction()}
         >
           {linkInner}
@@ -598,6 +600,13 @@ export function EcomProfileSidebar({
       } else {
         if (collapsed) expandSidebar();
         unlockEcomDocumentInteraction();
+        try {
+          syncEcomWorkspaceNavTrapUrl(
+            new URL(entry.link.href, window.location.href).href,
+          );
+        } catch {
+          /* ignore */
+        }
         router.push(entry.link.href);
       }
     }
@@ -655,7 +664,7 @@ export function EcomProfileSidebar({
     <RailTipContext.Provider value={railTipApi}>
       <aside
         className={cn(
-          "ecom-glass-sidebar pointer-events-auto relative isolate z-[250] flex h-full max-h-full shrink-0 flex-col overflow-hidden rounded-xl border border-white/10 text-zinc-100",
+          "ecom-glass-sidebar pointer-events-auto relative isolate z-[320] flex h-full max-h-full shrink-0 flex-col overflow-hidden rounded-xl border border-white/10 text-zinc-100",
           collapsed ? "w-[4.5rem]" : "w-[21rem]",
           className,
         )}

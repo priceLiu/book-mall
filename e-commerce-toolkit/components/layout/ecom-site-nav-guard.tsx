@@ -3,8 +3,10 @@
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef } from "react";
 
+import { unlockEcomDocumentInteraction } from "@/lib/ecom-document-unlock";
 import {
   installEcomSiteNavGuards,
+  primeEcomWorkspaceNavTrapFromAnchor,
   syncEcomWorkspaceNavTrapUrl,
 } from "@/lib/ecom-block-browser-nav";
 
@@ -27,6 +29,19 @@ function EcomSiteNavGuardInner() {
         routerRef.current.replace(`${url.pathname}${url.search}${url.hash}`);
       },
     });
+  }, []);
+
+  useEffect(() => {
+    const onPointerDown = (event: PointerEvent) => {
+      if (event.button !== 0) return;
+      const target = event.target as HTMLElement | null;
+      const anchor = target?.closest("a[href]");
+      if (!anchor || !(anchor instanceof HTMLAnchorElement)) return;
+      primeEcomWorkspaceNavTrapFromAnchor(anchor);
+      unlockEcomDocumentInteraction();
+    };
+    document.addEventListener("pointerdown", onPointerDown, true);
+    return () => document.removeEventListener("pointerdown", onPointerDown, true);
   }, []);
 
   const search = searchParams.toString();

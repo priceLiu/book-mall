@@ -132,8 +132,10 @@ export function EcomAppShell({
     };
   }, [loggedIn, bookOrigin]);
 
-  React.useEffect(() => {
+  React.useLayoutEffect(() => {
     unlockEcomDocumentInteraction();
+    const id = window.requestAnimationFrame(() => unlockEcomDocumentInteraction());
+    return () => window.cancelAnimationFrame(id);
   }, [pathname]);
 
   React.useEffect(() => {
@@ -167,7 +169,7 @@ export function EcomAppShell({
           bookOrigin={bookOrigin}
           collapsed={navCollapsed}
           onCollapsedChange={setCollapsed}
-          className="relative z-[200] hidden h-full max-h-full md:flex"
+          className="relative z-[320] hidden h-full max-h-full md:flex"
         />
         <div
           className="relative z-0 flex min-h-0 min-w-0 max-w-full flex-col overflow-clip rounded-xl bg-white"

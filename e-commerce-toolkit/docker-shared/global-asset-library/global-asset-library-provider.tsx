@@ -1,5 +1,6 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import {
   createContext,
   useCallback,
@@ -10,6 +11,8 @@ import {
   type ComponentType,
   type ReactNode,
 } from "react";
+
+import { unlockEcomDocumentInteraction } from "@/lib/ecom-document-unlock";
 
 import { GlobalAssetLibraryDialog } from "./global-asset-library-dialog";
 import { globalOptionsToUnified } from "./open-asset-library-utils";
@@ -63,6 +66,7 @@ export function GlobalAssetLibraryProvider({
   const [unifiedOptions, setUnifiedOptions] = useState<OpenAssetLibraryOptions>({
     app: defaultApp,
   });
+  const pathname = usePathname();
 
   const unifiedApi = api as UnifiedAssetLibraryApiClient;
   const UnifiedDialogComponent = UnifiedDialog ?? UnifiedAssetLibraryDialog;
@@ -98,6 +102,11 @@ export function GlobalAssetLibraryProvider({
   useEffect(() => {
     onOpenChange?.(legacyOpen || unifiedOpen);
   }, [legacyOpen, unifiedOpen, onOpenChange]);
+
+  useEffect(() => {
+    closeAll();
+    unlockEcomDocumentInteraction();
+  }, [pathname, closeAll]);
 
   const value = useMemo(
     () => ({ openGlobalAssetLibrary, openAssetLibrary }),

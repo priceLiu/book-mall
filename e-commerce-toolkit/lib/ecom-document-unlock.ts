@@ -5,6 +5,9 @@ export function unlockEcomDocumentInteraction() {
   document.body.style.removeProperty("overflow");
   document.body.style.removeProperty("padding-right");
   document.body.removeAttribute("data-scroll-locked");
+  document.body.removeAttribute("aria-hidden");
+  document.body.style.removeProperty("overflow");
   document.documentElement.style.removeProperty("overflow");
   document.documentElement.style.removeProperty("padding-right");
+  document.documentElement.removeAttribute("data-scroll-locked");
 }

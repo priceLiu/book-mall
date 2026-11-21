@@ -8,6 +8,7 @@ import {
   ecomModalBackdropMouseDown,
   useEcomModalEscape,
 } from "@/components/ui/ecom-modal-layer";
+import { unlockEcomDocumentInteraction } from "@/lib/ecom-document-unlock";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -48,6 +49,7 @@ export function EcomFullScreenOverlay({
     document.body.style.overflow = "hidden";
     return () => {
       document.body.style.overflow = prev;
+      unlockEcomDocumentInteraction();
     };
   }, [open]);
 

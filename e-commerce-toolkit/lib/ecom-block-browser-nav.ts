@@ -61,21 +61,27 @@ export type EcomWorkspaceNavGuardOptions = {
 let lockedWorkspaceHref = "";
 let navBlockedHandler: EcomWorkspaceNavGuardOptions["onNavBlocked"];
 
-function pushEcomWorkspaceHistoryTrap(href: string): void {
-  if (typeof window === "undefined") return;
-  if (!isEcomWorkspaceNavBlockActive()) return;
-  lockedWorkspaceHref = href;
-  try {
-    window.history.pushState({ __ecomWorkspaceNavTrap: true }, "", href);
-  } catch {
-    /* quota / sandbox */
-  }
-}
-
-/** 路由切换后刷新锁定 URL（仍禁止浏览器后退离开当前页）。 */
+/** 路由切换后仅更新锁定 URL（勿 pushState，避免与 Next 侧栏导航争用 popstate）。 */
 export function syncEcomWorkspaceNavTrapUrl(href?: string): void {
   if (typeof window === "undefined") return;
-  pushEcomWorkspaceHistoryTrap(href ?? window.location.href);
+  if (!isEcomWorkspaceNavBlockActive()) return;
+  lockedWorkspaceHref = href ?? window.location.href;
+}
+
+/** 站内链接点击前调用（capture 阶段），避免 popstate 时 locked 仍指向上页导致被 replace 拉回。 */
+export function primeEcomWorkspaceNavTrapFromAnchor(anchor: HTMLAnchorElement): void {
+  if (typeof window === "undefined") return;
+  if (!isEcomWorkspaceNavBlockActive()) return;
+  const href = anchor.getAttribute("href");
+  if (!href || href.startsWith("#")) return;
+  if (anchor.target === "_blank") return;
+  try {
+    const u = new URL(href, window.location.href);
+    if (u.origin !== window.location.origin) return;
+    syncEcomWorkspaceNavTrapUrl(u.href);
+  } catch {
+    /* ignore */
+  }
 }
 
 export function installEcomHistoryPopstateTrap(
@@ -84,23 +90,34 @@ export function installEcomHistoryPopstateTrap(
   if (typeof window === "undefined") return () => undefined;
 
   navBlockedHandler = opts?.onNavBlocked;
-  pushEcomWorkspaceHistoryTrap(window.location.href);
+  lockedWorkspaceHref = window.location.href;
+  try {
+    window.history.replaceState(
+      { __ecomWorkspaceNavTrap: true },
+      "",
+      window.location.href,
+    );
+  } catch {
+    /* quota / sandbox */
+  }
 
   const onPopState = () => {
     if (!isEcomWorkspaceNavBlockActive()) return;
-    if (!lockedWorkspaceHref) {
-      lockedWorkspaceHref = window.location.href;
-    }
+    const locked = lockedWorkspaceHref || window.location.href;
+    lockedWorkspaceHref = locked;
+    const afterPop = window.location.href;
+
     try {
-      window.history.pushState(
-        { __ecomWorkspaceNavTrap: true },
-        "",
-        lockedWorkspaceHref,
-      );
+      window.history.pushState({ __ecomWorkspaceNavTrap: true }, "", locked);
     } catch {
       /* quota / sandbox */
     }
-    navBlockedHandler?.(lockedWorkspaceHref);
+
+    // 仍是锁定页或用户已通过侧栏 primed 前进：勿 router.replace 拉回
+    if (afterPop === locked || window.location.href === locked) {
+      return;
+    }
+    navBlockedHandler?.(locked);
   };
 
   window.addEventListener("popstate", onPopState);
