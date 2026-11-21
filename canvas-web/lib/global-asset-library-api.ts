@@ -1,6 +1,9 @@
 "use client";
 
-import type { GlobalAssetLibraryApiClient } from "@/docker-shared/global-asset-library/types";
+import type {
+  GlobalAssetCatalogFacets,
+  GlobalAssetLibraryApiClient,
+} from "@/docker-shared/global-asset-library/types";
 import type {
   FetchProjectItemsQuery,
   UnifiedAssetPickItem,
@@ -76,7 +79,7 @@ export function createCanvasGlobalAssetLibraryApi(): GlobalAssetLibraryApiClient
         counts: (data.counts as Record<string, number>) ?? {},
         total: typeof data.total === "number" ? data.total : undefined,
         hasMore: data.hasMore === true,
-        facets: data.facets as import("@/docker-shared/global-asset-library/types").GlobalAssetCatalogFacets | undefined,
+        facets: data.facets as GlobalAssetCatalogFacets | undefined,
       };
     },
     async fetchWorks(query) {

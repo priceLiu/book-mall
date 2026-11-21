@@ -98,13 +98,19 @@ export function StoryProSceneAssetSlots({
     }
   }, [asset, localAsset]);
 
-  const resolveSceneKey = () =>
-    scriptHubId?.trim()
-      ? storyProSceneRowKey(scriptHubId, row.name)
-      : normalizeStoryProSceneKey(row.key);
+  const resolveSceneKey = useCallback(
+    () =>
+      scriptHubId?.trim()
+        ? storyProSceneRowKey(scriptHubId, row.name)
+        : normalizeStoryProSceneKey(row.key),
+    [scriptHubId, row.name, row.key],
+  );
 
-  const pasteTargetId = (kind: StoryProSceneRefKind) =>
-    `scene-asset:${scriptHubId?.trim() ?? "hub"}:${normalizeStoryProSceneKey(row.key)}:${kind}`;
+  const pasteTargetId = useCallback(
+    (kind: StoryProSceneRefKind) =>
+      `scene-asset:${scriptHubId?.trim() ?? "hub"}:${normalizeStoryProSceneKey(row.key)}:${kind}`,
+    [scriptHubId, row.key],
+  );
 
   const saveRef = async (
     kind: StoryProSceneRefKind,
@@ -162,7 +168,7 @@ export function StoryProSceneAssetSlots({
         setBusy(false);
       }
     },
-    [assetLocked, base, projectId, scriptHubId, row.key, row.name],
+    [assetLocked, base, projectId, resolveSceneKey, row.name],
   );
 
   useEffect(() => {
@@ -174,7 +180,7 @@ export function StoryProSceneAssetSlots({
         deactivateImagePasteTarget(pasteTargetId(kind));
       }
     };
-  }, [row.key, scriptHubId]);
+  }, [pasteTargetId]);
 
   const armPasteTarget = (kind: StoryProSceneRefKind) => {
     if (!canUpload) return;

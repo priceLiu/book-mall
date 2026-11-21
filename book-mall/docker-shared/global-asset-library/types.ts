@@ -19,6 +19,21 @@ export type GlobalAssetCatalogKind =
 
 export type GlobalAssetCatalogScope = "platform" | "user" | "team" | "project";
 
+export type GlobalAssetCatalogMediaFilter = "all" | "prompt" | "image";
+
+export type GlobalAssetCatalogFacets = {
+  poseMedia?: { all: number; prompt: number; image: number };
+  poseCategories?: Array<{ id: string; label: string; count: number }>;
+};
+
+export type GlobalAssetCatalogPage = {
+  items: GlobalAssetPickItem[];
+  counts: Record<string, number>;
+  total?: number;
+  hasMore?: boolean;
+  facets?: GlobalAssetCatalogFacets;
+};
+
 /** 画布「保存平台资产库」上下文（团队/项目范围仅画布） */
 export type GlobalAssetSaveContext = {
   projectId?: string;
@@ -83,10 +98,15 @@ export type GlobalAssetLibraryApiClient = {
     gender?: string | null;
     keyword?: string | null;
     limit?: number;
+    offset?: number;
+    countsScope?: "all" | "none";
+    countsKinds?: GlobalAssetCatalogKind[];
+    mediaFilter?: GlobalAssetCatalogMediaFilter;
+    poseCategory?: string | null;
     platformOnly?: boolean;
     tenantId?: string | null;
     projectId?: string | null;
-  }) => Promise<{ items: GlobalAssetPickItem[]; counts: Record<string, number> }>;
+  }) => Promise<GlobalAssetCatalogPage>;
   fetchWorks: (query: {
     kind?: "image" | "video" | "all";
     keyword?: string | null;
