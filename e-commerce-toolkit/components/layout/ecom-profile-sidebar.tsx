@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   BookOpen,
   ChevronDown,
@@ -31,6 +31,7 @@ import { ECOM_SIDEBAR_LOGO_MARK_CLASS } from "@/lib/ecom-outline-ui";
 import { cn } from "@/lib/utils";
 
 const NAV_ACTIVE_SECTION_KEY = "ecom-nav-active-section";
+const NAV_MAIN_SCROLL_KEY = "ecom-nav-main-scroll";
 
 const GLASS_DIVIDER = "mx-auto h-px w-8 shrink-0 bg-white/12";
 
@@ -52,26 +53,6 @@ function groupHasActiveChild(pathname: string, group: EcomSidebarNavGroup): bool
   return group.children.some(
     (c) => c.type !== "subheading" && linkIsActive(pathname, c),
   );
-}
-
-function shouldUseNativeNav(event: React.MouseEvent<HTMLAnchorElement>): boolean {
-  return (
-    event.button !== 0 ||
-    event.metaKey ||
-    event.ctrlKey ||
-    event.shiftKey ||
-    event.altKey
-  );
-}
-
-function navigateSidebarHref(
-  event: React.MouseEvent<HTMLAnchorElement>,
-  href: string,
-) {
-  if (shouldUseNativeNav(event)) return;
-  event.preventDefault();
-  unlockEcomDocumentInteraction();
-  window.location.assign(href);
 }
 
 function buildRailEntries(navItems: EcomSidebarNavItem[]): RailEntry[] {
@@ -173,6 +154,7 @@ function RailTooltip({
       className="flex items-center justify-center"
       onMouseEnter={(e) => tip?.show(label, e.currentTarget)}
       onMouseLeave={() => tip?.hide()}
+      onPointerDown={() => tip?.hide()}
       onFocus={(e) => tip?.show(label, e.currentTarget)}
       onBlur={() => tip?.hide()}
     >
@@ -244,13 +226,14 @@ function ExpandedNavLink({
           {linkInner}
         </a>
       ) : (
-        <a
+        <Link
           href={item.href}
+          prefetch
           className={linkClass}
-          onClick={(event) => navigateSidebarHref(event, item.href)}
+          onClick={() => unlockEcomDocumentInteraction()}
         >
           {linkInner}
-        </a>
+        </Link>
       )}
     </div>
   );
@@ -418,6 +401,8 @@ export function EcomProfileSidebar({
   className?: string;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const mainNavRef = React.useRef<HTMLElement>(null);
   const navItems = React.useMemo(
     () => buildEcomSidebarNavItems(bookOrigin),
     [bookOrigin],
@@ -525,6 +510,43 @@ export function EcomProfileSidebar({
     return () => window.removeEventListener("keydown", onKey);
   }, [collapsed, onCollapsedChange]);
 
+  React.useEffect(() => {
+    if (collapsed) return;
+    const el = mainNavRef.current;
+    if (!el) return;
+    let raf = 0;
+    const onScroll = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        try {
+          sessionStorage.setItem(NAV_MAIN_SCROLL_KEY, String(el.scrollTop));
+        } catch {
+          /* ignore */
+        }
+      });
+    };
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      el.removeEventListener("scroll", onScroll);
+      cancelAnimationFrame(raf);
+    };
+  }, [collapsed]);
+
+  React.useLayoutEffect(() => {
+    if (collapsed) return;
+    const el = mainNavRef.current;
+    if (!el) return;
+    try {
+      const raw = sessionStorage.getItem(NAV_MAIN_SCROLL_KEY);
+      if (!raw) return;
+      const top = Number(raw);
+      if (!Number.isFinite(top) || top <= 0) return;
+      if (el.scrollTop === 0) el.scrollTop = top;
+    } catch {
+      /* ignore */
+    }
+  }, [collapsed]);
+
   const resolvedSectionId =
     activeSectionId ??
     inferredId ??
@@ -576,7 +598,7 @@ export function EcomProfileSidebar({
       } else {
         if (collapsed) expandSidebar();
         unlockEcomDocumentInteraction();
-        window.location.assign(entry.link.href);
+        router.push(entry.link.href);
       }
     }
   }
@@ -617,14 +639,17 @@ export function EcomProfileSidebar({
 
   const hideRailTip = React.useCallback(() => setRailTip(null), []);
 
+  /** 收起轨图标卸掉时 mouseleave 不会触发，提示会停在旧坐标 */
+  React.useEffect(() => {
+    hideRailTip();
+  }, [collapsed, pathname, hideRailTip]);
+
   const railTipApi = React.useMemo(
     () => ({ show: showRailTip, hide: hideRailTip }),
     [showRailTip, hideRailTip],
   );
 
   const searchQ = normalizeSearch(searchQuery);
-
-  const homeActive = navTargetActive(pathname ?? "", "/");
 
   return (
     <RailTipContext.Provider value={railTipApi}>
@@ -636,6 +661,7 @@ export function EcomProfileSidebar({
         )}
         aria-label="电商工具箱导航"
         onPointerDown={() => unlockEcomDocumentInteraction()}
+        onPointerLeave={hideRailTip}
       >
         {collapsed ? (
           <div className="flex min-h-0 flex-1 flex-col items-center gap-2 py-4">
@@ -647,9 +673,7 @@ export function EcomProfileSidebar({
                 prefetch
                 className={cn(
                   ECOM_SIDEBAR_LOGO_MARK_CLASS,
-                  "size-10 text-sm transition hover:scale-105",
-                  homeActive &&
-                    "ring-2 ring-white/35 ring-offset-1 ring-offset-transparent",
+                  "size-9 text-sm font-semibold transition hover:scale-105",
                 )}
                 aria-label="电商工具箱首页"
               >
@@ -768,6 +792,7 @@ export function EcomProfileSidebar({
             </p>
 
             <nav
+              ref={mainNavRef}
               className="ecom-scrollbar-thin min-h-0 flex-1 space-y-1 overflow-y-auto pr-0.5"
               role="navigation"
               aria-label="主导航"

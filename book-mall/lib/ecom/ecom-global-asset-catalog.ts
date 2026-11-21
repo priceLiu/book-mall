@@ -14,6 +14,11 @@ import {
   readSceneLibraryCatalogLive,
   type EcomSceneLibraryEntry,
 } from "@/lib/ecom/ecom-scene-library-service";
+import {
+  readPropLibraryCatalogForUser,
+  readPropLibraryCatalogLive,
+  type EcomPropLibraryEntry,
+} from "@/lib/ecom/ecom-prop-library-service";
 import { listStyleLibraryEntriesForViewer } from "@/lib/ecom/ecom-style-library-service";
 import { buildCatalogViewerScopeOr } from "@/lib/ecom/ecom-catalog-viewer-scope";
 import { prisma } from "@/lib/prisma";
@@ -389,6 +394,47 @@ function sceneEntryToCatalogItem(s: EcomSceneLibraryEntry): GlobalAssetCatalogIt
   };
 }
 
+function propEntryToCatalogItem(p: EcomPropLibraryEntry): GlobalAssetCatalogItem {
+  const hasImage = Boolean(p.ossUrl?.trim());
+  return {
+    id: p.id,
+    catalogKind: "prop",
+    title: p.name,
+    ossUrl: hasImage ? p.ossUrl!.trim() : "",
+    thumbUrl: hasImage ? p.ossUrl ?? null : null,
+    scope: (p.scope ?? "platform") as EcomCatalogScope,
+    description: p.visualDescription,
+    promptOnly: !hasImage,
+  };
+}
+
+async function loadPropItems(
+  query: GlobalAssetCatalogQuery,
+  limit: number,
+): Promise<GlobalAssetCatalogItem[]> {
+  const merged: EcomPropLibraryEntry[] = [];
+
+  if (query.platformOnly) {
+    const cat = await readPropLibraryCatalogLive();
+    merged.push(...(cat.platform ?? cat.props));
+  } else {
+    const cat = await readPropLibraryCatalogForUser(query.userId);
+    merged.push(...(cat.platform ?? []), ...(cat.user ?? []));
+  }
+
+  const textItems = merged.slice(0, limit).map((p) => propEntryToCatalogItem(p));
+
+  const garmentProps = await loadGarmentBackedCatalogItems(query, limit, "prop", "prop");
+  const seen = new Set(textItems.map((i) => i.id));
+  for (const g of garmentProps) {
+    if (seen.has(g.id)) continue;
+    seen.add(g.id);
+    textItems.push(g);
+  }
+
+  return textItems.slice(0, limit);
+}
+
 async function loadSceneItems(
   query: GlobalAssetCatalogQuery,
   limit: number,
@@ -518,7 +564,7 @@ async function loadItemsForKind(
     case "reference":
       return loadGarmentBackedCatalogItems(query, limit, "reference", "reference");
     case "prop":
-      return loadGarmentBackedCatalogItems(query, limit, "prop", "prop");
+      return loadPropItems(query, limit);
     case "storyboard-image":
       return loadGarmentBackedCatalogItems(
         query,
