@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import Image from "next/image";
-import { Loader2, Plus, Sparkles, Trash2 } from "lucide-react";
+import { FileText, Loader2, Plus, Sparkles, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { EcomMediaGeneratingBusy } from "@/components/media/ecom-media-generating-busy";
@@ -187,7 +187,6 @@ export function ProductDesignGenSlotWorkspace({
   const [rows, setRows] = useState<GenSlotRow[]>(() => mergeGenSlots(project, target));
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [promptDialogIndex, setPromptDialogIndex] = useState<number | null>(null);
-  const [generateAllActive, setGenerateAllActive] = useState(false);
   const rowsRef = useRef(rows);
   rowsRef.current = rows;
 
@@ -289,28 +288,35 @@ export function ProductDesignGenSlotWorkspace({
     [rows, selected],
   );
 
+  const selectedSlotCount = selectedIndexes.length;
+  const promptReadyCount = rows.filter((r) => r.prompt.trim()).length;
+  const selectedImageGenCount = rows.filter(
+    (r) => selected.has(r.index) && r.prompt.trim(),
+  ).length;
+
   const handleGenerateSelected = async () => {
     const current = rowsRef.current;
-    const isGenerateAll = selectedIndexes.length === 0;
-    const indexes =
-      selectedIndexes.length > 0
-        ? selectedIndexes
-        : current.filter((r) => r.prompt.trim()).map((r) => r.index);
+    const indexes = current
+      .filter((r) => selected.has(r.index) && r.prompt.trim())
+      .map((r) => r.index);
+    if (selectedSlotCount === 0) {
+      await alert({
+        title: "无法出图",
+        message: "请先勾选要生成的点位。",
+        variant: "error",
+      });
+      return;
+    }
     if (indexes.length === 0) {
       await alert({
         title: "无法出图",
-        message: "请至少填写 1 条生图 Prompt，或勾选要生成的条目。",
+        message: "所选点位还没有生图 Prompt，请先编辑 Prompt 或重新分析。",
         variant: "error",
       });
       return;
     }
     await saveRows(current, { quiet: true });
-    if (isGenerateAll) setGenerateAllActive(true);
-    try {
-      await onGenerate(indexes);
-    } finally {
-      setGenerateAllActive(false);
-    }
+    await onGenerate(indexes);
   };
 
   const handleGenerateOne = async (index: number) => {
@@ -433,24 +439,32 @@ export function ProductDesignGenSlotWorkspace({
       id={target === "main" ? "pdt-gen-slots-main" : "pdt-gen-slots-detail"}
       className="scroll-mt-20 rounded-xl border border-[#e8e8ed] bg-[#fafafa] px-4 py-4"
     >
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h3 className="text-sm font-semibold text-[#1d1d1f]">{title}</h3>
-          <p className="mt-0.5 text-[11px] text-[#6e6e73]">
-            点击槽位内图标编辑 Prompt 或出图；悬停已出图可预览、下载与重新生成。
-            {rows.length > 0 ? (
-              <span className="ml-1">
-                已出 {doneCount}/{rows.length}
-              </span>
-            ) : null}
-            {editedCount > 0 ? (
-              <span className="ml-1 text-[#1d1d1f]">
-                · 已手改 {editedCount} 条，重新分析时保留
-              </span>
-            ) : null}
+      <div className="mb-3">
+        <h3 className="text-sm font-semibold text-[#1d1d1f]">{title}</h3>
+        <p className="mt-0.5 text-[11px] text-[#6e6e73]">
+          勾选点位后点「生图」批量出图；格子内可编辑 Prompt，已出图悬停可预览、下载与重新生成。
+          {rows.length > 0 ? (
+            <span className="ml-1">
+              已出 {doneCount}/{rows.length}
+            </span>
+          ) : null}
+          {editedCount > 0 ? (
+            <span className="ml-1 text-[#1d1d1f]">
+              · 已手改 {editedCount} 条，重新分析时保留
+            </span>
+          ) : null}
+        </p>
+      </div>
+
+      {beforeSlots}
+
+      {rows.length === 0 && !busy ? (
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <p className="text-[11px] text-[#86868b]">
+            {mode === "decompose"
+              ? "上传参考图并（可选）填写意图后，点击「分析」生成 Prompt 与占位。"
+              : "完成 Step 文案后，点击「从文案生成草稿」。"}
           </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
           <EcomButtonSecondary
             size="sm"
             type="button"
@@ -462,58 +476,60 @@ export function ProductDesignGenSlotWorkspace({
             ) : (
               <Sparkles className="h-3.5 w-3.5 shrink-0" />
             )}
-            {rows.length > 0
-              ? mode === "decompose"
-                ? "重新分析"
-                : "重新生成草稿"
-              : mode === "decompose"
-                ? "分析"
-                : "从文案生成草稿"}
+            {mode === "decompose" ? "分析" : "从文案生成草稿"}
           </EcomButtonSecondary>
-          {rows.length > 0 ? (
-            <EcomButtonPrimary
-              size="sm"
-              type="button"
-              disabled={workspaceDisabled}
-              onClick={() => void handleGenerateSelected()}
-            >
-              {selectedIndexes.length > 0
-                ? `生成选中 (${selectedIndexes.length})`
-                : "生成全部"}
-            </EcomButtonPrimary>
-          ) : null}
         </div>
-      </div>
-
-      {beforeSlots}
-
-      {rows.length === 0 && !busy ? (
-        <p className="mb-3 text-[11px] text-[#86868b]">
-          {mode === "decompose"
-            ? "上传参考图并（可选）填写意图后，点击「分析」生成 Prompt 与占位。"
-            : "完成 Step 文案后，点击「从文案生成草稿」。"}
-        </p>
       ) : null}
 
       {rows.length > 0 ? (
-        <div className="mb-2 flex items-center gap-2">
-          <label className="flex cursor-pointer items-center gap-1.5 text-[11px] text-[#6e6e73]">
-            <input
-              type="checkbox"
-              className="rounded border-[#d2d2d7]"
-              checked={selected.size === rows.length && rows.length > 0}
-              onChange={toggleSelectAll}
+        <>
+          <div className="mb-2 flex flex-wrap items-center gap-2">
+            <label className="flex cursor-pointer items-center gap-1.5 text-[11px] text-[#6e6e73]">
+              <input
+                type="checkbox"
+                className="rounded border-[#d2d2d7]"
+                checked={selected.size === rows.length && rows.length > 0}
+                onChange={toggleSelectAll}
+                disabled={workspaceDisabled}
+              />
+              全选
+            </label>
+            <EcomButtonSecondary
+              size="sm"
+              type="button"
               disabled={workspaceDisabled}
-            />
-            全选
-          </label>
-        </div>
+              onClick={() => void handleAnalyze()}
+            >
+              {busy?.includes("Prompt") || busy?.includes("拆解") ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Sparkles className="h-3.5 w-3.5 shrink-0" />
+              )}
+              {mode === "decompose" ? "重新分析" : "重新生成草稿"}
+            </EcomButtonSecondary>
+            <EcomButtonPrimary
+              size="sm"
+              type="button"
+              disabled={workspaceDisabled || selectedImageGenCount === 0}
+              onClick={() => void handleGenerateSelected()}
+            >
+              {`生图（${selectedImageGenCount}）`}
+            </EcomButtonPrimary>
+          </div>
+          <p className="mb-3 text-[11px] text-[#86868b]">
+            已选 {selectedSlotCount}/{rows.length} 个点位 · 提示词 {promptReadyCount}/
+            {rows.length}
+            {selectedSlotCount > 0 && selectedImageGenCount < selectedSlotCount
+              ? " · 出图时将跳过无 Prompt 的勾选点位"
+              : ""}
+          </p>
+        </>
       ) : null}
 
       <div className={ECOM_WORKSPACE_RESULT_GRID_CLASS}>
         {rows.map((row) => {
           const generating = cardGeneratingFor(row.index);
-          const rowLocked = generating || generateAllActive;
+          const rowLocked = generating;
           return (
             <article
               key={row.index}
@@ -721,9 +737,11 @@ function GenSlotPreview({
       )}
       style={aspectStyle}
     >
-      <span className="absolute left-1.5 top-1.5 z-20 rounded bg-black/60 px-1 py-0.5 text-[9px] font-medium text-white">
-        {label} {index}
-      </span>
+      {imageUrl ? (
+        <span className="absolute left-1.5 top-1.5 z-20 rounded bg-black/60 px-1 py-0.5 text-[9px] font-medium text-white">
+          {label} {index}
+        </span>
+      ) : null}
 
       {generating ? (
         <>
@@ -759,12 +777,15 @@ function GenSlotPreview({
           />
         </>
       ) : (
-        <EcomSlotImageHoverActions
-          layout="inline"
+        <button
+          type="button"
           disabled={actionDisabled}
-          onEditPrompt={onEditPrompt}
-          onQuickGenerate={onGenerate}
-        />
+          className="absolute inset-0 flex flex-col items-center justify-center gap-1 text-[11px] text-[#86868b] transition-colors hover:bg-[#f0f0f2] hover:text-[#1d1d1f] disabled:pointer-events-none disabled:opacity-50"
+          onClick={onEditPrompt}
+        >
+          <FileText className="h-5 w-5 opacity-60" />
+          点击编辑 Prompt
+        </button>
       )}
     </div>
   );
