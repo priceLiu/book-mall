@@ -93,16 +93,10 @@ export function UnifiedAssetLibraryDialog({ open, variant, api, options, onClose
     setVisibleCount(GALD_PAGE_SIZE);
     try {
       let merged: UnifiedAssetPickItem[] = [];
-      const kindFilter = options.allowedCatalogKinds;
-      const kinds =
-        section === "project"
-          ? []
-          : kindFilter?.length
-            ? kindFilter
-            : [catalogKind];
+      const kinds = section === "project" ? [] : [catalogKind];
 
       if (section === "platform") {
-        for (const k of kinds.length ? kinds : [catalogKind]) {
+        for (const k of kinds) {
           const page = await api.fetchCatalog({
             kind: k,
             keyword,
@@ -115,7 +109,7 @@ export function UnifiedAssetLibraryDialog({ open, variant, api, options, onClose
           merged.push(...page.items.map((i) => catalogItemToUnified(i, "platform")));
         }
       } else if (section === "shared") {
-        for (const k of kinds.length ? kinds : [catalogKind]) {
+        for (const k of kinds) {
           const page = await api.fetchCatalog({
             kind: k,
             keyword,
@@ -182,7 +176,6 @@ export function UnifiedAssetLibraryDialog({ open, variant, api, options, onClose
     api,
     catalogKind,
     keyword,
-    options.allowedCatalogKinds,
     options.allowedProjectKinds,
     options.ecomModule,
     options.ecomModules,
@@ -239,9 +232,17 @@ export function UnifiedAssetLibraryDialog({ open, variant, api, options, onClose
     }
   }
 
+  const catalogNavKinds = useMemo(() => {
+    const base = PLATFORM_CATALOG_SAVE_TYPE_OPTIONS.filter((o) => o.imageImport);
+    const allowed = options.allowedCatalogKinds;
+    if (!allowed?.length) return base;
+    const set = new Set(allowed);
+    return base.filter((o) => set.has(o.id));
+  }, [options.allowedCatalogKinds]);
+
   if (!open || typeof document === "undefined") return null;
 
-  const showKindNav = section !== "project";
+  const showKindNav = section !== "project" && catalogNavKinds.length > 1;
 
   return createPortal(
     <div
@@ -295,7 +296,7 @@ export function UnifiedAssetLibraryDialog({ open, variant, api, options, onClose
             <aside
               className={`hidden w-[140px] shrink-0 overflow-y-auto border-r p-2 sm:block ${theme.sidebar} ${theme.border}`}
             >
-              {PLATFORM_CATALOG_SAVE_TYPE_OPTIONS.filter((o) => o.imageImport).map((opt) => (
+              {catalogNavKinds.map((opt) => (
                 <button
                   key={opt.id}
                   type="button"

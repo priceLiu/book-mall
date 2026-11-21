@@ -93,32 +93,37 @@ export function UnifiedAssetLibraryDialog({ open, variant, api, options, onClose
     setVisibleCount(GALD_PAGE_SIZE);
     try {
       let merged: UnifiedAssetPickItem[] = [];
+      const kinds = section === "project" ? [] : [catalogKind];
+
       if (section === "platform") {
-        const page = await api.fetchCatalog({
-          kind: catalogKind,
-          keyword,
-          limit: GALD_PAGE_SIZE,
-          platformOnly: true,
-          projectId: options.projectId ?? options.saveContext?.projectId,
-          tenantId: options.saveContext?.tenantId,
-        });
-        if (gen !== fetchGenRef.current) return;
-        merged.push(...page.items.map((i) => catalogItemToUnified(i, "platform")));
+        for (const k of kinds) {
+          const page = await api.fetchCatalog({
+            kind: k,
+            keyword,
+            limit: 240,
+            platformOnly: true,
+            projectId: options.projectId ?? options.saveContext?.projectId,
+            tenantId: options.saveContext?.tenantId,
+          });
+          if (gen !== fetchGenRef.current) return;
+          merged.push(...page.items.map((i) => catalogItemToUnified(i, "platform")));
+        }
       } else if (section === "shared") {
-        const page = await api.fetchCatalog({
-          kind: catalogKind,
-          keyword,
-          limit: GALD_PAGE_SIZE,
-          platformOnly: false,
-          projectId: options.projectId ?? options.saveContext?.projectId,
-          tenantId: options.saveContext?.tenantId,
-        });
-        if (gen !== fetchGenRef.current) return;
-        merged.push(
-          ...page.items
-            .filter((i) => (i.scope ?? "platform") !== "platform")
-            .map((i) => catalogItemToUnified(i, "shared")),
-        );
+        for (const k of kinds) {
+          const page = await api.fetchCatalog({
+            kind: k,
+            keyword,
+            limit: 240,
+            projectId: options.projectId ?? options.saveContext?.projectId,
+            tenantId: options.saveContext?.tenantId,
+          });
+          if (gen !== fetchGenRef.current) return;
+          merged.push(
+            ...page.items
+              .filter((i) => (i.scope ?? "platform") !== "platform")
+              .map((i) => catalogItemToUnified(i, "shared")),
+          );
+        }
         const works = await api.fetchWorks({
           keyword,
           kind: options.media === "video" ? "video" : "image",
@@ -171,7 +176,6 @@ export function UnifiedAssetLibraryDialog({ open, variant, api, options, onClose
     api,
     catalogKind,
     keyword,
-    options.allowedCatalogKinds,
     options.allowedProjectKinds,
     options.ecomModule,
     options.ecomModules,
@@ -228,9 +232,17 @@ export function UnifiedAssetLibraryDialog({ open, variant, api, options, onClose
     }
   }
 
+  const catalogNavKinds = useMemo(() => {
+    const base = PLATFORM_CATALOG_SAVE_TYPE_OPTIONS.filter((o) => o.imageImport);
+    const allowed = options.allowedCatalogKinds;
+    if (!allowed?.length) return base;
+    const set = new Set(allowed);
+    return base.filter((o) => set.has(o.id));
+  }, [options.allowedCatalogKinds]);
+
   if (!open || typeof document === "undefined") return null;
 
-  const showKindNav = section !== "project";
+  const showKindNav = section !== "project" && catalogNavKinds.length > 1;
 
   return createPortal(
     <div
@@ -284,7 +296,7 @@ export function UnifiedAssetLibraryDialog({ open, variant, api, options, onClose
             <aside
               className={`hidden w-[140px] shrink-0 overflow-y-auto border-r p-2 sm:block ${theme.sidebar} ${theme.border}`}
             >
-              {PLATFORM_CATALOG_SAVE_TYPE_OPTIONS.filter((o) => o.imageImport).map((opt) => (
+              {catalogNavKinds.map((opt) => (
                 <button
                   key={opt.id}
                   type="button"
