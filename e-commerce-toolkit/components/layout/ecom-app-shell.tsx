@@ -16,6 +16,7 @@ import { fetchEcomToolsSessionLite } from "@/lib/ecom-tools-session-client";
 import { isEcomNavPersistentPath } from "@/lib/ecom-browse-hub-paths";
 import { isEcomPublicBrowsePath } from "@/lib/ecom-public-paths";
 import { setEcomRuntimeBookOrigin } from "@/lib/ecom-runtime-config";
+import { clearEcomSidebarNavIntent } from "@/lib/ecom-nav-in-flight";
 import { unlockEcomDocumentInteraction } from "@/lib/ecom-document-unlock";
 import type { EcomShellUser } from "@/lib/ecom-session.server";
 import { cn } from "@/lib/utils";
@@ -133,6 +134,7 @@ export function EcomAppShell({
   }, [loggedIn, bookOrigin]);
 
   React.useLayoutEffect(() => {
+    clearEcomSidebarNavIntent();
     unlockEcomDocumentInteraction();
     const id = window.requestAnimationFrame(() => unlockEcomDocumentInteraction());
     return () => window.cancelAnimationFrame(id);

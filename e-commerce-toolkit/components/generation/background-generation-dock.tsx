@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { startTransition, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   AlertCircle,
@@ -21,6 +21,7 @@ import {
   resolveBackgroundGenerationLabel,
 } from "@/lib/generation/background-generation-policy";
 import type { BackgroundGenerationTask } from "@/lib/generation/background-generation-types";
+import { isEcomSidebarNavInFlight } from "@/lib/ecom-nav-in-flight";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -52,10 +53,16 @@ export function BackgroundGenerationDock({
   const [renderTasks, setRenderTasks] = useState<BackgroundGenerationTask[]>([]);
 
   useEffect(() => setMounted(true), []);
+  // 空闲时不要每秒 setState。紧急更新会打断 Next 的 startTransition 跳转，
+  // 穿搭页一直挂着这个 Dock，侧栏点了就会停在当前页。
   useEffect(() => {
-    const id = window.setInterval(() => setNow(Date.now()), 1000);
+    if (tasks.length === 0) return;
+    const id = window.setInterval(() => {
+      if (isEcomSidebarNavInFlight()) return;
+      startTransition(() => setNow(Date.now()));
+    }, 1000);
     return () => window.clearInterval(id);
-  }, []);
+  }, [tasks.length]);
 
   const visibleTasks = useMemo(
     () => tasks.filter((task) => isBackgroundDockTaskVisible(task, now)),

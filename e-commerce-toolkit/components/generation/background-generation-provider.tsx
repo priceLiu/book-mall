@@ -2,6 +2,7 @@
 
 import {
   createContext,
+  startTransition,
   useCallback,
   useContext,
   useEffect,
@@ -10,6 +11,8 @@ import {
   useState,
   type ReactNode,
 } from "react";
+
+import { isEcomSidebarNavInFlight } from "@/lib/ecom-nav-in-flight";
 
 import { BackgroundGenerationDock } from "@/components/generation/background-generation-dock";
 import {
@@ -72,7 +75,10 @@ export function BackgroundGenerationProvider({ children }: { children: ReactNode
 
   const dismissTask = useCallback((id: string) => {
     clearSuccessDismissTimer(id);
-    setTasks((prev) => prev.filter((t) => t.id !== id));
+    setTasks((prev) => {
+      if (!prev.some((t) => t.id === id)) return prev;
+      return prev.filter((t) => t.id !== id);
+    });
   }, [clearSuccessDismissTimer]);
 
   const scheduleSuccessDismiss = useCallback(
@@ -154,8 +160,10 @@ export function BackgroundGenerationProvider({ children }: { children: ReactNode
   // 前台 busy 超时 → 自动最小化（Dock 本身在短任务运行中仍隐藏）
   useEffect(() => {
     const timer = window.setInterval(() => {
+      if (isEcomSidebarNavInFlight()) return;
       const now = Date.now();
-      setTasks((prev) => {
+      startTransition(() => {
+        setTasks((prev) => {
         let changed = false;
         const next = prev.map((t) => {
           if (t.status !== "running" || t.minimized) return t;
@@ -167,6 +175,7 @@ export function BackgroundGenerationProvider({ children }: { children: ReactNode
           return t;
         });
         return changed ? next : prev;
+        });
       });
     }, 5000);
     return () => window.clearInterval(timer);
@@ -175,7 +184,7 @@ export function BackgroundGenerationProvider({ children }: { children: ReactNode
   // Dock 轮询
   useEffect(() => {
     const tick = async () => {
-      if (pollLockRef.current) return;
+      if (pollLockRef.current || isEcomSidebarNavInFlight()) return;
       const running = tasksRef.current.filter((t) => t.status === "running");
       if (running.length === 0) return;
       pollLockRef.current = true;
@@ -188,49 +197,55 @@ export function BackgroundGenerationProvider({ children }: { children: ReactNode
                 result.progressPercent != null ||
                 result.detail != null
               ) {
-                setTasks((prev) =>
-                  prev.map((t) =>
-                    t.id === task.id
-                      ? {
-                          ...t,
-                          ...(result.progressPercent != null
-                            ? { progressPercent: result.progressPercent }
-                            : {}),
-                          ...(result.detail != null
-                            ? { progressDetail: result.detail }
-                            : {}),
-                        }
-                      : t,
-                  ),
-                );
+                startTransition(() => {
+                  setTasks((prev) =>
+                    prev.map((t) =>
+                      t.id === task.id
+                        ? {
+                            ...t,
+                            ...(result.progressPercent != null
+                              ? { progressPercent: result.progressPercent }
+                              : {}),
+                            ...(result.detail != null
+                              ? { progressDetail: result.detail }
+                              : {}),
+                          }
+                        : t,
+                    ),
+                  );
+                });
               }
               continue;
             }
             if (result.status === "succeeded") {
               await task.onSucceeded?.();
-              setTasks((prev) =>
-                prev.map((t) =>
-                  t.id === task.id
-                    ? { ...t, status: "succeeded", minimized: true }
-                    : t,
-                ),
-              );
+              startTransition(() => {
+                setTasks((prev) =>
+                  prev.map((t) =>
+                    t.id === task.id
+                      ? { ...t, status: "succeeded", minimized: true }
+                      : t,
+                  ),
+                );
+              });
               scheduleSuccessDismiss(task.id);
             } else {
               await task.onFailed?.();
-              setTasks((prev) =>
-                prev.map((t) =>
-                  t.id === task.id
-                    ? {
-                        ...t,
-                        status: "failed",
-                        error: result.error ?? "生成失败",
-                        minimized: true,
-                      }
-                    : t,
-                ),
-              );
-              setDockExpanded(false);
+              startTransition(() => {
+                setTasks((prev) =>
+                  prev.map((t) =>
+                    t.id === task.id
+                      ? {
+                          ...t,
+                          status: "failed",
+                          error: result.error ?? "生成失败",
+                          minimized: true,
+                        }
+                      : t,
+                  ),
+                );
+                setDockExpanded(false);
+              });
             }
           } catch (e) {
             /* 单次 poll 失败保留 running */

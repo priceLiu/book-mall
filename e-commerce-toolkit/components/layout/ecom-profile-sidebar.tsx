@@ -4,7 +4,6 @@ import * as React from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
-  BookOpen,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -25,8 +24,9 @@ import {
 import { EcomCreditsBalanceChip } from "@/components/layout/ecom-credits-balance-chip";
 import { PlatformTopupNavLink } from "@/lib/platform-billing/platform-topup-nav-link";
 import { ecomPrimaryLinkClass } from "@/components/ui/ecom-button";
+import { navigateEcomFromSidebar } from "@/lib/ecom-in-app-navigate";
+import { markEcomSidebarNavIntent } from "@/lib/ecom-nav-in-flight";
 import { unlockEcomDocumentInteraction } from "@/lib/ecom-document-unlock";
-import { feishuGuideUrlForPathname } from "@/lib/ecom-feishu-guide-urls";
 import { ECOM_SIDEBAR_LOGO_MARK_CLASS } from "@/lib/ecom-outline-ui";
 import { cn } from "@/lib/utils";
 
@@ -180,12 +180,13 @@ function ExpandedNavLink({
   item,
   active,
   nested,
+  onNavigate,
 }: {
   item: EcomSidebarNavLink;
   active: boolean;
   nested?: boolean;
+  onNavigate: (href: string, event?: React.MouseEvent) => void;
 }) {
-  const router = useRouter();
   const Icon = item.icon;
   const rowClass = cn(
     "group flex items-center rounded-xl transition-colors",
@@ -229,14 +230,17 @@ function ExpandedNavLink({
       ) : (
         <Link
           href={item.href}
-          prefetch
+          prefetch={false}
+          scroll={false}
           className={linkClass}
-          onPointerDown={() => unlockEcomDocumentInteraction()}
-          onClick={(e) => {
+          onPointerDown={() => {
             unlockEcomDocumentInteraction();
-            if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+            markEcomSidebarNavIntent();
+          }}
+          onClick={(e) => {
+            if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
             e.preventDefault();
-            router.push(item.href);
+            onNavigate(item.href, e);
           }}
         >
           {linkInner}
@@ -252,12 +256,14 @@ function NavGroupAccordion({
   open,
   onToggle,
   searchQ,
+  onNavigate,
 }: {
   entry: { id: string; group: EcomSidebarNavGroup };
   pathname: string;
   open: boolean;
   onToggle: () => void;
   searchQ: string;
+  onNavigate: (href: string, event?: React.MouseEvent) => void;
 }) {
   const { group } = entry;
   const Icon = group.icon;
@@ -304,6 +310,7 @@ function NavGroupAccordion({
                 item={child}
                 active={linkIsActive(pathname, child)}
                 nested
+                onNavigate={onNavigate}
               />
             ),
           )}
@@ -369,6 +376,32 @@ function RailExternalLink({
   );
 }
 
+function PersonalCenterAvatarLink({
+  user,
+  href,
+  className,
+}: {
+  user: EcomShellUser;
+  href: string;
+  className?: string;
+}) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      title="个人中心"
+      aria-label="个人中心（新标签打开）"
+      className={cn(
+        "shrink-0 rounded-full transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25",
+        className,
+      )}
+    >
+      <UserAvatar user={user} />
+    </a>
+  );
+}
+
 function UserAvatar({ user }: { user: EcomShellUser }) {
   if (user.avatarUrl) {
     return (
@@ -409,6 +442,12 @@ export function EcomProfileSidebar({
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  const navigateFromSidebar = React.useCallback(
+    (href: string, event?: React.MouseEvent) => {
+      navigateEcomFromSidebar(router, href, pathname ?? "", event);
+    },
+    [pathname, router],
+  );
   const mainNavRef = React.useRef<HTMLElement>(null);
   const navItems = React.useMemo(
     () => buildEcomSidebarNavItems(bookOrigin),
@@ -440,10 +479,11 @@ export function EcomProfileSidebar({
     [railEntries],
   );
 
-  const currentPageGuideUrl = React.useMemo(
-    () => feishuGuideUrlForPathname(pathname ?? ""),
-    [pathname],
-  );
+  const personalCenterHref = React.useMemo(() => {
+    const entry = railQuickTop.find((e) => e.kind === "link");
+    if (entry?.kind === "link") return entry.link.href;
+    return `${bookOrigin.replace(/\/$/, "")}/account`;
+  }, [bookOrigin, railQuickTop]);
 
   const inferredId = React.useMemo(
     () => inferSectionId(pathname, railSectionEntries),
@@ -542,17 +582,17 @@ export function EcomProfileSidebar({
   React.useLayoutEffect(() => {
     if (collapsed) return;
     const el = mainNavRef.current;
-    if (!el) return;
-    try {
-      const raw = sessionStorage.getItem(NAV_MAIN_SCROLL_KEY);
-      if (!raw) return;
-      const top = Number(raw);
-      if (!Number.isFinite(top) || top <= 0) return;
-      if (el.scrollTop === 0) el.scrollTop = top;
-    } catch {
-      /* ignore */
+    if (!el || !pathname) return;
+    const link = el.querySelector(`a[href="${CSS.escape(pathname)}"]`);
+    if (!(link instanceof HTMLElement)) return;
+    const pane = el.getBoundingClientRect();
+    const row = link.getBoundingClientRect();
+    if (row.top < pane.top) {
+      el.scrollTop -= pane.top - row.top;
+    } else if (row.bottom > pane.bottom) {
+      el.scrollTop += row.bottom - pane.bottom;
     }
-  }, [collapsed]);
+  }, [collapsed, pathname]);
 
   const resolvedSectionId =
     activeSectionId ??
@@ -580,8 +620,7 @@ export function EcomProfileSidebar({
       if (entry.link.external) {
         window.open(entry.link.href, "_blank", "noopener,noreferrer");
       } else {
-        unlockEcomDocumentInteraction();
-        window.location.assign(entry.link.href);
+        navigateFromSidebar(entry.link.href);
       }
       return;
     }
@@ -604,8 +643,7 @@ export function EcomProfileSidebar({
         window.open(entry.link.href, "_blank", "noopener,noreferrer");
       } else {
         if (collapsed) expandSidebar();
-        unlockEcomDocumentInteraction();
-        router.push(entry.link.href);
+        navigateFromSidebar(entry.link.href);
       }
     }
   }
@@ -672,7 +710,7 @@ export function EcomProfileSidebar({
       >
         {collapsed ? (
           <div className="flex min-h-0 flex-1 flex-col items-center gap-2 py-4">
-            {railQuickTop.map(renderRailQuickLink)}
+            {!user ? railQuickTop.map(renderRailQuickLink) : null}
 
             <RailTooltip label="电商工具箱首页">
               <Link
@@ -746,10 +784,12 @@ export function EcomProfileSidebar({
                 <div className="px-1">
                   <EcomCreditsBalanceChip collapsed />
                 </div>
-                <RailTooltip label={user.name}>
-                  <div className="pointer-events-none">
-                    <UserAvatar user={user} />
-                  </div>
+                <RailTooltip label="个人中心">
+                  <PersonalCenterAvatarLink
+                    user={user}
+                    href={personalCenterHref}
+                    className="flex items-center justify-center"
+                  />
                 </RailTooltip>
                 <RailIconButton title="退出登录" onClick={signOut}>
                   <LogOut className="size-4" />
@@ -816,6 +856,7 @@ export function EcomProfileSidebar({
                       open={open}
                       onToggle={() => toggleGroup(entry.id)}
                       searchQ={searchQuery}
+                      onNavigate={navigateFromSidebar}
                     />
                   );
                 }
@@ -825,37 +866,24 @@ export function EcomProfileSidebar({
                     key={entry.id}
                     item={entry.link}
                     active={linkIsActive(pathname ?? "", entry.link)}
+                    onNavigate={navigateFromSidebar}
                   />
                 );
               })}
             </nav>
 
-            {currentPageGuideUrl ? (
-              <div className="mt-2 shrink-0 border-t border-white/10 pt-3">
-                <a
-                  href={currentPageGuideUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2 rounded-xl px-2.5 py-2 text-sm font-medium text-[var(--ecom-chrome-text-muted)] transition-colors hover:bg-white/[0.07] hover:text-[var(--ecom-chrome-text)]"
-                  title="当前工具使用指南（飞书，新标签打开）"
-                >
-                  <BookOpen className="size-4 shrink-0 opacity-90" aria-hidden />
-                  <span className="min-w-0 flex-1 truncate">当前页使用指南</span>
-                  <ExternalLink className="size-3.5 shrink-0 opacity-60" aria-hidden />
-                </a>
-              </div>
-            ) : null}
-
             <div className="mt-3 shrink-0 space-y-2 border-t border-white/10 pt-3">
               {user ? (
                 <>
-                  <EcomCreditsBalanceChip />
-                  <PlatformTopupNavLink
-                    bookOrigin={bookOrigin}
-                    className="inline-flex w-full items-center justify-center rounded-xl border border-white/12 bg-white/[0.05] px-3 py-2 text-xs font-medium text-[var(--ecom-chrome-text)] transition-colors hover:bg-white/[0.1]"
-                  />
                   <div className="flex items-center gap-2.5 rounded-xl border border-white/10 bg-white/[0.04] px-2.5 py-2">
-                    <UserAvatar user={user} />
+                    <EcomCreditsBalanceChip inline />
+                    <PlatformTopupNavLink
+                      bookOrigin={bookOrigin}
+                      className="inline-flex shrink-0 items-center justify-center rounded-full border border-white/12 bg-white/[0.05] px-3 py-1.5 text-xs font-medium text-[var(--ecom-chrome-text)] transition-colors hover:bg-white/[0.12]"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2.5 rounded-xl border border-white/10 bg-white/[0.04] px-2.5 py-2">
+                    <PersonalCenterAvatarLink user={user} href={personalCenterHref} />
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium text-[var(--ecom-chrome-text)]">
                         {user.name}
@@ -883,23 +911,6 @@ export function EcomProfileSidebar({
                   登录
                 </a>
               )}
-
-              <div className="flex flex-wrap gap-x-3 gap-y-1 px-1 pt-1 text-[11px]">
-                {[...railQuickTop, ...railQuickBottom].map((entry) => {
-                  if (entry.kind !== "link") return null;
-                  return (
-                    <a
-                      key={entry.id}
-                      href={entry.link.href}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-[var(--ecom-chrome-text-subtle)] underline-offset-2 hover:text-[var(--ecom-chrome-text)] hover:underline"
-                    >
-                      {entry.link.label}
-                    </a>
-                  );
-                })}
-              </div>
             </div>
           </div>
         )}

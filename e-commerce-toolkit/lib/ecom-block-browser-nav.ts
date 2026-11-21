@@ -29,14 +29,7 @@ export function installEcomBrowserNavBlock(): () => void {
   const onMouse = (event: MouseEvent) => blockEcomBrowserNavMouse(event);
   const captureOpts: AddEventListenerOptions = { capture: true, passive: false };
   const targets: EventTarget[] = [document, window];
-  const eventNames = [
-    "pointerdown",
-    "mousedown",
-    "mouseup",
-    "pointerup",
-    "auxclick",
-    "click",
-  ] as const;
+  const eventNames = ["pointerdown", "mousedown", "auxclick"] as const;
 
   for (const target of targets) {
     for (const name of eventNames) {

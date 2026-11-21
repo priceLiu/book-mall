@@ -189,7 +189,18 @@ function OutfitVideoStudioInner() {
   const splitPromptSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const applyProject = useCallback((p: OutfitVideoProject) => {
-    setProject(p);
+    setProject((prev) => {
+      if (
+        prev?.id === p.id &&
+        prev.updatedAt === p.updatedAt &&
+        prev.sceneList.length === p.sceneList.length &&
+        prev.status === p.status &&
+        prev.phase === p.phase
+      ) {
+        return prev;
+      }
+      return p;
+    });
     writeEcomLastProjectId(PROJECT_STORAGE_KEY, p.id);
   }, []);
 
@@ -702,24 +713,25 @@ function OutfitVideoStudioInner() {
     splitSubmitLockRef.current = false;
   }, [project?.id, project?.sceneList.length, backgroundGen.dismissTask]);
 
+  const startOutfitSplitStatusJobRef = useRef(startOutfitSplitStatusJob);
+  startOutfitSplitStatusJobRef.current = startOutfitSplitStatusJob;
+  const dismissSplitTaskRef = useRef(backgroundGen.dismissTask);
+  dismissSplitTaskRef.current = backgroundGen.dismissTask;
+
+  const outfitSplitActive = Boolean(project && isOutfitSplitActive(project));
+  const projectRef = useRef(project);
+  projectRef.current = project;
+
   useEffect(() => {
-    if (loading || !project) return;
-    const taskId = outfitSplitTaskId(project.id);
-    if (!isOutfitSplitActive(project)) {
-      backgroundGen.dismissTask(taskId);
-    } else {
-      startOutfitSplitStatusJob(project.id, { fire: false });
+    const current = projectRef.current;
+    if (loading || !current) return;
+    const taskId = outfitSplitTaskId(current.id);
+    if (!outfitSplitActive) {
+      dismissSplitTaskRef.current(taskId);
+      return;
     }
-  }, [
-    loading,
-    project,
-    project?.id,
-    project?.status,
-    project?.meta,
-    project?.sceneList.length,
-    backgroundGen.dismissTask,
-    startOutfitSplitStatusJob,
-  ]);
+    startOutfitSplitStatusJobRef.current(current.id, { fire: false });
+  }, [loading, project?.id, outfitSplitActive]);
 
   async function handleSceneChange(scenes: SceneShot[]) {
     if (!project) return;

@@ -246,13 +246,21 @@ export function OutfitVideoWorkspace({
     [chatModels],
   );
 
+  const onSplitModelChangeRef = useRef(onSplitModelChange);
+  onSplitModelChangeRef.current = onSplitModelChange;
+
   useEffect(() => {
     if (eligibleSplitModels.length === 0) return;
     if (eligibleSplitModels.some((m) => m.modelKey === splitModelKey)) return;
-    onSplitModelChange(
-      pickMediaDecomposeChatModelKey(eligibleSplitModels, splitModelKey, "video"),
+    const next = pickMediaDecomposeChatModelKey(
+      eligibleSplitModels,
+      splitModelKey,
+      "video",
     );
-  }, [eligibleSplitModels, onSplitModelChange, splitModelKey]);
+    if (!next || next === splitModelKey) return;
+    if (!eligibleSplitModels.some((m) => m.modelKey === next)) return;
+    onSplitModelChangeRef.current(next);
+  }, [eligibleSplitModels, splitModelKey]);
 
   const selectedSplitModelLabel =
     eligibleSplitModels.find((m) => m.modelKey === splitModelKey)?.displayName ?? splitModelKey;
