@@ -229,17 +229,18 @@ export function isModelShotPropStepDone(
   const ref = refByRole(refs, "prop");
   if (ref?.source === "none") return true;
   if (meta?.propDeferred) return true;
-  return false;
+  if (!ref) return true;
+  return Boolean(ref.ossUrl || ref.description?.trim() || ref.name || ref.catalogId);
 }
 
-/** 场景步骤是否已完成（含显式跳过 source=none） */
+/** 场景步骤是否已完成（未设 / 显式 none 均为可选完成） */
 export function isModelShotOptionalRefDone(
   refs: ModelShotReference[],
   role: "scene" | "prop",
 ): boolean {
   if (role === "prop") return false;
   const ref = refByRole(refs, role);
-  if (!ref) return false;
+  if (!ref) return true;
   if (ref.source === "none") return true;
   return Boolean(ref.ossUrl || ref.description?.trim() || ref.name || ref.catalogId);
 }

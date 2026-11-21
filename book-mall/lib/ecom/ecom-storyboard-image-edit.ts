@@ -35,7 +35,7 @@ export function ecomStoryboardImageEditRequiresRefs(modelKey: string): boolean {
 export function ecomStoryboardImageEditMaxRefs(modelKey: string): number {
   const k = modelKey.trim().toLowerCase();
   if (isQwenImageEditModel(k) || isQwenImage30ProModel(k)) return 3;
-  if (k === "wan2.7-image-pro") return 5;
+  if (k.startsWith("wan2.7-image") || k.startsWith("wan2.6-image")) return 5;
   return 3;
 }
 

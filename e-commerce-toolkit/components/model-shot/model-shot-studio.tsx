@@ -1,20 +1,20 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { EcomLoginPrompt } from "@/components/auth/ecom-login-prompt";
 import { BackgroundGenerationProvider } from "@/components/generation";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
-import { ModelShotAssistantPanel } from "@/components/model-shot/model-shot-assistant-panel";
+import { ModelShotConfigSidebar } from "@/components/model-shot/model-shot-config-sidebar";
 import { ModelShotContentPanel } from "@/components/model-shot/model-shot-content-panel";
 import { ModelShotProgressRail } from "@/components/model-shot/model-shot-progress-rail";
-import { EcomAssistantComposerDock } from "@/components/layout/ecom-assistant-composer-dock";
 import { EcomWorkspaceLayout } from "@/components/layout/ecom-workspace-layout";
+import { cn } from "@/lib/utils";
+import { useEcomStudioAssistantCollapse } from "@/lib/ecom-assistant-collapse";
 import { ProductCreationStudioSkeleton } from "@/components/product-design/product-creation-studio-skeleton";
 import { StoryboardModelPickerDialog } from "@/components/storyboard/storyboard-model-picker-dialog";
 import { WorkflowShareLinkDialog } from "@/components/storyboard/workflow-share-link-dialog";
 import { EcomButtonSecondary } from "@/components/ui/ecom-button";
-import { ECOM_DEFAULT_CHAT_MODEL_KEY } from "@/lib/ecom-assistant-models";
 import { isEcomUnauthorizedError } from "@/lib/ecom-auth";
 import {
   createModelShotProject,
@@ -49,9 +49,7 @@ type ImagePickerRequest = {
 export function ModelShotStudio() {
   const { alert, confirm, doubleConfirm, toast } = useDialogs();
   const [project, setProject] = useState<ModelShotProject | null>(null);
-  const [chatModels, setChatModels] = useState<StoryboardGatewayModel[]>([]);
   const [imageModels, setImageModels] = useState<StoryboardGatewayModel[]>([]);
-  const [chatModelKey, setChatModelKey] = useState(ECOM_DEFAULT_CHAT_MODEL_KEY);
   const [imageModelKey, setImageModelKey] = useState("wan2.7-image");
   const [imageSize, setImageSize] = useState(() => {
     const opts = filterImageSizeOptionsByEcomRatio(
@@ -65,32 +63,18 @@ export function ModelShotStudio() {
   const [loading, setLoading] = useState(true);
   const [empty, setEmpty] = useState(false);
   const [needLogin, setNeedLogin] = useState(false);
-  const [assistantStreaming, setAssistantStreaming] = useState(false);
-  const [assistantWide, setAssistantWide] = useState(false);
-  const [assistantDockComposer, setAssistantDockComposer] = useState<ReactNode | null>(null);
-  const [generateToken, setGenerateToken] = useState(0);
   const [refGenBusyRole, setRefGenBusyRole] = useState<ModelShotReferenceRole | null>(null);
+  const { assistantCollapsed, setAssistantCollapsed, handleMainBlankPointerDown } =
+    useEcomStudioAssistantCollapse(false);
   const [imagePicker, setImagePicker] = useState<ImagePickerRequest | null>(null);
   const [workflowShareOpen, setWorkflowShareOpen] = useState(false);
   const imageGenerateRef = useRef<
     (modelKey: string, indexes: number[], imageSize?: string) => void
   >(() => {});
-  const chatModelsRef = useRef<StoryboardGatewayModel[]>([]);
-  chatModelsRef.current = chatModels;
-
   const applyProject = useCallback((p: ModelShotProject) => {
     setProject(p);
     writeEcomLastProjectId(PROJECT_STORAGE_KEY, p.id);
     if (p.settings.imageModelKey) setImageModelKey(p.settings.imageModelKey);
-    setChatModelKey((prev) =>
-      pickBoundStoryboardModelKey(
-        chatModelsRef.current,
-        p.settings.chatModelKey &&
-          chatModelsRef.current.some((m) => m.modelKey === p.settings.chatModelKey)
-          ? p.settings.chatModelKey
-          : prev,
-      ),
-    );
   }, []);
 
   const reload = useCallback(
@@ -115,11 +99,7 @@ export function ModelShotStudio() {
     setModelsLoading(true);
     try {
       const models = await fetchModelShotModels();
-      setChatModels(models.chatModels);
       setImageModels(models.imageModels);
-      setChatModelKey((prev) =>
-        pickBoundStoryboardModelKey(models.chatModels, models.defaults.chat ?? prev),
-      );
       setImageModelKey((prev) => pickBoundStoryboardModelKey(models.imageModels, prev));
       setModelsLoadError(
         models.imageModels.length === 0
@@ -132,18 +112,6 @@ export function ModelShotStudio() {
       setModelsLoading(false);
     }
   }, []);
-
-  /** 模型清单晚于项目到达时，补同步助手模型 */
-  useEffect(() => {
-    const savedKey = project?.settings.chatModelKey;
-    if (chatModels.length === 0 || !savedKey) return;
-    setChatModelKey((prev) =>
-      pickBoundStoryboardModelKey(
-        chatModels,
-        chatModels.some((m) => m.modelKey === savedKey) ? savedKey : prev,
-      ),
-    );
-  }, [chatModels, project?.id, project?.settings.chatModelKey]);
 
   useEffect(() => {
     let cancelled = false;
@@ -204,7 +172,7 @@ export function ModelShotStudio() {
     return () => {
       cancelled = true;
     };
-    // 仅挂载时初始化；勿把 reload/loadModels 放入 deps（loadModels 更新 chatModels 会触发死循环）
+    // 仅挂载时初始化；勿把 reload/loadModels 放入 deps（loadModels 更新 imageModels 会触发死循环）
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -251,19 +219,10 @@ export function ModelShotStudio() {
 
   async function handleOpenProject(id: string) {
     if (project?.id === id) return;
-    if (assistantStreaming) {
-      await alert({
-        title: "请稍候",
-        message: "请等待助手完成当前输出后再切换项目。",
-        variant: "error",
-      });
-      return;
-    }
     setLoading(true);
     try {
       await reload(id);
       setEmpty(false);
-      setAssistantWide(false);
     } catch (e) {
       await alert({
         title: "打开失败",
@@ -374,7 +333,7 @@ export function ModelShotStudio() {
         <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4 px-6 py-16 text-center">
           <h2 className="text-xl font-semibold text-[#1d1d1f]">服装模特图</h2>
           <p className="max-w-md text-sm text-[#6e6e73]">
-            上传服装参考图，通过助手采集模特/场景/风格，编排 6～8 个姿势方案，确认后批量生成上身展示图。
+            上传服装参考图，在右侧配置采集项并生成姿势方案，确认后于中栏批量生成上身展示图。
           </p>
           <EcomButtonSecondary type="button" onClick={() => void handleNewProject()} disabled={loading}>
             {loading ? "创建中…" : "开始创作"}
@@ -387,32 +346,30 @@ export function ModelShotStudio() {
   return (
     <BackgroundGenerationProvider>
       <EcomWorkspaceLayout
-        assistantWide={assistantWide}
         progress={<ModelShotProgressRail project={project} />}
+        assistantSeamCollapse
+        onMainBlankPointerDown={handleMainBlankPointerDown}
+        assistantClassName={cn(
+          assistantCollapsed &&
+            "max-md:max-h-0 max-md:min-h-0 max-md:overflow-visible max-md:border-t-0 bg-transparent md:w-0 md:min-w-0 md:max-w-0 md:overflow-visible md:border-l-0",
+        )}
         assistant={
-          <ModelShotAssistantPanel
+          <ModelShotConfigSidebar
             key={project.id}
             project={project}
-            chatModels={chatModels}
-            chatModelKey={chatModelKey}
-            composerWide={assistantWide}
-            onComposerWideChange={setAssistantWide}
-            onStreamingChange={setAssistantStreaming}
+            disabled={refGenBusyRole != null}
+            collapsed={assistantCollapsed}
+            onCollapsedChange={setAssistantCollapsed}
             onProjectChange={handleProjectChange}
-            onRequestGeneratePoses={() => setGenerateToken((t) => t + 1)}
-            refGenBusyRole={refGenBusyRole}
             onAlert={alert}
-            onDockComposerChange={setAssistantDockComposer}
           />
-        }
-        assistantFooter={
-          <EcomAssistantComposerDock>{assistantDockComposer}</EcomAssistantComposerDock>
         }
       >
         <ModelShotContentPanel
           project={project}
           imageModels={imageModels}
           imageModelKey={imageModelKey}
+          imageSize={imageSize}
           onImageModelChange={handleImageModelChange}
           modelsLoading={modelsLoading}
           modelsLoadError={modelsLoadError}
@@ -423,8 +380,6 @@ export function ModelShotStudio() {
           onDeleteProject={() => void handleDeleteProject()}
           onProjectChange={handleProjectChange}
           onRefGenBusyRoleChange={setRefGenBusyRole}
-          streaming={assistantStreaming}
-          generateRequestToken={generateToken}
           imagePickerOpen={imagePicker != null}
           onRequestImagePicker={requestImagePicker}
           onRegisterImageGenerate={registerImageGenerate}

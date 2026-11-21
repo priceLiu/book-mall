@@ -48,6 +48,23 @@ describe("resolveActiveModelShotPoseBusyIndexes", () => {
     ).toEqual([2]);
   });
 
+  it("keeps busy when regenerating a pose that already has an image", () => {
+    expect(
+      resolveActiveModelShotPoseBusyIndexes({
+        pendingIndices: [],
+        localWatchIndices: [2],
+        items: [
+          {
+            index: 2,
+            imageUrl: "https://a/2.png",
+            prompt: "p2",
+            status: "ready" as const,
+          },
+        ],
+      }),
+    ).toEqual([2]);
+  });
+
   it("clears busy when image exists in history without imageUrl", () => {
     expect(
       resolveActiveModelShotPoseBusyIndexes({

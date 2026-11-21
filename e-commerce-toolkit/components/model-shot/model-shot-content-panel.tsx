@@ -9,8 +9,6 @@ import {
   Plus,
   Trash2,
 } from "lucide-react";
-import { createPortal } from "react-dom";
-
 import { useBackgroundGeneration } from "@/components/generation";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { EcomProjectListButton } from "@/components/layout/ecom-project-list-button";
@@ -19,6 +17,7 @@ import {
   ModelShotPosePlanTable,
   type PoseItemPatch,
 } from "@/components/model-shot/model-shot-pose-plan-table";
+import { ModelShotPosePromptEditDialog } from "@/components/model-shot/model-shot-pose-prompt-edit-dialog";
 import { ModelShotRefUploader } from "@/components/model-shot/model-shot-ref-uploader";
 import {
   EcomImagePreviewHost,
@@ -29,7 +28,6 @@ import { StoryboardTaskStatus } from "@/components/storyboard/storyboard-task-st
 import { EcomIconButton, EcomIconButtonLink, EcomShareIconButton } from "@/components/ui/ecom-icon-button";
 import { EcomWorkspaceTitleHeading } from "@/components/layout/ecom-workspace-title-heading";
 import { EcomIconToolbar, EcomIconToolbarGroup } from "@/components/ui/ecom-icon-toolbar";
-import { EcomDialogCloseButton } from "@/components/ui/dialog";
 import {
   attachModelShotReference,
   confirmModelShotPlan,
@@ -66,6 +64,8 @@ type Props = {
   project: ModelShotProject;
   imageModels: StoryboardGatewayModel[];
   imageModelKey: string;
+  /** 与工作室模型弹层一致（如 1080*1440） */
+  imageSize?: string;
   onImageModelChange: (key: string) => void;
   modelsLoading?: boolean;
   modelsLoadError?: string | null;
@@ -93,6 +93,7 @@ export function ModelShotContentPanel({
   project,
   imageModels,
   imageModelKey,
+  imageSize,
   onImageModelChange,
   modelsLoading = false,
   modelsLoadError = null,
@@ -129,10 +130,7 @@ export function ModelShotContentPanel({
   const [busy, setBusy] = useState(false);
   const [selectedPoseIndexes, setSelectedPoseIndexes] = useState<Set<number>>(() => new Set());
   const [activeGenPoseIndexes, setActiveGenPoseIndexes] = useState<Set<number>>(() => new Set());
-  const [posePromptPreview, setPosePromptPreview] = useState<{
-    title: string;
-    prompt: string;
-  } | null>(null);
+  const [posePromptEditIndex, setPosePromptEditIndex] = useState<number | null>(null);
   const [exportBusy, setExportBusy] = useState(false);
   const imageGenInFlightCountRef = useRef(0);
   const imageGenWatchRef = useRef<number[]>([]);
@@ -150,11 +148,15 @@ export function ModelShotContentPanel({
 
   const reconcilePoseImageGenBusy = useCallback((source: ModelShotProject) => {
     const pending = listModelShotPendingPoseIndices(source.meta);
-    imageGenWatchRef.current = imageGenWatchRef.current.filter((idx) => {
-      if (pending.includes(idx)) return true;
-      const item = source.plan.items.find((row) => row.index === idx);
-      return item ? !modelShotPoseHasGeneratedImage(item) : true;
-    });
+    // 请求进行中不裁剪本地 watch，避免「重生成」时因已有成图立刻丢掉 watch
+    if (imageGenInFlightCountRef.current === 0) {
+      imageGenWatchRef.current = imageGenWatchRef.current.filter((idx) => {
+        if (pending.includes(idx)) return true;
+        const item = source.plan.items.find((row) => row.index === idx);
+        if (item?.status === "generating") return true;
+        return item ? !modelShotPoseHasGeneratedImage(item) : true;
+      });
+    }
     const active = resolveActiveModelShotPoseBusyIndexes({
       pendingIndices: pending,
       localWatchIndices: imageGenWatchRef.current,
@@ -169,6 +171,16 @@ export function ModelShotContentPanel({
       imageGenWatchRef.current = [
         ...new Set([...imageGenWatchRef.current, ...indexes]),
       ].sort((a, b) => a - b);
+      const pending = listModelShotPendingPoseIndices(project.meta);
+      setActiveGenPoseIndexes(
+        new Set(
+          resolveActiveModelShotPoseBusyIndexes({
+            pendingIndices: pending,
+            localWatchIndices: imageGenWatchRef.current,
+            items: project.plan.items,
+          }),
+        ),
+      );
       reconcilePoseImageGenBusy(project);
     },
     [project, reconcilePoseImageGenBusy],
@@ -443,6 +455,80 @@ export function ModelShotContentPanel({
     [alert, onProjectChange, project.id],
   );
 
+  const handleAttachModelArchetype = useCallback(
+    async (archetype: { id: string; label: string; description: string }) => {
+      setRefBusy(true);
+      try {
+        await attachModelShotReference(project.id, {
+          reference: {
+            id: `model-text-${archetype.id}`,
+            role: "model",
+            source: "text",
+            name: archetype.label,
+            description: archetype.description,
+          },
+        });
+        await onProjectChange();
+      } catch (e) {
+        await alert({
+          title: "保存失败",
+          message: e instanceof Error ? e.message : "无法保存模特",
+          variant: "error",
+        });
+      } finally {
+        setRefBusy(false);
+      }
+    },
+    [alert, onProjectChange, project.id],
+  );
+
+  const handleSaveModelDescription = useCallback(
+    async (description: string) => {
+      setRefBusy(true);
+      try {
+        await attachModelShotReference(project.id, { role: "model", description });
+        await onProjectChange();
+      } catch (e) {
+        await alert({
+          title: "保存失败",
+          message: e instanceof Error ? e.message : "无法保存模特描述",
+          variant: "error",
+        });
+      } finally {
+        setRefBusy(false);
+      }
+    },
+    [alert, onProjectChange, project.id],
+  );
+
+  const handleAttachScenePreset = useCallback(
+    async (preset: { id: string; name: string; visualPrompt: string }) => {
+      setRefBusy(true);
+      try {
+        await attachModelShotReference(project.id, {
+          reference: {
+            id: `scene-text-${preset.id}`,
+            role: "scene",
+            source: "library",
+            catalogId: preset.id,
+            name: preset.name,
+            description: preset.visualPrompt,
+          },
+        });
+        await onProjectChange();
+      } catch (e) {
+        await alert({
+          title: "保存失败",
+          message: e instanceof Error ? e.message : "无法保存场景",
+          variant: "error",
+        });
+      } finally {
+        setRefBusy(false);
+      }
+    },
+    [alert, onProjectChange, project.id],
+  );
+
   const handleGenerateRef = useCallback(
     async (
       role: Exclude<ModelShotReferenceRole, "garment">,
@@ -471,29 +557,6 @@ export function ModelShotContentPanel({
     },
     [alert, onImageModelChange, onProjectChange, onRefGenBusyRoleChange, project.id],
   );
-
-  const handleSkipScene = useCallback(async () => {
-    setRefBusy(true);
-    try {
-      await attachModelShotReference(project.id, {
-        reference: {
-          id: `scene-skip-${Date.now()}`,
-          role: "scene",
-          source: "none",
-          name: "跳过场景",
-        },
-      });
-      await onProjectChange();
-    } catch (e) {
-      await alert({
-        title: "操作失败",
-        message: e instanceof Error ? e.message : "无法跳过场景",
-        variant: "error",
-      });
-    } finally {
-      setRefBusy(false);
-    }
-  }, [alert, onProjectChange, project.id]);
 
   const openImagePicker = useCallback(
     (poseIndex?: number, batchIndexes?: number[]) => {
@@ -717,8 +780,7 @@ export function ModelShotContentPanel({
 
   const defaultSceneLabel = useMemo(() => {
     const sceneRef = project.references.find((r) => r.role === "scene");
-    if (!sceneRef) return null;
-    if (sceneRef.source === "none") return "跳过场景";
+    if (!sceneRef || sceneRef.source === "none") return "自由发挥";
     return sceneRef.name?.trim() || "已设场景";
   }, [project.references]);
 
@@ -754,6 +816,39 @@ export function ModelShotContentPanel({
     },
     [onProjectChange, project.id],
   );
+
+  const savePosePrompt = useCallback(
+    async (index: number, prompt: string) => {
+      setBusy(true);
+      try {
+        await patchModelShotPoseItem(project.id, index, { prompt });
+        await onProjectChange();
+      } finally {
+        setBusy(false);
+      }
+    },
+    [onProjectChange, project.id],
+  );
+
+  const regeneratePoseImageDirect = useCallback(
+    (index: number) => {
+      if (!planConfirmed) {
+        void alert({
+          title: "请先确认姿势计划",
+          message: "在中栏姿势脚本表确认计划后再生成模特图。",
+          variant: "error",
+        });
+        return;
+      }
+      void startBackgroundGenerate(imageModelKey, [index], imageSize);
+    },
+    [alert, imageModelKey, imageSize, planConfirmed, startBackgroundGenerate],
+  );
+
+  const posePromptEditItem = useMemo(() => {
+    if (posePromptEditIndex == null) return null;
+    return project.plan.items.find((i) => i.index === posePromptEditIndex) ?? null;
+  }, [posePromptEditIndex, project.plan.items]);
 
   const requestPoseImageGenerate = useCallback(
     (poseIndex?: number, batchIndexes?: number[]) => {
@@ -854,8 +949,10 @@ export function ModelShotContentPanel({
             onRemove={handleRefRemove}
             onAttachAssets={handleAttachAssets}
             onAttachModelFromLibrary={handleAttachModel}
+            onAttachModelArchetype={handleAttachModelArchetype}
+            onSaveModelDescription={handleSaveModelDescription}
+            onAttachScenePreset={handleAttachScenePreset}
             onGenerateRef={handleGenerateRef}
-            onSkipScene={handleSkipScene}
             imageModels={imageModels}
             imageModelKey={imageModelKey}
             modelsLoading={modelsLoading}
@@ -904,11 +1001,8 @@ export function ModelShotContentPanel({
               onPreviewImage={openPoseImagePreview}
               onPreviewPrompt={(index) => {
                 const item = project.plan.items.find((i) => i.index === index);
-                if (!item?.prompt?.trim()) return;
-                setPosePromptPreview({
-                  title: item.title ?? `姿势 ${index}`,
-                  prompt: item.prompt,
-                });
+                if (!item) return;
+                setPosePromptEditIndex(index);
               }}
             />
           ) : null}
@@ -939,33 +1033,22 @@ export function ModelShotContentPanel({
         </div>
       </div>
 
-      {posePromptPreview && typeof document !== "undefined"
-        ? createPortal(
-            <div
-              className="fixed inset-0 z-[300] flex items-center justify-center bg-black/45 p-4"
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="model-shot-pose-prompt-title"
-              onMouseDown={(e) => {
-                if (e.target === e.currentTarget) setPosePromptPreview(null);
-              }}
-            >
-              <div className="relative flex max-h-[min(92vh,880px)] w-[min(94vw,56rem)] flex-col rounded-2xl bg-white p-6 shadow-2xl">
-                <EcomDialogCloseButton onClick={() => setPosePromptPreview(null)} />
-                <h3
-                  id="model-shot-pose-prompt-title"
-                  className="pr-10 text-lg font-semibold text-[#1d1d1f]"
-                >
-                  {posePromptPreview.title}
-                </h3>
-                <div className="ecom-scrollbar-thin mt-4 min-h-[min(40vh,420px)] max-h-[min(72vh,680px)] w-full flex-1 overflow-y-auto whitespace-pre-wrap rounded-lg bg-[#f5f5f7] px-4 py-3 text-[13px] leading-relaxed text-[#1d1d1f]">
-                  {posePromptPreview.prompt}
-                </div>
-              </div>
-            </div>,
-            document.body,
-          )
-        : null}
+      {posePromptEditItem ? (
+        <ModelShotPosePromptEditDialog
+          open={posePromptEditIndex != null}
+          onClose={() => setPosePromptEditIndex(null)}
+          project={project}
+          item={posePromptEditItem}
+          imageModelKey={imageModelKey}
+          busy={busy || refBusy}
+          onSave={(prompt) => savePosePrompt(posePromptEditItem.index, prompt)}
+          onSaveAndRegenerate={async (prompt) => {
+            const index = posePromptEditItem.index;
+            await savePosePrompt(index, prompt);
+            regeneratePoseImageDirect(index);
+          }}
+        />
+      ) : null}
 
       <EcomImagePreviewHost
         preview={preview}

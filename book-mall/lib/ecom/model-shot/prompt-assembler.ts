@@ -10,7 +10,7 @@ export function resolveModelShotSceneText(
   brief: ModelShotBrief | null,
 ): string {
   const scene = refByRole(references, "scene");
-  if (scene?.source === "none") {
+  if (!scene || scene.source === "none") {
     const styleHint = brief?.styles?.filter(Boolean).join("、");
     const platform = brief?.platform;
     const hints = [styleHint, platform ? `适合${platform}展示` : ""].filter(Boolean);
@@ -54,7 +54,7 @@ export function assembleModelShotPrompt(opts: {
     model?.source === "text" && model.description
       ? model.description
       : model?.ossUrl
-        ? "参考图像中的人物身份保持不变"
+        ? "人物面部、发型、肤色与体型必须与模特参考图完全一致，不得沿用姿势库预览或其他参考图中的人脸"
         : "时尚模特";
 
   const garmentText =
@@ -90,8 +90,8 @@ export function assembleModelShotPrompt(opts: {
     scenePart,
     propPart,
     opts.hasPoseRef
-      ? "严格参考姿势参考图的身体姿态与构图，不改变服装款式与模特身份"
-      : "",
+      ? "严格参考姿势参考图的身体姿态与构图；服装款式与颜色必须以服装参考图为准，不得沿用姿势参考图中的衣物"
+      : "身体姿态与构图按姿势描述执行；服装款式与颜色必须以服装参考图为准",
     `${platformHint}，高清，自然光，无水印`,
   ].filter(Boolean);
 
@@ -108,6 +108,10 @@ export function rebuildModelShotItemPrompt(opts: {
   brief: ModelShotBrief | null;
   references: ModelShotReference[];
 }): string {
+  if (opts.item.promptEdited && opts.item.prompt?.trim()) {
+    return opts.item.prompt.trim();
+  }
+
   const hasStructuredFields =
     opts.item.poseDescription !== undefined ||
     opts.item.sceneText !== undefined ||

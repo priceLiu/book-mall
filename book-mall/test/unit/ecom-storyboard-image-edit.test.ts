@@ -31,6 +31,7 @@ describe("ecom-storyboard-image-edit", () => {
     expect(ecomStoryboardImageEditMaxRefs("qwen-image-edit")).toBe(3);
     expect(ecomStoryboardImageEditMaxRefs("qwen-image-3.0-pro")).toBe(3);
     expect(ecomStoryboardImageEditMaxRefs("wan2.7-image-pro")).toBe(5);
+    expect(ecomStoryboardImageEditMaxRefs("wan2.7-image")).toBe(5);
   });
 
   it("throws when qwen-image-edit invoked without refs", () => {

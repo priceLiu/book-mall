@@ -50,6 +50,23 @@ export function listModelShotPendingPoseIndices(
     .sort((a, b) => a - b);
 }
 
+function modelShotLocalWatchHasUnfinishedSibling(opts: {
+  index: number;
+  localWatchIndices: readonly number[];
+  pendingIndices: readonly number[];
+  items: readonly ModelShotPoseItem[];
+}): boolean {
+  for (const j of opts.localWatchIndices) {
+    if (j === opts.index) continue;
+    const item = opts.items.find((row) => row.index === j);
+    const hasImage = item ? modelShotPoseHasGeneratedImage(item) : false;
+    if (opts.pendingIndices.includes(j)) return true;
+    if (item?.status === "generating") return true;
+    if (!hasImage) return true;
+  }
+  return false;
+}
+
 export function resolveActiveModelShotPoseBusyIndexes(opts: {
   pendingIndices: readonly number[];
   localWatchIndices: readonly number[];
@@ -63,9 +80,20 @@ export function resolveActiveModelShotPoseBusyIndexes(opts: {
     const item = opts.items.find((row) => row.index === idx);
     const hasImage = item ? modelShotPoseHasGeneratedImage(item) : false;
     const serverPending = opts.pendingIndices.includes(idx);
-    // 服务端已落图且不再 pending → 立即解除 busy（批量 API 未返回时也同步）
-    if (hasImage && !serverPending) {
-      set.delete(idx);
+    const localWatch = opts.localWatchIndices.includes(idx);
+    const generating = item?.status === "generating";
+    if (hasImage && !serverPending && !generating) {
+      const soloRegenWatch =
+        localWatch &&
+        !modelShotLocalWatchHasUnfinishedSibling({
+          index: idx,
+          localWatchIndices: opts.localWatchIndices,
+          pendingIndices: opts.pendingIndices,
+          items: opts.items,
+        });
+      if (!soloRegenWatch) {
+        set.delete(idx);
+      }
     }
   }
   return [...set].sort((a, b) => a - b);

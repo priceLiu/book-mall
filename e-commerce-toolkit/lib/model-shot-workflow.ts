@@ -229,11 +229,15 @@ export function buildModelShotCollectionSummaryRows(
   const brief = project.brief ?? {};
   const modelLine = model?.name ?? model?.description?.slice(0, 40) ?? "未指定";
   const sceneLine =
-    scene?.source === "none"
-      ? "跳过（出图时由模型自由发挥）"
-      : (scene?.name ?? scene?.description?.slice(0, 40) ?? "未指定");
+    !scene || scene.source === "none"
+      ? "未设（出图时由模型自由发挥）"
+      : (scene.name ?? scene.description?.slice(0, 40) ?? "未指定");
   const propLine =
-    prop?.source === "none" ? "不需要" : (prop?.name ?? prop?.description?.slice(0, 32) ?? "未指定");
+    prop?.source === "none"
+      ? "不需要"
+      : prop
+        ? (prop.name ?? prop.description?.slice(0, 32) ?? "已设道具")
+        : "姿势表逐镜填写";
   const styles = brief.styles?.join("、") ?? "—";
   const n = brief.poseCount ?? 6;
   return [
@@ -563,8 +567,8 @@ export function choicePrompt(choice: string): string {
 }
 
 export function modelRefLabel(ref: ModelShotReference | undefined): string {
-  if (!ref) return "未选择";
-  if (ref.source === "none") return "已跳过";
+  if (!ref) return "未设（可选）";
+  if (ref.source === "none") return "未设（自由发挥）";
   if (ref.name) return ref.name;
   if (ref.source === "text" && ref.description) return ref.description.slice(0, 24);
   if (ref.source === "model-library") return "模特库";

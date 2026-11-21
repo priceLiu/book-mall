@@ -8,11 +8,15 @@ import { EcomAssetPickerDialog } from "@/components/media/ecom-asset-picker-dial
 import { EcomRefUploadCard } from "@/components/media/ecom-ref-upload-card";
 import { useAssetLibrary } from "@/docker-shared/global-asset-library";
 import { openEcomModelLibraryPick } from "@/lib/ecom-asset-library-pick";
+import { ModelShotModelCollectExtras } from "@/components/model-shot/model-shot-model-collect-extras";
 import { ModelShotRefGenerateDialog } from "@/components/model-shot/model-shot-ref-generate-dialog";
+import { ModelShotScenePresetDialog } from "@/components/model-shot/model-shot-scene-preset-dialog";
 import { EcomButtonSecondary } from "@/components/ui/ecom-button";
 import { useImageDropPaste } from "@/hooks/use-image-drop-paste";
 import { ECOM_REF_CARD_ACTION_BTN } from "@/lib/ecom-ref-upload-ui";
 import { IMAGE_UPLOAD_DROP_HINT } from "@/lib/image-upload-utils";
+import type { ModelShotModelArchetype } from "@/lib/model-shot-prompt-presets";
+import type { ModelShotScenePreset } from "@/lib/model-shot-prompt-presets";
 import type { ModelShotReference, ModelShotReferenceRole } from "@/lib/model-shot-types";
 import { modelRefLabel } from "@/lib/model-shot-workflow";
 import type { StoryboardGatewayModel } from "@/lib/storyboard-types";
@@ -37,7 +41,9 @@ type Props = {
     role: Exclude<ModelShotReferenceRole, "garment">,
     opts: { prompt: string; modelKey: string },
   ) => Promise<void>;
-  onSkipScene?: () => Promise<void>;
+  onAttachModelArchetype?: (archetype: ModelShotModelArchetype) => Promise<void>;
+  onSaveModelDescription?: (description: string) => Promise<void>;
+  onAttachScenePreset?: (preset: ModelShotScenePreset) => Promise<void>;
   imageModels: StoryboardGatewayModel[];
   imageModelKey: string;
   modelsLoading?: boolean;
@@ -80,7 +86,7 @@ const ROLE_SECTIONS: Array<{
     title: "场景图",
     refRole: "scene",
     aiGenerate: true,
-    emptyHint: "可选。拖放 / 粘贴 / 我的资产，或 AI 生成场景参考图；也可跳过，由模型自由发挥背景。",
+    emptyHint: "可选。不上传时出图背景由模型自由发挥；也可拖放 / 粘贴 / 我的资产 / AI 生成。",
   },
 ];
 
@@ -176,7 +182,9 @@ export function ModelShotRefUploader({
   onAttachAssets,
   onAttachModelFromLibrary,
   onGenerateRef,
-  onSkipScene,
+  onAttachModelArchetype,
+  onSaveModelDescription,
+  onAttachScenePreset,
   imageModels,
   imageModelKey,
   modelsLoading = false,
@@ -202,6 +210,7 @@ export function ModelShotRefUploader({
     null,
   );
   const [genModelKey, setGenModelKey] = useState(imageModelKey);
+  const [scenePresetOpen, setScenePresetOpen] = useState(false);
 
   const genModelDisplayName = useMemo(
     () => imageModels.find((m) => m.modelKey === genModelKey)?.displayName ?? genModelKey,
@@ -307,9 +316,14 @@ export function ModelShotRefUploader({
         {ROLE_SECTIONS.map(({ role, title, refRole, emptyHint, required, aiGenerate }) => {
           const ref = refFor(refRole);
           const isGenerating = genBusyRole === refRole;
-          const skipped = ref?.source === "none";
+          const sceneFreeform =
+            refRole === "scene" && (!ref || ref.source === "none") && !ref?.ossUrl;
           const aiDesc =
             ref?.source === "ai-generate" && ref.description ? ref.description : null;
+          const textRefLabel =
+            ref && !ref.ossUrl && refRole !== "garment"
+              ? modelRefLabel(ref)
+              : null;
           return (
             <div key={role}>
               <EcomRefUploadCard
@@ -329,13 +343,15 @@ export function ModelShotRefUploader({
                     : []
                 }
                 emptyHint={
-                  skipped
-                    ? refRole === "prop"
-                      ? "不需要道具，出图时不带入道具参考。"
-                      : "已跳过场景，出图时由模型自由发挥背景。"
-                    : aiDesc
-                      ? ""
-                      : emptyHint
+                  refRole === "prop" && ref?.source === "none"
+                    ? "不需要道具，出图时不带入道具参考。"
+                    : textRefLabel
+                      ? `当前：${textRefLabel}`
+                      : sceneFreeform
+                        ? "未上传场景，出图时背景由模型自由发挥。"
+                        : aiDesc
+                          ? ""
+                          : emptyHint
                 }
                 busy={disabled || pasteSuspended}
                 generating={isGenerating}
@@ -370,6 +386,20 @@ export function ModelShotRefUploader({
                 }}
                 headerActions={
                   <>
+                    {refRole === "scene" && onAttachScenePreset ? (
+                      <EcomButtonSecondary
+                        size="sm"
+                        type="button"
+                        disabled={disabled}
+                        className={ECOM_REF_CARD_ACTION_BTN}
+                        onClick={() => {
+                          onActiveRoleChange?.(role);
+                          setScenePresetOpen(true);
+                        }}
+                      >
+                        词库
+                      </EcomButtonSecondary>
+                    ) : null}
                     {refRole === "model" && onAttachModelFromLibrary ? (
                       <EcomButtonSecondary
                         size="sm"
@@ -383,20 +413,6 @@ export function ModelShotRefUploader({
                       >
                         <UserRound className="h-3 w-3 shrink-0" />
                         模特库
-                      </EcomButtonSecondary>
-                    ) : null}
-                    {refRole === "scene" && onSkipScene && !ref?.ossUrl && !skipped ? (
-                      <EcomButtonSecondary
-                        size="sm"
-                        type="button"
-                        disabled={disabled}
-                        className={ECOM_REF_CARD_ACTION_BTN}
-                        onClick={() => {
-                          onActiveRoleChange?.(role);
-                          void onSkipScene();
-                        }}
-                      >
-                        跳过
                       </EcomButtonSecondary>
                     ) : null}
                     {aiGenerate && onGenerateRef ? (
@@ -422,10 +438,28 @@ export function ModelShotRefUploader({
                   Prompt：{aiDesc}
                 </p>
               ) : null}
+              {refRole === "model" && onAttachModelArchetype && onSaveModelDescription ? (
+                <ModelShotModelCollectExtras
+                  modelRef={ref}
+                  disabled={disabled}
+                  onAttachArchetype={onAttachModelArchetype}
+                  onSaveDescription={onSaveModelDescription}
+                />
+              ) : null}
             </div>
           );
         })}
       </div>
+
+      {onAttachScenePreset ? (
+        <ModelShotScenePresetDialog
+          open={scenePresetOpen}
+          onClose={() => setScenePresetOpen(false)}
+          busy={disabled}
+          selectedCatalogId={refFor("scene")?.catalogId}
+          onConfirm={onAttachScenePreset}
+        />
+      ) : null}
 
       <ModelShotRefOverlays
         pickerRole={pickerRole}

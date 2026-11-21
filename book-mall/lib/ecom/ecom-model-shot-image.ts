@@ -3,7 +3,7 @@ import { Prisma } from "@prisma/client";
 import { generateEcomImage } from "@/lib/ecom/ecom-image-gen-invoke";
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
 import { rebuildModelShotItemPrompt } from "@/lib/ecom/model-shot/prompt-assembler";
-import { buildModelShotRefImageUrls } from "@/lib/ecom/model-shot/pose-ref";
+import { describeModelShotRefImageSlots } from "@/lib/ecom/model-shot/pose-ref";
 import { resolvePoseRefUrl } from "@/lib/ecom/ecom-pose-library-import";
 import { appendModelShotPoseImage } from "@/lib/ecom/model-shot/pose-image-history";
 import {
@@ -27,22 +27,6 @@ import {
 import { ECOM_STORYBOARD_DEFAULT_IMAGE_MODEL } from "@/lib/gateway/ecom-storyboard-chat-models";
 import { mapWithConcurrency } from "@/lib/generation/poll-parallel";
 import { prisma } from "@/lib/prisma";
-
-function refUrls(
-  project: Awaited<ReturnType<typeof getEcomModelShotProject>>,
-  item?: { poseRefUrl?: string; poseId?: string },
-  modelKey?: string,
-): string[] {
-  if (!project) return [];
-  const poseRef =
-    item?.poseRefUrl?.trim() ||
-    undefined;
-  return buildModelShotRefImageUrls({
-    references: project.references,
-    poseRefUrl: poseRef,
-    modelKey,
-  });
-}
 
 export async function generateModelShotImages(opts: {
   userId: string;
@@ -105,12 +89,35 @@ export async function generateModelShotImages(opts: {
         poseRefUrl = (await resolvePoseRefUrl(item.poseId)) ?? undefined;
       }
 
-      const refs = refUrls(live!, { poseRefUrl, poseId: item.poseId }, modelKey);
+      const refSlots = describeModelShotRefImageSlots({
+        references: live!.references,
+        poseRefUrl,
+        modelKey,
+      });
+      const refs = refSlots.map((s) => s.url);
+      const hasPoseRefInBatch = refSlots.some((s) => s.role === "poseRef");
 
-      const prompt = rebuildModelShotItemPrompt({
-        item: { ...item, poseRefUrl },
+      let prompt = rebuildModelShotItemPrompt({
+        item: { ...item, poseRefUrl: hasPoseRefInBatch ? poseRefUrl : undefined },
         brief: live!.brief,
         references: live!.references,
+      });
+      const modelRef = refByRole(live!.references, "model");
+      if (
+        item.promptEdited &&
+        modelRef?.ossUrl?.trim() &&
+        !/模特参考|人物身份|人脸/.test(prompt)
+      ) {
+        prompt = `${prompt.trim()} 人物面部、发型与体型须与模特参考图一致，不得沿用其他参考图人脸。`;
+      }
+
+      console.info("[model-shot] image/generate pose", {
+        projectId: opts.projectId,
+        index,
+        modelKey,
+        refRoles: refSlots.map((s) => s.role),
+        refCount: refs.length,
+        promptPreview: prompt.slice(0, 120),
       });
 
       try {

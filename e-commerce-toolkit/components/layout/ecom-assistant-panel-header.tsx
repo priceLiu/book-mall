@@ -12,9 +12,10 @@ type Props = {
   subtitle?: string;
   composerWide?: boolean;
   onComposerWideChange?: (wide: boolean) => void;
-  /** 折叠助手为右下角输入框 */
+  /** 折叠助手侧栏 */
   onCollapse?: () => void;
   collapseDisabled?: boolean;
+  collapseTitle?: string;
   /** 展开钮左侧（如微剧「影片参数」） */
   trailing?: React.ReactNode;
 };
@@ -27,6 +28,7 @@ export function EcomAssistantPanelHeader({
   onComposerWideChange,
   onCollapse,
   collapseDisabled = false,
+  collapseTitle,
   trailing,
 }: Props) {
   return (
@@ -55,7 +57,11 @@ export function EcomAssistantPanelHeader({
         {onCollapse ? (
           <EcomAssistantIconButton
             variant="muted"
-            title={collapseDisabled ? "生成中不可收起" : "收起至右下角输入框"}
+            title={
+              collapseDisabled
+                ? "生成中不可收起"
+                : (collapseTitle ?? "收起至右下角输入框")
+            }
             disabled={collapseDisabled}
             onClick={() => onCollapse()}
           >

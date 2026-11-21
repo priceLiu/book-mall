@@ -2,6 +2,7 @@
 
 import { useRef } from "react";
 
+import { EcomWorkspaceAssistantSeamProvider } from "@/components/layout/ecom-workspace-assistant-seam-context";
 import { EcomWorkspaceFloatingPortalProvider } from "@/components/layout/ecom-workspace-floating-portal-context";
 import { cn } from "@/lib/utils";
 
@@ -27,6 +28,8 @@ type Props = {
   onMainBlankPointerDown?: (e: React.PointerEvent<HTMLElement>) => void;
   /** 覆盖助手栏宽度（如图片分层加宽） */
   assistantClassName?: string;
+  /** 右栏边缘切钮走接缝 Portal（避免工作区 overflow 裁切） */
+  assistantSeamCollapse?: boolean;
 };
 
 /**
@@ -45,12 +48,15 @@ export function EcomWorkspaceLayout({
   assistantCollapsed = false,
   onMainBlankPointerDown,
   assistantClassName,
+  assistantSeamCollapse = false,
 }: Props) {
   const hasAssistant = Boolean(assistant) && !fullWidth;
   const floatingPortalRef = useRef<HTMLDivElement>(null);
+  const assistantSeamRef = useRef<HTMLDivElement>(null);
 
   return (
     <EcomWorkspaceFloatingPortalProvider portalRef={floatingPortalRef}>
+    <EcomWorkspaceAssistantSeamProvider seamRef={assistantSeamRef}>
     <div
       className="relative flex h-full min-h-0 min-w-0 w-full max-w-full flex-col overflow-hidden md:flex-row"
       data-ecom-workspace-root
@@ -71,10 +77,21 @@ export function EcomWorkspaceLayout({
         ) : null}
       </div>
 
+      {hasAssistant && assistantSeamCollapse ? (
+        <div
+          ref={assistantSeamRef}
+          className="relative hidden h-full w-0 shrink-0 self-stretch md:block"
+          data-ecom-assistant-seam
+          aria-hidden
+        />
+      ) : null}
+
       {hasAssistant ? (
         <aside
           className={cn(
-            "flex h-full min-h-0 max-h-full flex-col overflow-hidden border-t border-[var(--ecom-assistant-border)] bg-[var(--ecom-assistant-bg)] max-md:max-h-[min(52dvh,520px)] max-md:min-h-[240px] max-md:shrink-0 md:w-[380px] md:min-w-[380px] md:max-w-[380px] md:self-stretch md:border-l md:border-t-0 md:contain-[layout_size_style]",
+            "flex h-full min-h-0 max-h-full flex-col overflow-hidden border-t border-[var(--ecom-assistant-border)] bg-[var(--ecom-assistant-bg)] max-md:max-h-[min(52dvh,520px)] max-md:min-h-[240px] max-md:shrink-0 md:w-[380px] md:min-w-[380px] md:max-w-[380px] md:self-stretch md:border-l md:border-t-0",
+            !assistantSeamCollapse && "md:contain-[layout_size_style]",
+            assistantSeamCollapse && "overflow-visible",
             assistantCollapsed
               ? "hidden"
               : cn(
@@ -98,7 +115,14 @@ export function EcomWorkspaceLayout({
                 : "grid-rows-[minmax(0,1fr)]",
             )}
           >
-            <div className="flex h-full min-h-0 flex-col overflow-hidden">{assistant}</div>
+            <div
+              className={cn(
+                "flex h-full min-h-0 flex-col",
+                assistantSeamCollapse ? "overflow-visible" : "overflow-hidden",
+              )}
+            >
+              {assistant}
+            </div>
             {assistantFooter ? (
               <div
                 className="relative z-10 shrink-0 border-t border-[var(--ecom-assistant-border)] bg-[var(--ecom-assistant-composer-bg)]"
@@ -119,6 +143,7 @@ export function EcomWorkspaceLayout({
         />
       ) : null}
     </div>
+    </EcomWorkspaceAssistantSeamProvider>
     </EcomWorkspaceFloatingPortalProvider>
   );
 }
