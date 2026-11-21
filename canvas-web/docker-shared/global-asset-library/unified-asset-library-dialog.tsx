@@ -93,43 +93,32 @@ export function UnifiedAssetLibraryDialog({ open, variant, api, options, onClose
     setVisibleCount(GALD_PAGE_SIZE);
     try {
       let merged: UnifiedAssetPickItem[] = [];
-      const kindFilter = options.allowedCatalogKinds;
-      const kinds =
-        section === "project"
-          ? []
-          : kindFilter?.length
-            ? kindFilter
-            : [catalogKind];
-
       if (section === "platform") {
-        for (const k of kinds.length ? kinds : [catalogKind]) {
-          const page = await api.fetchCatalog({
-            kind: k,
-            keyword,
-            limit: 240,
-            platformOnly: true,
-            projectId: options.projectId ?? options.saveContext?.projectId,
-            tenantId: options.saveContext?.tenantId,
-          });
-          if (gen !== fetchGenRef.current) return;
-          merged.push(...page.items.map((i) => catalogItemToUnified(i, "platform")));
-        }
+        const page = await api.fetchCatalog({
+          kind: catalogKind,
+          keyword,
+          limit: GALD_PAGE_SIZE,
+          platformOnly: true,
+          projectId: options.projectId ?? options.saveContext?.projectId,
+          tenantId: options.saveContext?.tenantId,
+        });
+        if (gen !== fetchGenRef.current) return;
+        merged.push(...page.items.map((i) => catalogItemToUnified(i, "platform")));
       } else if (section === "shared") {
-        for (const k of kinds.length ? kinds : [catalogKind]) {
-          const page = await api.fetchCatalog({
-            kind: k,
-            keyword,
-            limit: 240,
-            projectId: options.projectId ?? options.saveContext?.projectId,
-            tenantId: options.saveContext?.tenantId,
-          });
-          if (gen !== fetchGenRef.current) return;
-          merged.push(
-            ...page.items
-              .filter((i) => (i.scope ?? "platform") !== "platform")
-              .map((i) => catalogItemToUnified(i, "shared")),
-          );
-        }
+        const page = await api.fetchCatalog({
+          kind: catalogKind,
+          keyword,
+          limit: GALD_PAGE_SIZE,
+          platformOnly: false,
+          projectId: options.projectId ?? options.saveContext?.projectId,
+          tenantId: options.saveContext?.tenantId,
+        });
+        if (gen !== fetchGenRef.current) return;
+        merged.push(
+          ...page.items
+            .filter((i) => (i.scope ?? "platform") !== "platform")
+            .map((i) => catalogItemToUnified(i, "shared")),
+        );
         const works = await api.fetchWorks({
           keyword,
           kind: options.media === "video" ? "video" : "image",

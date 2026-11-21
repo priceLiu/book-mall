@@ -35,6 +35,13 @@ export type GlobalAssetLibraryMode = "pick" | "browse" | "save";
 
 export type GlobalAssetLibraryTab = "works" | "catalog";
 
+export type GlobalAssetCatalogMediaFilter = "all" | "prompt" | "image";
+
+export type GlobalAssetCatalogFacets = {
+  poseMedia?: { all: number; prompt: number; image: number };
+  poseCategories?: Array<{ id: string; label: string; count: number }>;
+};
+
 export type GlobalAssetPickItem = {
   id: string;
   catalogKind?: GlobalAssetCatalogKind | "works";
@@ -83,10 +90,21 @@ export type GlobalAssetLibraryApiClient = {
     gender?: string | null;
     keyword?: string | null;
     limit?: number;
+    offset?: number;
+    countsScope?: "none" | "all";
+    countsKinds?: GlobalAssetCatalogKind[];
+    mediaFilter?: GlobalAssetCatalogMediaFilter;
+    poseCategory?: string | null;
     platformOnly?: boolean;
     tenantId?: string | null;
     projectId?: string | null;
-  }) => Promise<{ items: GlobalAssetPickItem[]; counts: Record<string, number> }>;
+  }) => Promise<{
+    items: GlobalAssetPickItem[];
+    counts: Record<string, number>;
+    total?: number;
+    hasMore?: boolean;
+    facets?: GlobalAssetCatalogFacets;
+  }>;
   fetchWorks: (query: {
     kind?: "image" | "video" | "all";
     keyword?: string | null;

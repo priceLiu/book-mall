@@ -23,7 +23,6 @@ import {
   CanvasListGridSkeleton,
   CanvasListSkeleton,
 } from "@/components/canvas/canvas-list-skeleton";
-import { CanvasPanelShellLoading } from "@/components/canvas/canvas-panel-shell-loading";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import {
   deleteProjectAsset,
@@ -326,11 +325,7 @@ export function UnifiedProjectAssetsView({
 
         <div className={compact ? "min-h-0 flex-1 pt-2" : hubNeutralChrome ? "" : "pt-1"}>
         {loading && assets.length === 0 ? (
-          scrollPaginate ? (
-            <CanvasListSkeleton sections={1} cardsPerSection={12} />
-          ) : (
-            <CanvasPanelShellLoading />
-          )
+          <CanvasListSkeleton sections={1} cardsPerSection={12} />
         ) : error ? (
           <p className="text-xs text-rose-300/85">
             加载失败：{error}

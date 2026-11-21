@@ -1,13 +1,15 @@
 "use client";
 
-import { Loader2 } from "lucide-react";
+import { CanvasListGridSkeleton } from "@/components/canvas/canvas-list-skeleton";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { globalAssetCatalogCopyPromptText } from "@/docker-shared/global-asset-library/catalog-media-url";
 import { GALD_PAGE_SIZE } from "@/docker-shared/global-asset-library/theme";
 import type {
+  GlobalAssetCatalogFacets,
   GlobalAssetCatalogKind,
+  GlobalAssetCatalogMediaFilter,
   GlobalAssetLibraryApiClient,
   GlobalAssetPickItem,
 } from "@/docker-shared/global-asset-library/types";
@@ -65,6 +67,10 @@ export function PlatformCatalogPanel({
     if (catalogNav === "catalog-pick") return platformCatalogPickNav();
     return platformHubModelCatalogNav();
   }, [catalogNav]);
+  const hubKindIds = useMemo(
+    () => (catalogNav === "hub-model" ? navItems.map((n) => n.id) : []),
+    [catalogNav, navItems],
+  );
   const lockedKind =
     catalogNav === "fixed-kind"
       ? fixedKind
@@ -77,14 +83,23 @@ export function PlatformCatalogPanel({
   const [keyword, setKeyword] = useState("");
   const [allItems, setAllItems] = useState<GlobalAssetPickItem[]>([]);
   const [counts, setCounts] = useState<Record<string, number>>({});
-  const [visibleCount, setVisibleCount] = useState(GALD_PAGE_SIZE);
+  const [listTotal, setListTotal] = useState<number | null>(null);
+  const [hasMoreRemote, setHasMoreRemote] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
   const [confirming, setConfirming] = useState(false);
+  const [poseMediaFilter, setPoseMediaFilter] =
+    useState<GlobalAssetCatalogMediaFilter>("all");
+  const [poseCategory, setPoseCategory] = useState("all");
+  const [poseFacets, setPoseFacets] = useState<GlobalAssetCatalogFacets | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const fetchGenRef = useRef(0);
+  const countsGenRef = useRef(0);
+  const allItemsLenRef = useRef(0);
+  allItemsLenRef.current = allItems.length;
 
   useEffect(() => {
     if (catalogNav === "fixed-kind") {
@@ -99,72 +114,134 @@ export function PlatformCatalogPanel({
     return () => window.clearTimeout(t);
   }, [keywordInput]);
 
-  const fetchCatalog = useCallback(async () => {
-    const gen = ++fetchGenRef.current;
-    setLoading(true);
-    setError(null);
-    setAllItems([]);
-    setVisibleCount(GALD_PAGE_SIZE);
+  const poseFiltersActive = catalogKind === "pose";
+
+  const fetchHubCounts = useCallback(async () => {
+    if (hubKindIds.length === 0) return;
+    const gen = ++countsGenRef.current;
     try {
       const page = await api.fetchCatalog({
         kind: catalogKind,
         gender: gender === "all" ? null : gender,
         keyword,
-        limit: 240,
-        platformOnly: platformOnly ? true : undefined,
+        limit: 0,
+        countsKinds: hubKindIds,
+        platformOnly,
         projectId: undefined,
+        mediaFilter: poseFiltersActive ? poseMediaFilter : "all",
+        poseCategory:
+          poseFiltersActive && poseCategory !== "all" ? poseCategory : null,
       });
-      if (gen !== fetchGenRef.current) return;
-      const items = platformOnly
-        ? page.items
-        : page.items.filter((i) => (i.scope ?? "platform") !== "platform");
-      setAllItems(items);
-      setCounts(page.counts ?? {});
-    } catch (e) {
-      if (gen !== fetchGenRef.current) return;
-      setError(e instanceof Error ? e.message : "加载失败");
-      setAllItems([]);
-    } finally {
-      if (gen === fetchGenRef.current) setLoading(false);
+      if (gen !== countsGenRef.current) return;
+      setCounts((c) => ({ ...c, ...(page.counts ?? {}) }));
+    } catch {
+      // 条数预取失败不阻塞列表
     }
-  }, [api, catalogKind, gender, keyword, platformOnly]);
+  }, [
+    api,
+    catalogKind,
+    gender,
+    hubKindIds,
+    keyword,
+    platformOnly,
+    poseCategory,
+    poseFiltersActive,
+    poseMediaFilter,
+  ]);
+
+  useEffect(() => {
+    void fetchHubCounts();
+  }, [fetchHubCounts]);
+
+  const fetchCatalog = useCallback(
+    async (append?: boolean) => {
+      const isAppend = append === true;
+      const gen = ++fetchGenRef.current;
+      if (!isAppend) {
+        setLoading(true);
+        setError(null);
+        setAllItems([]);
+        setListTotal(null);
+        setHasMoreRemote(false);
+        if (poseFiltersActive) setPoseFacets(null);
+      } else {
+        setLoadingMore(true);
+      }
+      try {
+        const page = await api.fetchCatalog({
+          kind: catalogKind,
+          gender: gender === "all" ? null : gender,
+          keyword,
+          limit: GALD_PAGE_SIZE,
+          offset: isAppend ? allItemsLenRef.current : 0,
+          platformOnly,
+          projectId: undefined,
+          mediaFilter: poseFiltersActive ? poseMediaFilter : "all",
+          poseCategory:
+            poseFiltersActive && poseCategory !== "all" ? poseCategory : null,
+        });
+        if (gen !== fetchGenRef.current) return;
+        setAllItems((prev) => (isAppend ? [...prev, ...page.items] : page.items));
+        setCounts((c) => ({ ...c, ...(page.counts ?? {}) }));
+        setListTotal(page.total ?? null);
+        setHasMoreRemote(page.hasMore === true);
+        if (poseFiltersActive && page.facets) setPoseFacets(page.facets);
+      } catch (e) {
+        if (gen !== fetchGenRef.current) return;
+        if (!isAppend) {
+          setError(e instanceof Error ? e.message : "加载失败");
+          setAllItems([]);
+        }
+      } finally {
+        if (gen === fetchGenRef.current) {
+          if (isAppend) setLoadingMore(false);
+          else setLoading(false);
+        }
+      }
+    },
+    [
+      api,
+      catalogKind,
+      gender,
+      keyword,
+      platformOnly,
+      poseCategory,
+      poseFiltersActive,
+      poseMediaFilter,
+    ],
+  );
 
   useEffect(() => {
     void fetchCatalog();
   }, [fetchCatalog]);
 
-  const visibleItems = useMemo(
-    () => allItems.slice(0, visibleCount),
-    [allItems, visibleCount],
-  );
-
   const { promptItems, imageItems } = useMemo(() => {
     const prompt: GlobalAssetPickItem[] = [];
     const image: GlobalAssetPickItem[] = [];
-    for (const item of visibleItems) {
+    for (const item of allItems) {
       if (platformCatalogPromptFirst(item)) prompt.push(item);
       else image.push(item);
     }
     return { promptItems: prompt, imageItems: image };
-  }, [visibleItems]);
+  }, [allItems]);
 
-  const hasMore = visibleCount < allItems.length;
+  const hasMore = hasMoreRemote;
 
   useEffect(() => {
     const root = scrollRef.current;
     const target = loadMoreRef.current;
-    if (!root || !target || !hasMore || loading) return;
+    if (!root || !target || !hasMore || loading || loadingMore) return;
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries.some((e) => e.isIntersecting)) {
-          setVisibleCount((n) => Math.min(n + GALD_PAGE_SIZE, allItems.length));
+          void fetchCatalog(true);
         }
       },
       { root, rootMargin: "120px" },
     );
     observer.observe(target);
     return () => observer.disconnect();
-  }, [hasMore, loading, allItems.length]);
+  }, [hasMore, loading, loadingMore, fetchCatalog]);
 
   const selectedItems = useMemo(
     () =>
@@ -263,6 +340,8 @@ export function PlatformCatalogPanel({
         ? `${scopeLabel} catalog · 类型与「保存平台资产库」一致`
         : `${scopeLabel}模特与素材 · 姿势 / 头像 / 全身（服装见同级「服装」）`;
 
+  const totalLabel = listTotal ?? allItems.length;
+
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
       <p className="text-[11px] text-white/45">{intro}</p>
@@ -288,12 +367,61 @@ export function PlatformCatalogPanel({
             >
               {nav.label}
               {typeof count === "number" ? (
-                <span className="ml-1 text-[10px] opacity-70">{count}</span>
+                <span className="ml-1 text-[10px] tabular-nums opacity-70">{count}</span>
+              ) : hubKindIds.length > 0 ? (
+                <span className="ml-1 text-[10px] opacity-40">…</span>
               ) : null}
             </button>
           );
         })}
       </div>
+
+      {poseFiltersActive ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            className="rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-xs text-white"
+            value={poseMediaFilter}
+            onChange={(e) => {
+              setPoseMediaFilter(e.target.value as GlobalAssetCatalogMediaFilter);
+              setSelected([]);
+            }}
+            aria-label="姿势内容类型"
+          >
+            <option value="all">
+              全部类型
+              {poseFacets?.poseMedia
+                ? `（${poseFacets.poseMedia.all}）`
+                : typeof counts.pose === "number"
+                  ? `（${counts.pose}）`
+                  : ""}
+            </option>
+            <option value="prompt">
+              仅提示词
+              {poseFacets?.poseMedia ? `（${poseFacets.poseMedia.prompt}）` : ""}
+            </option>
+            <option value="image">
+              有参考图
+              {poseFacets?.poseMedia ? `（${poseFacets.poseMedia.image}）` : ""}
+            </option>
+          </select>
+          <select
+            className="min-w-[120px] rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-xs text-white"
+            value={poseCategory}
+            onChange={(e) => {
+              setPoseCategory(e.target.value);
+              setSelected([]);
+            }}
+            aria-label="姿势分类"
+          >
+            <option value="all">全部分类</option>
+            {(poseFacets?.poseCategories ?? []).map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.label}（{c.count}）
+              </option>
+            ))}
+          </select>
+        </div>
+      ) : null}
 
       <div className="flex flex-wrap items-center gap-2">
         <input
@@ -321,10 +449,11 @@ export function PlatformCatalogPanel({
         className="min-h-0 flex-1 overflow-y-auto rounded-xl border border-white/10 bg-black/20 p-3"
       >
         {loading ? (
-          <div className="flex min-h-[240px] flex-col items-center justify-center gap-2 text-white/50">
-            <Loader2 className="size-5 animate-spin" />
-            <span className="text-sm">正在加载…</span>
-          </div>
+          <CanvasListGridSkeleton
+            cards={12}
+            gridClassName="columns-2 gap-3 sm:columns-3 md:columns-4 xl:columns-5 [column-fill:_balance]"
+            className="[&>div]:mb-3 [&>div]:break-inside-avoid"
+          />
         ) : error ? (
           <div className="flex min-h-[240px] flex-col items-center justify-center gap-2 px-4 text-center">
             <p className="text-sm text-red-400">{error}</p>
@@ -365,12 +494,10 @@ export function PlatformCatalogPanel({
             ) : null}
             {hasMore ? (
               <div ref={loadMoreRef} className="py-3 text-center text-[10px] text-white/40">
-                向下滚动加载更多
+                {loadingMore ? "加载中…" : "向下滚动加载更多"}
               </div>
             ) : (
-              <p className="py-2 text-center text-[10px] text-white/40">
-                共 {allItems.length} 项
-              </p>
+              <p className="py-2 text-center text-[10px] text-white/40">共 {totalLabel} 项</p>
             )}
           </>
         )}

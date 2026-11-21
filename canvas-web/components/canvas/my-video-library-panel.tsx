@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Film, Loader2, Play, Sparkles, Trash2, X } from "lucide-react";
 
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
-import { CanvasPanelShellLoading } from "@/components/canvas/canvas-panel-shell-loading";
+import { CanvasListSkeleton } from "@/components/canvas/canvas-list-skeleton";
 import { CanvasToolbarSidePanelShell } from "@/components/canvas/canvas-toolbar-side-panel-shell";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { isPinnedInAiSpace, pinToAiSpace } from "@/lib/canvas-ai-space";
@@ -208,7 +208,7 @@ export function MyVideoLibraryPanel({
 
         <div className={CANVAS_PANEL_SHELL_BODY_CLASS}>
           {loading ? (
-            <CanvasPanelShellLoading />
+            <CanvasListSkeleton sections={1} cardsPerSection={10} />
           ) : error ? (
             <p className={CANVAS_PANEL_SHELL_ERROR_CLASS}>{error}</p>
           ) : items.length === 0 ? (

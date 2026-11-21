@@ -32,9 +32,25 @@ export function createCanvasGlobalAssetLibraryApi(): GlobalAssetLibraryApiClient
       if (query.gender) params.set("gender", query.gender);
       if (query.keyword) params.set("keyword", query.keyword);
       if (query.limit) params.set("limit", String(query.limit));
-      if (query.platformOnly) {
+      if (query.offset != null && query.offset > 0) {
+        params.set("offset", String(query.offset));
+      }
+      if (query.countsScope === "all") params.set("countsScope", "all");
+      if (query.countsKinds?.length) {
+        params.set("countsKinds", query.countsKinds.join(","));
+      }
+      if (query.mediaFilter && query.mediaFilter !== "all") {
+        params.set("mediaFilter", query.mediaFilter);
+      }
+      if (query.poseCategory?.trim()) {
+        params.set("poseCategory", query.poseCategory.trim());
+      }
+      if (query.limit === 0) params.set("limit", "0");
+      if (query.platformOnly === true) {
         params.set("platformOnly", "1");
         params.set("audience", "platform-hub");
+      } else if (query.platformOnly === false) {
+        params.set("platformOnly", "0");
       }
       if (query.tenantId?.trim()) params.set("tenantId", query.tenantId.trim());
       if (query.projectId?.trim()) params.set("projectId", query.projectId.trim());
@@ -58,6 +74,9 @@ export function createCanvasGlobalAssetLibraryApi(): GlobalAssetLibraryApiClient
           };
         }),
         counts: (data.counts as Record<string, number>) ?? {},
+        total: typeof data.total === "number" ? data.total : undefined,
+        hasMore: data.hasMore === true,
+        facets: data.facets as import("@/docker-shared/global-asset-library/types").GlobalAssetCatalogFacets | undefined,
       };
     },
     async fetchWorks(query) {

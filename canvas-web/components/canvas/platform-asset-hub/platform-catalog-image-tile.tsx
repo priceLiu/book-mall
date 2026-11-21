@@ -17,6 +17,7 @@ import { PlatformCatalogPromptCard } from "./platform-catalog-prompt-card";
 import {
   platformCatalogHasPromptCopy,
   platformCatalogPreviewUrl,
+  platformCatalogPromptBody,
   platformCatalogPromptFirst,
 } from "./platform-catalog-item-utils";
 
@@ -64,11 +65,14 @@ export function PlatformCatalogImageTile({
 
   const showCopy = platformCatalogHasPromptCopy(item);
   const previewUrl = platformCatalogPreviewUrl(item);
+  const posePrompt =
+    item.catalogKind === "pose" ? platformCatalogPromptBody(item).trim() : "";
+  const showPosePrompt = posePrompt.length > 0;
 
   return (
     <div
       className={cn(
-        "group relative w-full overflow-hidden rounded-md border border-white/10 transition-colors hover:border-white/20",
+        "group relative w-full overflow-hidden rounded-md border border-white/10 bg-black/25 transition-colors hover:border-white/20",
         active && "border-cyan-400/50 ring-1 ring-cyan-400/40",
       )}
     >
@@ -142,6 +146,14 @@ export function PlatformCatalogImageTile({
           </button>
         ) : null}
       </div>
+      {showPosePrompt ? (
+        <p
+          className="border-t border-white/8 px-2 py-2 text-[10px] leading-relaxed text-white/58"
+          title={posePrompt}
+        >
+          {posePrompt}
+        </p>
+      ) : null}
     </div>
   );
 }

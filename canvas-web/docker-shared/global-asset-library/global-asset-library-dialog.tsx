@@ -69,6 +69,8 @@ export function GlobalAssetLibraryDialog({
   const [allItems, setAllItems] = useState<GlobalAssetPickItem[]>([]);
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [visibleCount, setVisibleCount] = useState(GALD_PAGE_SIZE);
+  const [catalogHasMore, setCatalogHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
@@ -92,28 +94,41 @@ export function GlobalAssetLibraryDialog({
   }, [keywordInput]);
 
   const fetchCatalog = useCallback(
-    async (kind: GlobalAssetCatalogKind) => {
+    async (kind: GlobalAssetCatalogKind, append?: boolean) => {
+      const isAppend = append === true;
       const gen = ++fetchGenRef.current;
-      setLoading(true);
-      setError(null);
-      setAllItems([]);
-      setVisibleCount(GALD_PAGE_SIZE);
+      if (!isAppend) {
+        setLoading(true);
+        setError(null);
+        setAllItems([]);
+        setCatalogHasMore(false);
+        setVisibleCount(GALD_PAGE_SIZE);
+      } else {
+        setLoadingMore(true);
+      }
       try {
         const page = await api.fetchCatalog({
           kind,
           gender: gender === "all" ? null : gender,
           keyword,
-          limit: 240,
+          limit: GALD_PAGE_SIZE,
+          offset: isAppend ? allItemsLenRef.current : 0,
         });
         if (gen !== fetchGenRef.current) return;
-        setAllItems(page.items);
-        setCounts(page.counts ?? {});
+        setAllItems((prev) => (isAppend ? [...prev, ...page.items] : page.items));
+        setCounts((c) => ({ ...c, ...(page.counts ?? {}) }));
+        setCatalogHasMore(page.hasMore === true);
       } catch (e) {
         if (gen !== fetchGenRef.current) return;
-        setError(e instanceof Error ? e.message : "加载失败");
-        setAllItems([]);
+        if (!isAppend) {
+          setError(e instanceof Error ? e.message : "加载失败");
+          setAllItems([]);
+        }
       } finally {
-        if (gen === fetchGenRef.current) setLoading(false);
+        if (gen === fetchGenRef.current) {
+          if (isAppend) setLoadingMore(false);
+          else setLoading(false);
+        }
       }
     },
     [api, gender, keyword],
@@ -177,11 +192,12 @@ export function GlobalAssetLibraryDialog({
   }, [catalogKind]);
 
   const visibleItems = useMemo(
-    () => allItems.slice(0, visibleCount),
-    [allItems, visibleCount],
+    () => (tab === "catalog" ? allItems : allItems.slice(0, visibleCount)),
+    [allItems, visibleCount, tab],
   );
 
-  const hasMore = visibleCount < allItems.length;
+  const hasMore =
+    tab === "catalog" ? catalogHasMore : visibleCount < allItems.length;
 
   const revealMoreItems = useCallback(() => {
     setVisibleCount((n) => {
@@ -194,22 +210,36 @@ export function GlobalAssetLibraryDialog({
   useEffect(() => {
     const root = scrollRef.current;
     const target = loadMoreRef.current;
-    if (!root || !target || !hasMore || loading) return;
+    if (!root || !target || !hasMore || loading || loadingMore) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries.some((e) => e.isIntersecting)) {
-          revealMoreItems();
+          if (tab === "catalog") {
+            void fetchCatalog(catalogKind, true);
+          } else {
+            revealMoreItems();
+          }
         }
       },
       { root, rootMargin: "120px", threshold: 0 },
     );
     observer.observe(target);
     return () => observer.disconnect();
-  }, [allItems.length, hasMore, loading, revealMoreItems]);
+  }, [
+    allItems.length,
+    catalogKind,
+    fetchCatalog,
+    hasMore,
+    loading,
+    loadingMore,
+    revealMoreItems,
+    tab,
+  ]);
 
   useEffect(() => {
-    if (loading || !showPicker || visibleCount >= allItems.length) return;
+    if (tab === "catalog" || loading || loadingMore || !showPicker) return;
+    if (visibleCount >= allItems.length) return;
     const root = scrollRef.current;
     if (!root) return;
 

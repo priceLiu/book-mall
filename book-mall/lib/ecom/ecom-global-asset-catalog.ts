@@ -63,6 +63,18 @@ export type GlobalAssetCatalogQuery = {
   limit?: number;
   /** 画布平台资产库 / 纯平台选用：不含 user·team 个人 catalog */
   platformOnly?: boolean;
+  /** 我的共用：仅 user / team / project，不含 platform */
+  sharedOnly?: boolean;
+  /** 分页偏移（单 kind 请求） */
+  offset?: number;
+  /** 仅返回当前 kind 条数，不拉全站 counts（默认单 kind 即 none） */
+  countsScope?: "none" | "all";
+  /** limit=0 时并行统计这些 kind 条数（模特·素材 Hub 三级 Tab） */
+  countsKinds?: GlobalAssetCatalogKind[];
+  /** 姿势库：提示词 / 参考图 */
+  mediaFilter?: "all" | "prompt" | "image";
+  /** 姿势库 · category（subtitle） */
+  poseCategory?: string | null;
 };
 
 function matchesKeyword(item: GlobalAssetCatalogItem, keyword: string): boolean {
@@ -158,9 +170,7 @@ async function loadAvatarItems(
     gender: query.gender,
   });
   return sortAvatarCatalogItems(
-    models
-      .filter((m) => !isCharacterModelId(m.id))
-      .map((m) => ({
+    models.map((m) => ({
         id: m.id,
         catalogKind: "avatar" as const,
         title: m.name,
@@ -416,6 +426,8 @@ function applyCatalogFilters(
   let filtered = items;
   if (query.platformOnly) {
     filtered = filtered.filter((i) => i.scope === "platform");
+  } else if (query.sharedOnly) {
+    filtered = filtered.filter((i) => i.scope !== "platform");
   }
   const gender = query.gender?.trim();
   if (gender) {
@@ -424,16 +436,203 @@ function applyCatalogFilters(
   if (query.keyword?.trim()) {
     filtered = filtered.filter((i) => matchesKeyword(i, query.keyword!));
   }
+  const mediaFilter = query.mediaFilter ?? "all";
+  if (mediaFilter !== "all") {
+    filtered = filtered.filter((i) => matchesMediaFilter(i, mediaFilter));
+  }
+  const poseCategory = query.poseCategory?.trim();
+  if (poseCategory) {
+    filtered = filtered.filter(
+      (i) => i.catalogKind !== "pose" || (i.subtitle?.trim() || "未分类") === poseCategory,
+    );
+  }
   return filtered;
 }
 
+function matchesMediaFilter(
+  item: GlobalAssetCatalogItem,
+  filter: "prompt" | "image",
+): boolean {
+  if (item.catalogKind !== "pose") {
+    return filter === "image";
+  }
+  if (filter === "prompt") return item.promptOnly === true;
+  return item.promptOnly !== true;
+}
+
+function buildPoseFacets(
+  poseItems: GlobalAssetCatalogItem[],
+): NonNullable<GlobalAssetCatalogPage["facets"]> {
+  let prompt = 0;
+  let image = 0;
+  const catMap = new Map<string, number>();
+  for (const p of poseItems) {
+    if (p.promptOnly) prompt += 1;
+    else image += 1;
+    const cat = p.subtitle?.trim() || "未分类";
+    catMap.set(cat, (catMap.get(cat) ?? 0) + 1);
+  }
+  return {
+    poseMedia: { all: poseItems.length, prompt, image },
+    poseCategories: [...catMap.entries()]
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "zh-CN"))
+      .map(([id, count]) => ({ id, label: id, count })),
+  };
+}
+
+async function countKindsParallel(
+  kinds: GlobalAssetCatalogKind[],
+  query: GlobalAssetCatalogQuery,
+  itemLimit: number,
+): Promise<Record<string, number>> {
+  const entries = await Promise.all(
+    kinds.map(async (kind) => {
+      const q: GlobalAssetCatalogQuery = {
+        ...query,
+        kind,
+        mediaFilter: kind === "pose" ? query.mediaFilter : "all",
+        poseCategory: kind === "pose" ? query.poseCategory : null,
+      };
+      const raw = await loadItemsForKind(kind, q, itemLimit);
+      const filtered = applyCatalogFilters(raw, q);
+      return [kind, filtered.length] as const;
+    }),
+  );
+  return Object.fromEntries(entries);
+}
+
+async function loadItemsForKind(
+  kind: GlobalAssetCatalogKind,
+  query: GlobalAssetCatalogQuery,
+  limit: number,
+): Promise<GlobalAssetCatalogItem[]> {
+  switch (kind) {
+    case "pose":
+      return loadPoseItems(query.userId);
+    case "avatar":
+      return loadAvatarItems(query);
+    case "character":
+      return loadCharacterItems(query);
+    case "garment":
+      return loadGarmentItems(query, limit);
+    case "reference":
+      return loadGarmentBackedCatalogItems(query, limit, "reference", "reference");
+    case "prop":
+      return loadGarmentBackedCatalogItems(query, limit, "prop", "prop");
+    case "storyboard-image":
+      return loadGarmentBackedCatalogItems(
+        query,
+        limit,
+        "storyboard-image",
+        "storyboard-image",
+      );
+    case "storyboard-video":
+      return loadGarmentBackedCatalogItems(
+        query,
+        limit,
+        "storyboard-video",
+        "storyboard-video",
+      );
+    case "full-body":
+      return loadFullBodyItems(query, limit);
+    case "style":
+      return loadStyleItems(query, limit);
+    case "scene":
+      return loadSceneItems(query, limit);
+    case "audio":
+      return [];
+    default: {
+      const _exhaustive: never = kind;
+      return _exhaustive;
+    }
+  }
+}
+
+export type GlobalAssetCatalogPage = {
+  items: GlobalAssetCatalogItem[];
+  counts: Record<string, number>;
+  total?: number;
+  hasMore?: boolean;
+  facets?: {
+    poseMedia?: { all: number; prompt: number; image: number };
+    poseCategories?: Array<{ id: string; label: string; count: number }>;
+  };
+};
+
 export async function listGlobalAssetCatalog(
   query: GlobalAssetCatalogQuery,
-): Promise<{ items: GlobalAssetCatalogItem[]; counts: Record<string, number> }> {
-  const limit = Math.min(Math.max(query.limit ?? 120, 1), 240);
+): Promise<GlobalAssetCatalogPage> {
+  const limitParam = query.limit ?? 120;
+  const limit =
+    limitParam === 0 ? 0 : Math.min(Math.max(limitParam, 1), 240);
+  const offset = Math.max(0, Math.floor(query.offset ?? 0));
   const requestedKind =
     query.kind && query.kind !== "all" ? query.kind : null;
+  const countsKinds = (query.countsKinds ?? []).filter((k) =>
+    ALL_KINDS.includes(k),
+  );
+  const itemLoadCap = Math.max(limit || 18, 240);
 
+  if (countsKinds.length > 0 && limit === 0 && offset === 0) {
+    const counts = await countKindsParallel(countsKinds, query, itemLoadCap);
+    return { items: [], counts, total: 0, hasMore: false };
+  }
+
+  if (requestedKind) {
+    const raw = await loadItemsForKind(requestedKind, query, itemLoadCap);
+    const filtered = applyCatalogFilters(raw, query);
+    const total = filtered.length;
+    const items = limit === 0 ? [] : filtered.slice(offset, offset + limit);
+    const countsScope = query.countsScope ?? "none";
+    let counts: Record<string, number> =
+      countsScope === "all"
+        ? await buildAllKindCounts(query, itemLoadCap)
+        : { [requestedKind]: total };
+    if (countsKinds.length > 0) {
+      const extra = await countKindsParallel(countsKinds, query, itemLoadCap);
+      counts = { ...extra, ...counts };
+    }
+    const facets =
+      requestedKind === "pose"
+        ? buildPoseFacets(filtered.filter((i) => i.catalogKind === "pose"))
+        : undefined;
+    return {
+      items,
+      counts,
+      total,
+      hasMore: limit > 0 && offset + items.length < total,
+      facets,
+    };
+  }
+
+  const byKind = await buildAllKindBuckets(query, limit);
+  const counts: Record<string, number> = Object.fromEntries(
+    ALL_KINDS.map((kind) => [kind, byKind[kind].length]),
+  );
+  const merged = ALL_KINDS.flatMap((kind) => byKind[kind]);
+
+  return {
+    items: merged.slice(0, limit),
+    counts,
+    total: merged.length,
+    hasMore: merged.length > limit,
+  };
+}
+
+async function buildAllKindCounts(
+  query: GlobalAssetCatalogQuery,
+  limit: number,
+): Promise<Record<string, number>> {
+  const byKind = await buildAllKindBuckets(query, limit);
+  return Object.fromEntries(
+    ALL_KINDS.map((kind) => [kind, byKind[kind].length]),
+  );
+}
+
+async function buildAllKindBuckets(
+  query: GlobalAssetCatalogQuery,
+  limit: number,
+): Promise<Record<GlobalAssetCatalogKind, GlobalAssetCatalogItem[]>> {
   const [
     poseRaw,
     avatarRaw,
@@ -460,7 +659,7 @@ export async function listGlobalAssetCatalog(
     loadSceneItems(query, limit),
   ]);
 
-  const byKind: Record<GlobalAssetCatalogKind, GlobalAssetCatalogItem[]> = {
+  return {
     pose: applyCatalogFilters(poseRaw, query),
     avatar: applyCatalogFilters(avatarRaw, query),
     character: applyCatalogFilters(characterRaw, query),
@@ -473,29 +672,5 @@ export async function listGlobalAssetCatalog(
     "full-body": applyCatalogFilters(fullBodyRaw, query),
     style: applyCatalogFilters(styleRaw, query),
     scene: applyCatalogFilters(sceneRaw, query),
-  };
-
-  const counts: Record<string, number> = {
-    pose: byKind.pose.length,
-    avatar: byKind.avatar.length,
-    character: byKind.character.length,
-    garment: byKind.garment.length,
-    reference: byKind.reference.length,
-    prop: byKind.prop.length,
-    "storyboard-image": byKind["storyboard-image"].length,
-    "storyboard-video": byKind["storyboard-video"].length,
-    audio: 0,
-    "full-body": byKind["full-body"].length,
-    style: byKind.style.length,
-    scene: byKind.scene.length,
-  };
-
-  const merged = requestedKind
-    ? byKind[requestedKind]
-    : ALL_KINDS.flatMap((kind) => byKind[kind]);
-
-  return {
-    items: requestedKind ? merged : merged.slice(0, limit),
-    counts,
   };
 }

@@ -9,18 +9,43 @@ import {
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
+const CATALOG_KIND_PARAMS = new Set<GlobalAssetCatalogKind>([
+  "pose",
+  "avatar",
+  "character",
+  "garment",
+  "full-body",
+  "style",
+  "scene",
+  "reference",
+  "prop",
+  "storyboard-image",
+  "storyboard-video",
+  "audio",
+]);
+
 function readKind(raw: string | null): GlobalAssetCatalogKind | "all" {
-  if (
-    raw === "pose" ||
-    raw === "avatar" ||
-    raw === "garment" ||
-    raw === "full-body" ||
-    raw === "style" ||
-    raw === "scene"
-  ) {
-    return raw;
+  if (raw && CATALOG_KIND_PARAMS.has(raw as GlobalAssetCatalogKind)) {
+    return raw as GlobalAssetCatalogKind;
   }
   return "all";
+}
+
+function readCountsKinds(raw: string | null): GlobalAssetCatalogKind[] {
+  if (!raw?.trim()) return [];
+  return raw
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s): s is GlobalAssetCatalogKind =>
+      CATALOG_KIND_PARAMS.has(s as GlobalAssetCatalogKind),
+    );
+}
+
+function readMediaFilter(
+  raw: string | null,
+): "all" | "prompt" | "image" | undefined {
+  if (raw === "prompt" || raw === "image") return raw;
+  return undefined;
 }
 
 export async function GET(req: Request) {
@@ -29,12 +54,16 @@ export async function GET(req: Request) {
 
   const url = new URL(req.url);
   const limitRaw = Number(url.searchParams.get("limit"));
+  const offsetRaw = Number(url.searchParams.get("offset"));
 
   try {
     const audience = url.searchParams.get("audience");
     const platformOnly =
       url.searchParams.get("platformOnly") === "1" ||
       audience === "platform-hub";
+    const sharedOnly =
+      url.searchParams.get("sharedOnly") === "1" ||
+      url.searchParams.get("platformOnly") === "0";
 
     const page = await listGlobalAssetCatalog({
       userId: auth.actor.userId,
@@ -44,7 +73,13 @@ export async function GET(req: Request) {
       gender: url.searchParams.get("gender"),
       keyword: url.searchParams.get("keyword"),
       limit: Number.isFinite(limitRaw) ? limitRaw : undefined,
+      offset: Number.isFinite(offsetRaw) ? offsetRaw : undefined,
+      countsScope: url.searchParams.get("countsScope") === "all" ? "all" : "none",
+      countsKinds: readCountsKinds(url.searchParams.get("countsKinds")),
+      mediaFilter: readMediaFilter(url.searchParams.get("mediaFilter")) ?? "all",
+      poseCategory: url.searchParams.get("poseCategory"),
       platformOnly,
+      sharedOnly: platformOnly ? false : sharedOnly,
     });
     return NextResponse.json(page);
   } catch (e) {

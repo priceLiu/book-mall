@@ -8,7 +8,7 @@ import {
   listCanvasTemplates,
   type CanvasTemplateRecord,
 } from "@/lib/canvas-api";
-import { CanvasPanelShellLoading } from "@/components/canvas/canvas-panel-shell-loading";
+import { CanvasListSkeleton } from "@/components/canvas/canvas-list-skeleton";
 import { CanvasToolbarSidePanelShell } from "@/components/canvas/canvas-toolbar-side-panel-shell";
 import {
   fetchToolbarPanelWithSwr,
@@ -101,7 +101,7 @@ export function MyTemplatesPanel({
               ) : null}
 
               {loading ? (
-                <CanvasPanelShellLoading />
+                <CanvasListSkeleton sections={1} cardsPerSection={10} />
               ) : templates.length === 0 ? (
                 <div className="rounded-xl border border-dashed border-white/10 px-4 py-10 text-center text-[12px] text-[var(--canvas-muted)]">
                   还没有保存的模板。

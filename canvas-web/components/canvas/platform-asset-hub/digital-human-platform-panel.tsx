@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { CanvasListGridSkeleton } from "@/components/canvas/canvas-list-skeleton";
 
 import { useBookMallBaseUrl } from "@/components/book-mall-base-url-provider";
 import {
@@ -43,9 +43,8 @@ export function DigitalHumanPlatformPanel() {
 
   if (loading) {
     return (
-      <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 py-16 text-white/50">
-        <Loader2 className="size-5 animate-spin" />
-        <span className="text-sm">加载平台数字人…</span>
+      <div className="min-h-0 flex-1 py-2">
+        <CanvasListGridSkeleton cards={8} />
       </div>
     );
   }
