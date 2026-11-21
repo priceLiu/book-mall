@@ -53,92 +53,28 @@ export function installEcomBrowserNavBlock(): () => void {
   };
 }
 
+/** @deprecated 历史陷阱已移除，仅保留别名避免调用方报错 */
+export function syncEcomWorkspaceNavTrapUrl(_href?: string): void {}
+
+/** @deprecated 历史陷阱已移除 */
+export function primeEcomWorkspaceNavTrapFromAnchor(_anchor: HTMLAnchorElement): void {}
+
 export type EcomWorkspaceNavGuardOptions = {
-  /** popstate 触发后同步 SPA 路由（Next.js App Router） */
   onNavBlocked?: (lockedHref: string) => void;
 };
 
-let lockedWorkspaceHref = "";
-let navBlockedHandler: EcomWorkspaceNavGuardOptions["onNavBlocked"];
-
-/** 路由切换后仅更新锁定 URL（勿 pushState，避免与 Next 侧栏导航争用 popstate）。 */
-export function syncEcomWorkspaceNavTrapUrl(href?: string): void {
-  if (typeof window === "undefined") return;
-  if (!isEcomWorkspaceNavBlockActive()) return;
-  lockedWorkspaceHref = href ?? window.location.href;
-}
-
-/** 站内链接点击前调用（capture 阶段），避免 popstate 时 locked 仍指向上页导致被 replace 拉回。 */
-export function primeEcomWorkspaceNavTrapFromAnchor(anchor: HTMLAnchorElement): void {
-  if (typeof window === "undefined") return;
-  if (!isEcomWorkspaceNavBlockActive()) return;
-  const href = anchor.getAttribute("href");
-  if (!href || href.startsWith("#")) return;
-  if (anchor.target === "_blank") return;
-  try {
-    const u = new URL(href, window.location.href);
-    if (u.origin !== window.location.origin) return;
-    syncEcomWorkspaceNavTrapUrl(u.href);
-  } catch {
-    /* ignore */
-  }
-}
-
-export function installEcomHistoryPopstateTrap(
-  opts?: EcomWorkspaceNavGuardOptions,
-): () => void {
-  if (typeof window === "undefined") return () => undefined;
-
-  navBlockedHandler = opts?.onNavBlocked;
-  lockedWorkspaceHref = window.location.href;
-  try {
-    window.history.replaceState(
-      { __ecomWorkspaceNavTrap: true },
-      "",
-      window.location.href,
-    );
-  } catch {
-    /* quota / sandbox */
-  }
-
-  const onPopState = () => {
-    if (!isEcomWorkspaceNavBlockActive()) return;
-    const locked = lockedWorkspaceHref || window.location.href;
-    lockedWorkspaceHref = locked;
-    const afterPop = window.location.href;
-
-    try {
-      window.history.pushState({ __ecomWorkspaceNavTrap: true }, "", locked);
-    } catch {
-      /* quota / sandbox */
-    }
-
-    // 仍是锁定页或用户已通过侧栏 primed 前进：勿 router.replace 拉回
-    if (afterPop === locked || window.location.href === locked) {
-      return;
-    }
-    navBlockedHandler?.(locked);
-  };
-
-  window.addEventListener("popstate", onPopState);
-  return () => {
-    window.removeEventListener("popstate", onPopState);
-    navBlockedHandler = undefined;
-    lockedWorkspaceHref = "";
-  };
-}
-
-/** 电商工作台页：拦截浏览器 history.back/forward；返回卸载函数。 */
+/**
+ * 电商工作台：仅拦截鼠标侧键后退/前进（防误触离开长任务页）。
+ * 不再使用 history.pushState / popstate + router.replace，避免与 Next 侧栏 Link 争用。
+ */
 export function installEcomWorkspaceNavGuards(
-  opts?: EcomWorkspaceNavGuardOptions,
+  _opts?: EcomWorkspaceNavGuardOptions,
 ): () => void {
   if (typeof document !== "undefined") {
     document.documentElement.setAttribute(ECOM_WORKSPACE_PAGE_HTML_ATTR, "");
   }
   const uninstallBlock = installEcomBrowserNavBlock();
-  const uninstallHistoryTrap = installEcomHistoryPopstateTrap(opts);
   return () => {
-    uninstallHistoryTrap();
     uninstallBlock();
     if (typeof document !== "undefined") {
       document.documentElement.removeAttribute(ECOM_WORKSPACE_PAGE_HTML_ATTR);

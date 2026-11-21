@@ -1,6 +1,5 @@
 "use client";
 
-import { usePathname } from "next/navigation";
 import {
   createContext,
   useCallback,
@@ -11,8 +10,6 @@ import {
   type ComponentType,
   type ReactNode,
 } from "react";
-
-import { unlockEcomDocumentInteraction } from "@/lib/ecom-document-unlock";
 
 import { GlobalAssetLibraryDialog } from "./global-asset-library-dialog";
 import { globalOptionsToUnified } from "./open-asset-library-utils";
@@ -50,6 +47,10 @@ type ProviderProps = {
   onOpenChange?: (open: boolean) => void;
   /** 画布等：Hub 式三 Tab 弹层，替代默认 GALD UnifiedAssetLibraryDialog */
   UnifiedDialog?: ComponentType<UnifiedAssetLibraryDialogProps>;
+  /** 路由变化时关闭弹层（由宿主应用在 layout 内传入 pathname 版本号） */
+  routeChangeKey?: string;
+  /** 路由变化时额外回调（如电商 unlock body） */
+  onRouteChange?: () => void;
 };
 
 export function GlobalAssetLibraryProvider({
@@ -59,6 +60,8 @@ export function GlobalAssetLibraryProvider({
   defaultApp = "ecom",
   onOpenChange,
   UnifiedDialog,
+  routeChangeKey,
+  onRouteChange,
 }: ProviderProps) {
   const [legacyOpen, setLegacyOpen] = useState(false);
   const [unifiedOpen, setUnifiedOpen] = useState(false);
@@ -66,7 +69,6 @@ export function GlobalAssetLibraryProvider({
   const [unifiedOptions, setUnifiedOptions] = useState<OpenAssetLibraryOptions>({
     app: defaultApp,
   });
-  const pathname = usePathname();
 
   const unifiedApi = api as UnifiedAssetLibraryApiClient;
   const UnifiedDialogComponent = UnifiedDialog ?? UnifiedAssetLibraryDialog;
@@ -104,9 +106,10 @@ export function GlobalAssetLibraryProvider({
   }, [legacyOpen, unifiedOpen, onOpenChange]);
 
   useEffect(() => {
+    if (routeChangeKey === undefined) return;
     closeAll();
-    unlockEcomDocumentInteraction();
-  }, [pathname, closeAll]);
+    onRouteChange?.();
+  }, [routeChangeKey, closeAll, onRouteChange]);
 
   const value = useMemo(
     () => ({ openGlobalAssetLibrary, openAssetLibrary }),

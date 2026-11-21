@@ -26,7 +26,6 @@ import { EcomCreditsBalanceChip } from "@/components/layout/ecom-credits-balance
 import { PlatformTopupNavLink } from "@/lib/platform-billing/platform-topup-nav-link";
 import { ecomPrimaryLinkClass } from "@/components/ui/ecom-button";
 import { unlockEcomDocumentInteraction } from "@/lib/ecom-document-unlock";
-import { syncEcomWorkspaceNavTrapUrl } from "@/lib/ecom-block-browser-nav";
 import { feishuGuideUrlForPathname } from "@/lib/ecom-feishu-guide-urls";
 import { ECOM_SIDEBAR_LOGO_MARK_CLASS } from "@/lib/ecom-outline-ui";
 import { cn } from "@/lib/utils";
@@ -186,6 +185,7 @@ function ExpandedNavLink({
   active: boolean;
   nested?: boolean;
 }) {
+  const router = useRouter();
   const Icon = item.icon;
   const rowClass = cn(
     "group flex items-center rounded-xl transition-colors",
@@ -232,7 +232,12 @@ function ExpandedNavLink({
           prefetch
           className={linkClass}
           onPointerDown={() => unlockEcomDocumentInteraction()}
-          onClick={() => unlockEcomDocumentInteraction()}
+          onClick={(e) => {
+            unlockEcomDocumentInteraction();
+            if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+            e.preventDefault();
+            router.push(item.href);
+          }}
         >
           {linkInner}
         </Link>
@@ -600,13 +605,6 @@ export function EcomProfileSidebar({
       } else {
         if (collapsed) expandSidebar();
         unlockEcomDocumentInteraction();
-        try {
-          syncEcomWorkspaceNavTrapUrl(
-            new URL(entry.link.href, window.location.href).href,
-          );
-        } catch {
-          /* ignore */
-        }
         router.push(entry.link.href);
       }
     }
