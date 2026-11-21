@@ -2,10 +2,12 @@
 /**
  * 本地开发：合并 .env.development / .env.local，并从 book-mall/.env.local 继承 SSO 与主站地址。
  */
-import { spawn } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+
+const DEV_PORT = 3009;
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const appRoot = resolve(__dirname, "..");
@@ -77,9 +79,44 @@ if (secret.length < 16) {
   );
 }
 
+function listPortListeners(port) {
+  try {
+    const out = execFileSync("lsof", ["-nP", `-iTCP:${port}`, "-sTCP:LISTEN", "-Fpc"], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+    const procs = [];
+    let cur = null;
+    for (const line of out.split("\n")) {
+      if (line.startsWith("p")) {
+        if (cur) procs.push(cur);
+        cur = { pid: Number(line.slice(1)), command: "?" };
+      } else if (line.startsWith("c") && cur) {
+        cur.command = line.slice(1);
+      }
+    }
+    if (cur) procs.push(cur);
+    return procs;
+  } catch {
+    return [];
+  }
+}
+
+const listeners = listPortListeners(DEV_PORT);
+if (listeners.length > 0) {
+  const detail = listeners.map((p) => `pid ${p.pid} (${p.command})`).join(", ");
+  console.error(
+    `\n[director-web] 端口 ${DEV_PORT} 已被占用: ${detail}\n` +
+      "  · 若 dev:all 已在跑，请直接打开 http://localhost:3009\n" +
+      "  · 若要重启全套：在仓库根目录执行 pnpm dev:preflight:kill 或 pnpm dev:all:clean\n" +
+      "  · dev:all 下 director 会在 book-mall 就绪后再等约 20s 才出现 [director] 日志，勿过早 Ctrl+C\n",
+  );
+  process.exit(1);
+}
+
 const child = spawn(
   process.platform === "win32" ? "pnpm.cmd" : "pnpm",
-  ["exec", "next", "dev", "-p", "3009"],
+  ["exec", "next", "dev", `-p`, String(DEV_PORT)],
   { cwd: appRoot, env: merged, stdio: "inherit", shell: true },
 );
 
