@@ -114,6 +114,7 @@ function sep(): { type: "separator" } {
 function imageModuleIcon(id: string): LucideIcon {
   if (id === "product-creation") return LayoutGrid;
   if (id === "product-image-set") return Layers;
+  if (id === "main-image-hit-replica") return Copy;
   if (id === "ai-detail-page") return ScrollText;
   if (id === "detail-page-creation") return ScrollText;
   if (
@@ -171,6 +172,7 @@ const ECOM_NAV_SECTIONS: ReadonlyArray<{
     links: [
       { kind: "module", id: "product-creation" },
       { kind: "module", id: "product-image-set" },
+      { kind: "module", id: "main-image-hit-replica" },
     ],
   },
   {

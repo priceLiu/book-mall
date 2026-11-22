@@ -747,6 +747,7 @@ export function ProductCreationStudio({ module }: StudioProps) {
         onProjectChange={async () => {
           await reload(project.id);
         }}
+        onProjectPatched={applyProject}
         streaming={assistantStreaming}
         generateMainImagesToken={generateMainImagesToken}
         generateDetailImagesToken={generateDetailImagesToken}

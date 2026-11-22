@@ -103,7 +103,8 @@ export const imageGenPlanItemSchema = z.object({
   index: z.number().int().positive(),
   title: z.string().min(1),
   purpose: z.string().optional(),
-  prompt: z.string().min(1),
+  /** 允许空字符串：用户新增的占位槽位待填写 */
+  prompt: z.string(),
   copySnapshot: z.record(z.unknown()).optional(),
   /** 详情长图按屏切分后的 OSS 地址（出图垫图用，非整页长图） */
   styleSliceOssUrl: z.string().url().optional(),

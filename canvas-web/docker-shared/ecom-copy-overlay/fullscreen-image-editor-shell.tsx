@@ -6,7 +6,7 @@ import { createPortal } from "react-dom";
 /**
  * 全屏图片编辑器壳。视觉对齐平台全屏剪辑台（黑底、圆角 surface、左中右）。
  * 挂到 document.body，并带 nopan/nodrag/nowheel，画布 React Flow 里可直接复用。
- * 电商默认 z-[300]（高于侧栏）；画布传 zClassName="z-[2000]"。
+ * 电商默认 z-[360]（高于侧栏 z-[320]）；画布传 zClassName="z-[2000]"。
  */
 export const FULLSCREEN_IMAGE_EDITOR_SURFACE =
   "overflow-hidden rounded-xl bg-[#161616] text-white";
@@ -46,7 +46,7 @@ export function FullscreenImageEditorShell({
   right,
   rightFooter,
   footer,
-  zClassName = "z-[300]",
+  zClassName = "z-[360]",
 }: Props) {
   useEffect(() => {
     if (!open) return;

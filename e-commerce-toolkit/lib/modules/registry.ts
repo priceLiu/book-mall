@@ -46,6 +46,16 @@ export const ECOM_MODULES: EcomModuleDef[] = [
     tile: "light",
   },
   {
+    id: "main-image-hit-replica",
+    title: "爆款图复刻",
+    tagline: "上传爆款参考 · 换产品 · 一键同款结构出图",
+    href: "/ecom/main-image-hit-replica",
+    kind: "image",
+    toolKey: "ecom-toolkit__main-image-hit-replica",
+    action: "replicate",
+    tile: "light",
+  },
+  {
     id: "ai-detail-page",
     title: "产品详情页模块出图",
     tagline: "无参考图 · 16 模块 · 9 品类 · 自动子维度",

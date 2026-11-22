@@ -504,7 +504,7 @@ export function EcomCopyLayoutStudioDialog({
   return (
     <FullscreenImageEditorShell
       open={open}
-      zClassName={zClassName ?? "z-[280]"}
+      zClassName={zClassName ?? "z-[360]"}
       title={title}
       onClose={() => void requestClose()}
       headerLeading={<EditorBrandMark />}

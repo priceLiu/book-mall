@@ -67,6 +67,7 @@ import {
   needsBriefCollection,
   briefComplete,
   shouldSkipBrief,
+  getImageGenPlan,
 } from "@/lib/product-design-workflow";
 import { buildProductDesignPromptMentionRefs } from "@/lib/product-design-mention-refs";
 import { PRODUCT_DESIGN_PROMPT_MENTION_FIELD_PROPS } from "@/lib/product-design-prompt-mention-ui";
@@ -186,6 +187,7 @@ type Props = {
   /** 主图入口：主图出完后引导新建详情页项目并带走策略 */
   onContinueToDetailPages?: () => void;
   onProjectChange: () => void | Promise<void>;
+  onProjectPatched?: (project: ProductDesignProject) => void | Promise<void>;
   streaming?: boolean;
   generateMainImagesToken?: number;
   generateDetailImagesToken?: number;
@@ -249,6 +251,7 @@ export function ProductDesignContentPanel({
   onImportFromMainProject,
   onContinueToDetailPages,
   onProjectChange,
+  onProjectPatched,
   streaming,
   generateMainImagesToken = 0,
   generateDetailImagesToken = 0,
@@ -579,6 +582,8 @@ export function ProductDesignContentPanel({
   const mainImagesSyncKeyRef = useRef("");
   useEffect(() => {
     if (!isStep3ReadyForDownstream(project)) return;
+    const planMain = getImageGenPlan(project, "main");
+    if (planMain && planMain.items.length > 0) return;
     if (mainImagesDisplay.length === 0) return;
     const nextKey = JSON.stringify(
       mainImagesDisplay.map((m) => ({
@@ -1669,6 +1674,7 @@ export function ProductDesignContentPanel({
             disabled={streaming || (Boolean(busy) && !hasActiveImageGen)}
             mode="decompose"
             onProjectChange={onProjectChange}
+            onProjectPatched={onProjectPatched}
             onRequestAnalyze={() => void requestMainPlanAnalyze()}
             onGenerate={(indexes) => void requestMainGenerate(indexes)}
             cardGeneratingFor={(index) => cardGeneratingFor("main", index)}
@@ -1756,6 +1762,7 @@ export function ProductDesignContentPanel({
             disabled={streaming || (Boolean(busy) && !hasActiveImageGen)}
             mode="decompose"
             onProjectChange={onProjectChange}
+            onProjectPatched={onProjectPatched}
             onRequestAnalyze={() => void requestDetailPlanAnalyze()}
             onGenerate={(indexes) => void requestDetailGenerate(indexes)}
             cardGeneratingFor={(index) => cardGeneratingFor("detail", index)}
@@ -2069,6 +2076,7 @@ export function ProductDesignContentPanel({
                 disabled={streaming || (Boolean(busy) && !hasActiveImageGen)}
                 mode="derive"
                 onProjectChange={onProjectChange}
+                onProjectPatched={onProjectPatched}
                 onGenerate={(indexes) => void requestMainGenerate(indexes)}
                 cardGeneratingFor={(index) => cardGeneratingFor("main", index)}
                 onPromptEditorOpenChange={(open) => {
@@ -2141,6 +2149,7 @@ export function ProductDesignContentPanel({
                 disabled={streaming || (Boolean(busy) && !hasActiveImageGen)}
                 mode="derive"
                 onProjectChange={onProjectChange}
+                onProjectPatched={onProjectPatched}
                 onGenerate={(indexes) => void requestDetailGenerate(indexes)}
                 cardGeneratingFor={(index) => cardGeneratingFor("detail", index)}
                 onPromptEditorOpenChange={(open) => {

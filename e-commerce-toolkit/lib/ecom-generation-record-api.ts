@@ -112,6 +112,7 @@ const SOURCE_MODULE_LABELS: Record<string, string> = {
   "detail-page-suite-hit": "学竞品结构 · 原创详情",
   "detail-page-suite-replica": "产品详情页套图复刻",
   "ai-detail-page": "产品详情页模块出图",
+  "main-image-hit-replica": "爆款图复刻",
 };
 
 export function generationRecordSourceLabel(meta: EcomGenerationRecordMeta | null): string {

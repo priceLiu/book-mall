@@ -26,6 +26,7 @@ import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-but
 import { buildProductDesignPromptMentionRefs } from "@/lib/product-design-mention-refs";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import {
+  appendProductDesignImagePlan,
   deriveProductDesignImagePlan,
   patchProductDesignImagePlan,
   updateProductDesignProject,
@@ -36,6 +37,11 @@ import type {
   ProductDesignMainImage,
   ProductDesignProject,
 } from "@/lib/product-design-types";
+import {
+  isProductDesignPlanPromptReady,
+  productDesignPlanPromptForSave,
+  productDesignPlanPromptForUi,
+} from "@/lib/product-design-plan-prompt";
 import { getImageGenPlan } from "@/lib/product-design-workflow";
 import {
   productDesignCssAspectRatio,
@@ -64,6 +70,8 @@ type Props = {
   disabled?: boolean;
   mode: "decompose" | "derive";
   onProjectChange: () => void | Promise<void>;
+  /** 保存 plan 后直接用 PATCH 返回体更新项目，避免 reload 与 Step4 同步抢写 */
+  onProjectPatched?: (project: ProductDesignProject) => void | Promise<void>;
   onRequestAnalyze?: () => void | Promise<void>;
   onGenerate: (indexes: number[]) => void | Promise<void>;
   cardGeneratingFor: (index: number) => boolean;
@@ -90,7 +98,7 @@ function mergeGenSlots(project: ProductDesignProject, target: "main" | "detail")
         index: item.index,
         title: item.title,
         purpose: item.purpose,
-        prompt: item.prompt,
+        prompt: productDesignPlanPromptForUi(item.prompt),
         imageUrl: slot?.imageUrl,
         assetId: slot?.assetId,
         promptEdited: slot?.promptEdited,
@@ -144,24 +152,23 @@ function buildPlanItemsFromRows(
   label: string,
   plan: ReturnType<typeof getImageGenPlan>,
 ): ImageGenPlanItem[] | null {
+  if (nextRows.length === 0) return null;
   const styleSliceByIndex = new Map(
     plan?.items.map((item) => [item.index, item.styleSliceOssUrl]) ?? [],
   );
   const items: ImageGenPlanItem[] = [];
   for (const row of nextRows) {
-    const prompt = row.prompt.trim();
-    if (!prompt) continue;
     const item: ImageGenPlanItem = {
       index: row.index,
       title: row.title.trim() || `${label} ${row.index}`,
       purpose: row.purpose?.trim() || undefined,
-      prompt,
+      prompt: productDesignPlanPromptForSave(row.prompt),
     };
     const slice = styleSliceByIndex.get(row.index);
     if (slice) item.styleSliceOssUrl = slice;
     items.push(item);
   }
-  return items.length > 0 ? items : null;
+  return items;
 }
 
 
@@ -173,6 +180,7 @@ export function ProductDesignGenSlotWorkspace({
   disabled,
   mode,
   onProjectChange,
+  onProjectPatched,
   onRequestAnalyze,
   onGenerate,
   cardGeneratingFor,
@@ -189,8 +197,10 @@ export function ProductDesignGenSlotWorkspace({
   const [promptDialogIndex, setPromptDialogIndex] = useState<number | null>(null);
   const rowsRef = useRef(rows);
   rowsRef.current = rows;
+  const rowsSyncLockRef = useRef(0);
 
   useEffect(() => {
+    if (rowsSyncLockRef.current > 0) return;
     setRows(mergeGenSlots(project, target));
   }, [project, target, project.design?.imageGenPlans, project.design?.mainImages, project.design?.detailPages]);
 
@@ -214,7 +224,7 @@ export function ProductDesignGenSlotWorkspace({
         if (!opts?.quiet) {
           await alert({
             title: "无法保存",
-            message: "至少需要 1 条非空生图 Prompt。",
+            message: "至少需要保留 1 个出图槽位。",
             variant: "error",
           });
         }
@@ -222,11 +232,19 @@ export function ProductDesignGenSlotWorkspace({
       }
       if (!opts?.quiet) setBusy("正在保存…");
       try {
-        await patchProductDesignImagePlan(project.id, { target, items });
-        if (opts?.quiet) {
+        const { project: updated } = await patchProductDesignImagePlan(project.id, {
+          target,
+          items,
+        });
+        if (onProjectPatched) {
+          await onProjectPatched(updated);
+        } else if (opts?.quiet) {
           void onProjectChange();
         } else {
           await onProjectChange();
+        }
+        if (rowsSyncLockRef.current === 0) {
+          setRows(mergeGenSlots(updated, target));
         }
       } catch (e) {
         await alert({
@@ -239,7 +257,7 @@ export function ProductDesignGenSlotWorkspace({
         if (!opts?.quiet) setBusy(null);
       }
     },
-    [alert, label, onProjectChange, project, target],
+    [alert, label, onProjectChange, onProjectPatched, project, target],
   );
 
   const runDerive = useCallback(async () => {
@@ -289,15 +307,17 @@ export function ProductDesignGenSlotWorkspace({
   );
 
   const selectedSlotCount = selectedIndexes.length;
-  const promptReadyCount = rows.filter((r) => r.prompt.trim()).length;
+  const promptReadyCount = rows.filter((r) =>
+    isProductDesignPlanPromptReady(r.prompt),
+  ).length;
   const selectedImageGenCount = rows.filter(
-    (r) => selected.has(r.index) && r.prompt.trim(),
+    (r) => selected.has(r.index) && isProductDesignPlanPromptReady(r.prompt),
   ).length;
 
   const handleGenerateSelected = async () => {
     const current = rowsRef.current;
     const indexes = current
-      .filter((r) => selected.has(r.index) && r.prompt.trim())
+      .filter((r) => selected.has(r.index) && isProductDesignPlanPromptReady(r.prompt))
       .map((r) => r.index);
     if (selectedSlotCount === 0) {
       await alert({
@@ -321,7 +341,7 @@ export function ProductDesignGenSlotWorkspace({
 
   const handleGenerateOne = async (index: number) => {
     const row = rowsRef.current.find((r) => r.index === index);
-    if (!row?.prompt.trim()) {
+    if (!row || !isProductDesignPlanPromptReady(row.prompt)) {
       await alert({
         title: "无法出图",
         message: "请先填写本条生图 Prompt。",
@@ -608,21 +628,39 @@ export function ProductDesignGenSlotWorkspace({
           className="col-span-full flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-[#d2d2d7] py-2.5 text-[11px] text-[#6e6e73] hover:border-[var(--ecom-chrome-accent)] hover:text-[#1d1d1f]"
           disabled={workspaceDisabled}
           onClick={async () => {
-            const nextIndex =
-              rowsRef.current.length > 0
-                ? Math.max(...rowsRef.current.map((r) => r.index)) + 1
-                : 1;
-            const next = [
-              ...rowsRef.current,
-              {
-                index: nextIndex,
-                title: emptyPlanItem(nextIndex, target).title,
-                purpose: "",
-                prompt: "",
-              },
-            ];
-            setRows(next);
-            await saveRows(next);
+            const prev = rowsRef.current;
+            const busyLabel =
+              target === "main" ? "正在生成新主图 Prompt…" : "正在生成新详情屏 Prompt…";
+            setBusy(busyLabel);
+            rowsSyncLockRef.current += 1;
+            try {
+              const { project: updated, newIndex } = await appendProductDesignImagePlan(
+                project.id,
+                { target },
+              );
+              if (!isProductDesignPlanPromptReady(
+                mergeGenSlots(updated, target).find((r) => r.index === newIndex)?.prompt,
+              )) {
+                throw new Error("AI 未生成有效 Prompt，请重试");
+              }
+              setRows(mergeGenSlots(updated, target));
+              setSelected((s) => new Set(s).add(newIndex));
+              if (onProjectPatched) {
+                await onProjectPatched(updated);
+              } else {
+                await onProjectChange();
+              }
+            } catch (e) {
+              setRows(prev);
+              await alert({
+                title: "增加失败",
+                message: e instanceof Error ? e.message : "未知错误",
+                variant: "error",
+              });
+            } finally {
+              rowsSyncLockRef.current = Math.max(0, rowsSyncLockRef.current - 1);
+              setBusy(null);
+            }
           }}
         >
           <Plus className="h-3.5 w-3.5" />

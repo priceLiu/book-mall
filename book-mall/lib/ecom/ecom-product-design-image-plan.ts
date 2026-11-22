@@ -47,6 +47,33 @@ import { ECOM_DEFAULT_VISION_MODEL } from "@/lib/gateway/ecom-storyboard-chat-mo
 
 export type ImageGenPlanTarget = "main" | "detail";
 
+export const PRODUCT_DESIGN_IMAGE_GEN_PLAN_MAX_ITEMS = 30;
+
+const MAIN_APPEND_SYSTEM = `你是电商主图策划与 AI 生图 Prompt 专家。用户会提供商品实拍、可选的主图风格参考，以及「已有主图计划」列表。
+你的任务是新增 1 张主图（第 N+1 张），其职责、模特姿势/场景/构图须与已有条目明显区分，不得重复或仅换措辞。
+
+必须只输出一个 JSON 对象（不要 markdown 围栏），字段：
+{
+  "title": "如：侧身细节",
+  "purpose": "本张主图职责",
+  "prompt": "给生图模型的完整中文指令，须含画幅气质、场景、光影、模特姿势、构图、商品锁定、文案层级占位说明"
+}
+
+商品锁定（最高优先级）：商品实拍里的商品才是本次要卖的商品。风格参考只提供排版、光影、场景与模特气质，
+其中出现的商品与本次无关。prompt 须写明商品的颜色/版型/材质以商品实拍为准，并注明「不得替换为风格参考中的款式」。`;
+
+const DETAIL_APPEND_SYSTEM = `你是电商详情页策划与 AI 生图 Prompt 专家。用户会提供商品实拍、详情页风格参考，以及「已有详情屏计划」列表。
+你的任务是新增 1 屏（第 N+1 屏），主题与版式须与已有屏明显区分。
+
+必须只输出一个 JSON 对象（不要 markdown 围栏），字段：
+{
+  "title": "屏标题",
+  "purpose": "本屏使命",
+  "prompt": "给生图模型的完整中文指令，须含单屏海报排版、主标题/正文要点、商品呈现方式、与整套视觉统一约束"
+}
+
+商品锁定（最高优先级）：商品实拍里的商品才是本次要卖的商品。风格参考只提供版式与调性，其中出现的商品与本次无关。`;
+
 const MAIN_DECOMPOSE_SYSTEM = `你是电商主图策划与 AI 生图 Prompt 专家。用户会提供商品实拍、可选的主图风格参考，以及可选的文字意图。
 请识别商品信息，并拆解为 N 张主图（N 由你根据参考图/平台规范决定，通常 4–9 张），每张职责不同、姿势/场景/构图有差异。
 
@@ -177,6 +204,85 @@ function parseDecomposeJson(text: string): {
       : undefined;
 
   return { productContext, sharedVisualBrief, items };
+}
+
+function parseAppendPlanItemJson(text: string): Omit<ImageGenPlanItem, "index"> {
+  const trimmed = text.trim();
+  const start = trimmed.indexOf("{");
+  const end = trimmed.lastIndexOf("}");
+  if (start < 0 || end <= start) {
+    throw new Error("追加槽位未返回有效 JSON");
+  }
+  const parsed = JSON.parse(trimmed.slice(start, end + 1)) as Record<string, unknown>;
+  const prompt = typeof parsed.prompt === "string" ? parsed.prompt.trim() : "";
+  if (!prompt) throw new Error("AI 未生成有效 Prompt，请重试");
+  const title =
+    typeof parsed.title === "string" && parsed.title.trim()
+      ? parsed.title.trim()
+      : "新增槽位";
+  const purpose =
+    typeof parsed.purpose === "string" && parsed.purpose.trim()
+      ? parsed.purpose.trim()
+      : undefined;
+  return { title, purpose, prompt };
+}
+
+function summarizePlanItemsForAppend(items: ImageGenPlanItem[]): string {
+  return items
+    .map((item) => {
+      const p = item.prompt.trim();
+      const excerpt = p.length > 320 ? `${p.slice(0, 320)}…` : p;
+      return [
+        `${item.index}. 「${item.title}」`,
+        item.purpose ? `职责：${item.purpose}` : "",
+        `Prompt：${excerpt}`,
+      ]
+        .filter(Boolean)
+        .join("\n");
+    })
+    .join("\n\n");
+}
+
+function ensureImageGenPlanFromDesign(
+  design: ProductDesign,
+  target: ImageGenPlanTarget,
+): ImageGenPlan {
+  const existing = design.imageGenPlans?.[target];
+  if (existing?.items.length) return existing;
+
+  const slots = target === "main" ? design.mainImages : design.detailPages;
+  if (slots.length === 0) {
+    throw new Error(
+      target === "main"
+        ? "还没有主图计划，请先拆解或生成草稿"
+        : "还没有详情屏计划，请先拆解或生成草稿",
+    );
+  }
+
+  return {
+    target,
+    source: "interactive",
+    status: "draft",
+    productContext: undefined,
+    items: slots.map((slot) => {
+      if (target === "main") {
+        const m = slot as ProductDesignMainImage;
+        return {
+          index: m.index,
+          title: m.layers?.title || `主图 ${m.index}`,
+          purpose: m.purpose,
+          prompt: m.genPrompt?.trim() ?? "",
+        };
+      }
+      const d = slot as ProductDesignDetailPage;
+      return {
+        index: d.index,
+        title: d.title || `详情 ${d.index}`,
+        purpose: d.purpose,
+        prompt: d.genPrompt?.trim() ?? "",
+      };
+    }),
+  };
 }
 
 function strField(v: unknown): string | undefined {
@@ -557,6 +663,137 @@ export async function deriveImageGenPlan(opts: {
   const updated = await getProductDesignProject(opts.userId, opts.projectId);
   if (!updated) throw new Error("项目不存在");
   return { plan, project: updated };
+}
+
+export async function appendImageGenPlanItem(opts: {
+  userId: string;
+  projectId: string;
+  target: ImageGenPlanTarget;
+  modelKey?: string;
+}): Promise<{
+  plan: ImageGenPlan;
+  project: NonNullable<Awaited<ReturnType<typeof getProductDesignProject>>>;
+  newIndex: number;
+}> {
+  await assertEcomToolkitGatewayAccess(opts.userId);
+
+  const project = await getProductDesignProject(opts.userId, opts.projectId);
+  if (!project) throw new Error("项目不存在");
+  const design = project.design;
+  if (!design) throw new Error("设计稿不存在");
+
+  const existing = ensureImageGenPlanFromDesign(design, opts.target);
+  if (existing.items.length >= PRODUCT_DESIGN_IMAGE_GEN_PLAN_MAX_ITEMS) {
+    throw new Error(`最多 ${PRODUCT_DESIGN_IMAGE_GEN_PLAN_MAX_ITEMS} 个出图槽位`);
+  }
+
+  const modelKey =
+    opts.modelKey?.trim() ||
+    project.settings.visionModelKey?.trim() ||
+    ECOM_DEFAULT_VISION_MODEL;
+  assertStoryLlmVisionModel(modelKey, "追加槽位 Prompt");
+
+  const target = opts.target;
+  const styleRole = target === "main" ? "main-style" : "detail-style";
+  const styleRefs = filterProductDesignReferencesByRole(project.references, [styleRole]);
+  const hasVisionRefs =
+    filterProductDesignReferencesByRole(project.references, ["product"]).length +
+      styleRefs.length >
+    0;
+  if (!hasVisionRefs && existing.items.every((item) => !item.prompt.trim())) {
+    throw new Error("请先上传产品实拍或风格参考图，或完成已有 Prompt 计划");
+  }
+
+  const refs = refsForVisionAnalysis(
+    project.references,
+    target as ProductDesignVisionTarget,
+    modelKey,
+  );
+  const imageUrls = refs.map((r) => r.ossUrl);
+  const spec = getEcomPlatformSpec(project.platform);
+  const ratio =
+    target === "main" ? project.resolved.mainImageRatio : project.resolved.detailPageRatio;
+  const sharedBrief = existing.sharedVisualBrief?.trim() ?? "";
+  const nextIndex = existing.items.length + 1;
+
+  const userParts: CanvasChatContentPart[] = [
+    ...imageUrls.map(
+      (url): CanvasChatContentPart => ({
+        type: "image_url",
+        image_url: { url },
+      }),
+    ),
+    {
+      type: "text",
+      text: [
+        `平台：${spec.label}`,
+        `画幅：${ratio}`,
+        `任务：在已有计划基础上新增第 ${nextIndex} 张${target === "main" ? "主图" : "详情屏"}的 title / purpose / prompt。`,
+        `已有计划（共 ${existing.items.length} 张，勿重复其构图与职责）：\n${summarizePlanItemsForAppend(existing.items)}`,
+        sharedBrief ? `整套共享视觉约束：\n${sharedBrief}` : "",
+        existing.productContext?.productName
+          ? `产品名：${existing.productContext.productName}`
+          : project.brief?.productName
+            ? `产品名：${String(project.brief.productName)}`
+            : "",
+        refLegendNote(refs, target),
+      ]
+        .filter(Boolean)
+        .join("\n\n"),
+    },
+  ];
+
+  const toolKey =
+    target === "main"
+      ? `${ECOM_MAIN_IMAGE_TOOL_KEY}__${ECOM_MAIN_IMAGE_ACTION}`
+      : `${ECOM_DETAIL_PAGE_TOOL_KEY}__${ECOM_DETAIL_PAGE_ACTION}`;
+
+  const raw = await drainEcomGwChat(opts.userId, {
+    modelKey,
+    messages: [
+      {
+        role: "system",
+        content: target === "main" ? MAIN_APPEND_SYSTEM : DETAIL_APPEND_SYSTEM,
+      },
+      {
+        role: "user",
+        content: userParts.length === 1 && userParts[0]?.type === "text"
+          ? userParts[0].text
+          : userParts,
+      },
+    ],
+    clientPage: ecomClientPage(opts.userId, opts.projectId, toolKey),
+  });
+
+  const appended = parseAppendPlanItemJson(raw);
+  const items = reindexPlanItems([
+    ...existing.items,
+    { index: nextIndex, ...appended },
+  ]);
+  const newIndex = items[items.length - 1]!.index;
+
+  const plan: ImageGenPlan = {
+    ...existing,
+    status: "draft",
+    productContext:
+      existing.productContext ?? productContextFromBrief(project),
+    items,
+  };
+
+  const designPatch = designPatchFromPlan(plan, design, target);
+
+  await updateProductDesignProject(opts.userId, opts.projectId, {
+    designPatch,
+    settings: {
+      visionModelKey: modelKey,
+      ...countSettingsFromPlan(plan, target),
+    },
+  });
+
+  const updated = await getProductDesignProject(opts.userId, opts.projectId);
+  if (!updated) throw new Error("项目不存在");
+  const savedPlan = updated.design?.imageGenPlans?.[target] ?? plan;
+  return { plan: savedPlan, project: updated, newIndex };
 }
 
 export async function patchImageGenPlan(opts: {

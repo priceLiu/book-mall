@@ -7,6 +7,7 @@ import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-but
 import { ProductDesignPromptExpandableTextarea } from "@/components/product-design/product-design-prompt-expandable-textarea";
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import {
+  appendProductDesignImagePlan,
   confirmProductDesignImagePlan,
   decomposeProductDesignImagePlan,
   deriveProductDesignImagePlan,
@@ -35,15 +36,6 @@ type Props = {
   mode: "decompose" | "derive";
   title?: string;
 };
-
-function emptyItem(index: number): ImageGenPlanItem {
-  return {
-    index,
-    title: `第 ${index} 张`,
-    purpose: "",
-    prompt: "",
-  };
-}
 
 export function ProductDesignPromptPlanWorkspace({
   project,
@@ -214,9 +206,38 @@ export function ProductDesignPromptPlanWorkspace({
     );
   };
 
-  const addItem = () => {
-    setItems((prev) => [...prev, emptyItem(prev.length + 1)]);
-  };
+  const addItem = useCallback(async () => {
+    if (items.length === 0) {
+      await alert({
+        title: "无法增加",
+        message: "请先拆解参考图或从文案生成草稿。",
+        variant: "error",
+      });
+      return;
+    }
+    setBusy(target === "main" ? "正在生成新主图 Prompt…" : "正在生成新详情屏 Prompt…");
+    try {
+      const { project: updated } = await appendProductDesignImagePlan(project.id, {
+        target,
+        modelKey: visionModelKey,
+      });
+      const nextPlan = updated.design?.imageGenPlans?.[target];
+      if (nextPlan) {
+        setProductContext(nextPlan.productContext ?? {});
+        setItems(nextPlan.items);
+        setSharedVisualBrief(nextPlan.sharedVisualBrief ?? "");
+      }
+      await onProjectChange();
+    } catch (e) {
+      await alert({
+        title: "增加失败",
+        message: e instanceof Error ? e.message : "未知错误",
+        variant: "error",
+      });
+    } finally {
+      setBusy(null);
+    }
+  }, [alert, items.length, onProjectChange, project.id, target, visionModelKey]);
 
   function reindexItems(list: ImageGenPlanItem[]): ImageGenPlanItem[] {
     return list.map((item, i) => ({ ...item, index: i + 1 }));
@@ -397,7 +418,7 @@ export function ProductDesignPromptPlanWorkspace({
                 type="button"
                 className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-[#d2d2d7] py-2 text-[11px] text-[#6e6e73] hover:border-[var(--ecom-chrome-accent)] hover:text-[#1d1d1f]"
                 disabled={Boolean(disabled) || Boolean(busy)}
-                onClick={addItem}
+                onClick={() => void addItem()}
               >
                 <Plus className="h-3.5 w-3.5" />
                 增加一张

@@ -462,6 +462,23 @@ export async function deriveProductDesignImagePlan(
   };
 }
 
+/** 增加一张槽位并由视觉模型生成该条 Prompt（写入 plan + design） */
+export async function appendProductDesignImagePlan(
+  projectId: string,
+  opts: { target: "main" | "detail"; modelKey?: string },
+): Promise<{ plan: ImageGenPlan; project: ProductDesignProject; newIndex: number }> {
+  const data = await ecomBookFetch(`${BASE}/projects/${projectId}/image/plan/append`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(opts),
+  });
+  return {
+    plan: data.plan as ImageGenPlan,
+    project: data.project as ProductDesignProject,
+    newIndex: typeof data.newIndex === "number" ? data.newIndex : 0,
+  };
+}
+
 export async function patchProductDesignImagePlan(
   projectId: string,
   opts: {
