@@ -8,7 +8,7 @@ import {
   ImageEditorFrameHandles,
   ImageEditorRectCropRuleGrid,
 } from "@/components/image-editor/image-editor-frame-handles";
-import { ImageEditorShapeMaskChrome } from "@/components/image-editor/image-editor-shape-mask-workspace";
+import { ImageEditorShapeMaskChrome, ShapeMaskDimOverlay } from "@/components/image-editor/image-editor-shape-mask-workspace";
 import { EcomMediaGeneratingBusy } from "@/components/media/ecom-media-generating-busy";
 import {
   computeCanvasSizeFromHandleDrag,
@@ -435,6 +435,7 @@ export function ImageEditorCanvasStage({
                     />
                   ) : null}
 
+                  {shapeMask !== "none" ? <ShapeMaskDimOverlay shapeMask={shapeMask} /> : null}
                   {canvasCropInteract && cropRect && onCropRect ? (
                     <ImageEditorFrameHandles
                       crop={cropRect}
@@ -449,13 +450,16 @@ export function ImageEditorCanvasStage({
                   ) : null}
                 </div>
               ) : resizeInteract ? (
-                <div className="pointer-events-none absolute inset-0 z-[18]" aria-hidden>
+                <>
+                  {shapeMask !== "none" ? <ShapeMaskDimOverlay shapeMask={shapeMask} /> : null}
+                  <div className="pointer-events-none absolute inset-0 z-[18]" aria-hidden>
                   <div className="absolute inset-y-0 left-1/3 w-px bg-white/75" />
                   <div className="absolute inset-y-0 left-2/3 w-px bg-white/75" />
                   <div className="absolute inset-x-0 top-1/3 h-px bg-white/75" />
                   <div className="absolute inset-x-0 top-2/3 h-px bg-white/75" />
                   <div className="absolute inset-0 border border-white/90" />
-                </div>
+                  </div>
+                </>
               ) : (
                 <>
                   {/* eslint-disable-next-line @next/next/no-img-element */}

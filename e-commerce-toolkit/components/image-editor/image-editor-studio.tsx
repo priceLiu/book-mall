@@ -226,22 +226,23 @@ export function ImageEditorStudio() {
     if (tool !== "adjust") adjustDraftRef.current = null;
   }, [tool, imageUrl, canvasW, canvasH, rotateDeg, flipH, flipV]);
 
-  const shapeMaskInteract =
-    tool === "adjust" && adjustTab === "shape" && Boolean(imageUrl) && shapeMask !== "none";
+  const shapeOverlay =
+    tool === "adjust" && Boolean(imageUrl) && shapeMask !== "none";
 
-  /** 尺寸 / 比例：画布裁切框与右栏尺寸一体（参照设计室，样式走电商主题） */
+  /** 比例裁剪：底图不动，只移动裁切窗。蒙版叠在窗上，不替换这个模式 */
   const canvasCropInteract =
     tool === "adjust" && Boolean(imageUrl) && adjustTab === "ratio";
 
-  const resizeInteract = tool === "adjust" && Boolean(imageUrl) && adjustTab === "resize";
+  /** 尺寸调整与形状蒙版共用像素框；蒙版只是叠在框上的压暗 */
+  const resizeInteract =
+    tool === "adjust" && Boolean(imageUrl) && (adjustTab === "resize" || adjustTab === "shape");
 
-  const canvasFrameInteract = shapeMaskInteract || canvasCropInteract;
+  const canvasFrameInteract = canvasCropInteract;
 
-  const previewShapeMask =
-    tool === "adjust" && adjustTab === "shape" && shapeMask !== "none" ? shapeMask : "none";
+  const previewShapeMask = shapeOverlay ? shapeMask : "none";
 
-  /** 形状编辑中：预览不裁切，仅蒙版层压暗（对齐美图）；确定后再写入 clip */
-  const previewClipInRender = shapeMaskInteract ? "none" : previewShapeMask;
+  /** 编辑中只叠蒙版压暗，确定时再写入裁切 */
+  const previewClipInRender = "none" as const;
 
   const activeFilterStyle =
     tool === "color" || brightness !== 100 || contrast !== 100 || saturate !== 100 ? filterStyle : undefined;
@@ -385,7 +386,7 @@ export function ImageEditorStudio() {
       setCropPreviewUrl(null);
       return;
     }
-    if (adjustTab === "resize") return;
+    if (adjustTab === "resize" || adjustTab === "shape") return;
     const rect = cropRectRef.current;
     if (!imageUrl || !rect) return;
     setCanvasW(Math.max(1, Math.round(rect.w)));
@@ -394,7 +395,7 @@ export function ImageEditorStudio() {
       imageUrl,
       rect,
       1600,
-      adjustTab === "shape" ? shapeMask : "none",
+      shapeMask,
     )
       .then((url) => setCropPreviewUrl(url))
       .catch(() => setCropPreviewUrl(null));
@@ -653,7 +654,7 @@ export function ImageEditorStudio() {
           rotateDeg,
           flipH,
           flipV,
-          shapeMask: "none",
+          shapeMask: shapeMask,
           fitInside: false,
           stretch: true,
           filterStyle: activeFilterStyle,
@@ -677,6 +678,7 @@ export function ImageEditorStudio() {
           flipH: false,
           flipV: false,
         };
+        if (shapeMask !== "none") setShapeMask("none");
         toast({ title: "已应用", message: "图片尺寸已更新", variant: "success" });
         return;
       }
@@ -686,11 +688,11 @@ export function ImageEditorStudio() {
         w: naturalW || canvasW,
         h: naturalH || canvasH,
       };
-      const shape = adjustTab === "shape" ? shapeMask : "none";
+      const shape = shapeMask;
       const outW = Math.max(1, Math.round(rect.w));
       const outH = Math.max(1, Math.round(rect.h));
       const out = await renderImageEditorCropRegion(imageUrl, rect, 8192, shape);
-      if (adjustTab === "shape" && shapeMask !== "none") {
+      if (shape !== "none") {
         setShapeMask("none");
       }
       setImageUrl(out);
@@ -1085,7 +1087,7 @@ export function ImageEditorStudio() {
               dropZoneProps={canvasPaste.dropZoneProps}
               onOpenFile={() => fileInputRef.current?.click()}
               onActivatePaste={canvasPaste.focusZone}
-              shapeMaskInteract={shapeMaskInteract}
+              shapeMaskInteract={false}
               onShapeMaskCancel={
                 resizeInteract ? cancelResizeEdit : canvasCropInteract ? cancelCropEdit : cancelShapeMaskEdit
               }

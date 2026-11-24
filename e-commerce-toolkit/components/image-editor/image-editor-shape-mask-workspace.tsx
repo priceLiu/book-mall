@@ -36,7 +36,7 @@ export function ShapeMaskDimOverlay({ shapeMask }: { shapeMask: ImageEditorShape
 
   return (
     <svg
-      className="pointer-events-none absolute inset-0 z-[15] h-full w-full overflow-hidden rounded-xl"
+      className="pointer-events-none absolute inset-0 z-[15] h-full w-full overflow-hidden"
       viewBox="0 0 100 100"
       preserveAspectRatio="xMidYMid meet"
       aria-hidden

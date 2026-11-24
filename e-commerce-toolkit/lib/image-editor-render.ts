@@ -1,4 +1,4 @@
-import { clipPathForImageEditorShape, clipPathForImageEditorShapeMeet } from "@/lib/image-editor-shape-mask";
+import { clipPathForImageEditorShapeMeet } from "@/lib/image-editor-shape-mask";
 import type { ImageEditorTransform } from "@/lib/image-editor-transform";
 
 export type RenderImageEditorOptions = ImageEditorTransform & {
@@ -49,7 +49,7 @@ export async function renderImageEditorFrame(
 
   const mask = opts.shapeMask ?? "none";
   if (mask !== "none") {
-    clipPathForImageEditorShape(ctx, outW, outH, mask);
+    clipPathForImageEditorShapeMeet(ctx, outW, outH, mask);
   }
 
   if (opts.filterStyle) {
