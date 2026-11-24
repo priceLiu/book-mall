@@ -21,6 +21,10 @@ export type ImageEditorSessionSnapshot = {
   contrast: number;
   saturate: number;
   erasePrompt: string;
+  correctVertical?: number;
+  correctHorizontal?: number;
+  correctCenter?: number;
+  correctRotate?: number;
   imageUrl: string | null;
   imageOmitted?: boolean;
 };

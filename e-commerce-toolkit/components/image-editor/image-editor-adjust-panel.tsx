@@ -10,7 +10,7 @@ import {
   RotateCcw,
   RotateCw,
 } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import { ImageEditorShapeGrid } from "@/components/image-editor/image-editor-shape-grid";
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
@@ -53,6 +53,7 @@ type Props = {
   hasImage: boolean;
   correctionOpen: boolean;
   onToggleCorrection: () => void;
+  onCloseCorrection: () => void;
   correctionPanel?: ReactNode;
   shapeMask: ImageEditorShapeMaskId;
   onShapeMask: (id: ImageEditorShapeMaskId) => void;
@@ -68,13 +69,24 @@ const TABS: Array<{ id: ImageEditorAdjustTab; label: string }> = [
 export function ImageEditorAdjustPanel(props: Props) {
   const [sectionOpen, setSectionOpen] = useState(true);
 
+  useEffect(() => {
+    if (props.correctionOpen) setSectionOpen(false);
+  }, [props.correctionOpen]);
+
   return (
     <div className="space-y-3">
       <div className="overflow-hidden rounded-xl border border-[var(--ie-border-soft)] bg-[var(--ie-cream)] shadow-sm">
         <button
           type="button"
           className="flex w-full items-center justify-between px-3 py-2.5 text-left"
-          onClick={() => setSectionOpen((v) => !v)}
+          onClick={() => {
+            if (sectionOpen) {
+              setSectionOpen(false);
+              return;
+            }
+            setSectionOpen(true);
+            props.onCloseCorrection();
+          }}
         >
           <span className="text-[12px] font-semibold text-[var(--ie-ink)]">裁剪/旋转/尺寸</span>
           {sectionOpen ? (

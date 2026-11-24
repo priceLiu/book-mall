@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Loader2 } from "lucide-react";
+import { Loader2, RotateCcw, ChevronUp, ChevronDown } from "lucide-react";
 
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { EcomAssetPickerDialog } from "@/components/media/ecom-asset-picker-dialog";
@@ -33,6 +33,13 @@ import { exportImageEditorFrame, renderImageEditorCropRegion, renderImageEditorF
 import { cropRectForRatio, fullImageCropRect, type ImageEditorCropRect } from "@/lib/image-editor-crop-rect";
 import { takeImageEditorImportUrl } from "@/lib/image-editor-session";
 import { stepRotateDeg } from "@/lib/image-editor-transform";
+import {
+  IMAGE_EDITOR_CORRECTION_DEFAULT,
+  imageEditorCorrectionCss,
+  isImageEditorCorrectionNeutral,
+  renderImageEditorCorrection,
+  type ImageEditorCorrection,
+} from "@/lib/image-editor-correction";
 import { cn } from "@/lib/utils";
 import { useImageDropPaste } from "@/hooks/use-image-drop-paste";
 import type {
@@ -97,6 +104,7 @@ export function ImageEditorStudio() {
   const [losslessResize, setLosslessResize] = useState(true);
   const [customPresets, setCustomPresets] = useState<ImageEditorPresetSize[]>([]);
   const [correctionOpen, setCorrectionOpen] = useState(false);
+  const [correction, setCorrection] = useState<ImageEditorCorrection>(IMAGE_EDITOR_CORRECTION_DEFAULT);
   const [shapeMask, setShapeMask] = useState<ImageEditorShapeMaskId>("none");
   const [canvasFrameDragging, setCanvasFrameDragging] = useState(false);
   const [baseDisplayUrl, setBaseDisplayUrl] = useState<string | null>(null);
@@ -189,6 +197,12 @@ export function ImageEditorStudio() {
       setLosslessResize(snap.losslessResize);
       setLockAspect(snap.lockAspect);
       setCorrectionOpen(snap.correctionOpen);
+      setCorrection({
+        vertical: snap.correctVertical ?? 50,
+        horizontal: snap.correctHorizontal ?? 50,
+        center: snap.correctCenter ?? 50,
+        rotate: snap.correctRotate ?? 0,
+      });
       setBrightness(snap.brightness);
       setContrast(snap.contrast);
       setSaturate(snap.saturate);
@@ -229,17 +243,19 @@ export function ImageEditorStudio() {
   const shapeOverlay =
     tool === "adjust" && Boolean(imageUrl) && shapeMask !== "none";
 
-  /** 比例裁剪：底图不动，只移动裁切窗。蒙版叠在窗上，不替换这个模式 */
-  const canvasCropInteract =
-    tool === "adjust" && Boolean(imageUrl) && adjustTab === "ratio";
+  /** 比例裁剪与尺寸调整只在「裁剪/旋转/尺寸」展开时生效 */
+  const cropSectionActive = tool === "adjust" && Boolean(imageUrl) && !correctionOpen;
 
-  /** 尺寸调整与形状蒙版共用像素框；蒙版只是叠在框上的压暗 */
+  const canvasCropInteract = cropSectionActive && adjustTab === "ratio";
+
   const resizeInteract =
-    tool === "adjust" && Boolean(imageUrl) && (adjustTab === "resize" || adjustTab === "shape");
+    cropSectionActive && (adjustTab === "resize" || adjustTab === "shape");
+
+  const correctionInteract = tool === "adjust" && Boolean(imageUrl) && correctionOpen;
 
   const canvasFrameInteract = canvasCropInteract;
 
-  const previewShapeMask = shapeOverlay ? shapeMask : "none";
+  const previewShapeMask = cropSectionActive && shapeOverlay ? shapeMask : "none";
 
   /** 编辑中只叠蒙版压暗，确定时再写入裁切 */
   const previewClipInRender = "none" as const;
@@ -453,6 +469,10 @@ export function ImageEditorStudio() {
       contrast,
       saturate,
       erasePrompt,
+      correctVertical: correction.vertical,
+      correctHorizontal: correction.horizontal,
+      correctCenter: correction.center,
+      correctRotate: correction.rotate,
       imageUrl: null,
     });
     toast({ title: "已移除图片", variant: "success" });
@@ -469,6 +489,7 @@ export function ImageEditorStudio() {
     saturate,
     toast,
     tool,
+    correction,
   ]);
 
   useEffect(() => {
@@ -489,6 +510,10 @@ export function ImageEditorStudio() {
       contrast,
       saturate,
       erasePrompt,
+      correctVertical: correction.vertical,
+      correctHorizontal: correction.horizontal,
+      correctCenter: correction.center,
+      correctRotate: correction.rotate,
       imageUrl: sessionPersistUrl ?? (imageUrl?.startsWith("http") || imageUrl?.startsWith("data:") ? imageUrl : null),
       imageOmitted: Boolean(imageUrl) && !sessionPersistUrl && !imageUrl?.startsWith("http") && !imageUrl?.startsWith("data:") ? true : undefined,
     };
@@ -512,6 +537,7 @@ export function ImageEditorStudio() {
     erasePrompt,
     imageUrl,
     sessionPersistUrl,
+    correction,
   ]);
 
   useEffect(() => {
@@ -645,7 +671,24 @@ export function ImageEditorStudio() {
     if (!imageUrl) return;
     setBusy(true);
     try {
-      if (adjustTab === "resize") {
+      if (correctionOpen) {
+        if (isImageEditorCorrectionNeutral(correction)) {
+          toast({ title: "校正未改动", message: "垂直、水平、中心和旋转都还是初始值" });
+          return;
+        }
+        const out = await renderImageEditorCorrection(imageUrl, correction);
+        const outW = Math.max(1, naturalW);
+        const outH = Math.max(1, naturalH);
+        setCorrection(IMAGE_EDITOR_CORRECTION_DEFAULT);
+        setImageUrl(out);
+        setDisplayUrl(out);
+        persistImageUrlRef.current = out;
+        setSessionPersistUrl(out);
+        pushHistory(out, outW, outH);
+        toast({ title: "已应用", message: "图片校正已写入", variant: "success" });
+        return;
+      }
+      if (adjustTab === "resize" || adjustTab === "shape") {
         const outW = Math.max(1, Math.round(canvasW));
         const outH = Math.max(1, Math.round(canvasH));
         const out = await renderImageEditorFrame(imageUrl, {
@@ -915,17 +958,14 @@ export function ImageEditorStudio() {
             busy={busy}
             hasImage={Boolean(imageUrl)}
             correctionOpen={correctionOpen}
-            onToggleCorrection={() => setCorrectionOpen((v) => !v)}
+            onToggleCorrection={() => setCorrectionOpen((open) => !open)}
+            onCloseCorrection={() => setCorrectionOpen(false)}
             correctionPanel={
-              <CorrectionSliders
-                brightness={brightness}
-                contrast={contrast}
-                saturate={saturate}
-                onBrightness={setBrightness}
-                onContrast={setContrast}
-                onSaturate={setSaturate}
+              <ImageCorrectionPanel
+                value={correction}
                 disabled={!imageUrl || busy}
-                onBake={() => void commitExport()}
+                onChange={setCorrection}
+                onReset={() => setCorrection(IMAGE_EDITOR_CORRECTION_DEFAULT)}
               />
             }
             shapeMask={shapeMask}
@@ -1069,6 +1109,7 @@ export function ImageEditorStudio() {
               cropMode={canvasCropInteract}
               canvasCropInteract={canvasCropInteract}
               resizeInteract={resizeInteract}
+              correctionInteract={correctionInteract}
               lockAspect={lockAspect}
               shapeMask={previewShapeMask}
               fitInside={losslessResize}
@@ -1076,6 +1117,7 @@ export function ImageEditorStudio() {
               flipH={flipH}
               flipV={flipV}
               filterStyle={activeFilterStyle}
+              correctionCss={correctionOpen ? imageEditorCorrectionCss(correction) : ""}
               naturalWidth={naturalW}
               naturalHeight={naturalH}
               canvasWidth={canvasW}
@@ -1089,7 +1131,13 @@ export function ImageEditorStudio() {
               onActivatePaste={canvasPaste.focusZone}
               shapeMaskInteract={false}
               onShapeMaskCancel={
-                resizeInteract ? cancelResizeEdit : canvasCropInteract ? cancelCropEdit : cancelShapeMaskEdit
+                correctionInteract
+                  ? () => setCorrection(IMAGE_EDITOR_CORRECTION_DEFAULT)
+                  : resizeInteract
+                    ? cancelResizeEdit
+                    : canvasCropInteract
+                      ? cancelCropEdit
+                      : cancelShapeMaskEdit
               }
               onShapeMaskConfirm={() => void commitExport()}
               onShapeMaskRotateDeg={setRotateDeg}
@@ -1154,33 +1202,120 @@ function ToolPanelCard({ title, children }: { title: string; children: React.Rea
   );
 }
 
-function CorrectionSliders({
-  brightness,
-  contrast,
-  saturate,
-  onBrightness,
-  onContrast,
-  onSaturate,
+function ImageCorrectionPanel({
+  value,
   disabled,
-  onBake,
+  onChange,
+  onReset,
 }: {
-  brightness: number;
-  contrast: number;
-  saturate: number;
-  onBrightness: (v: number) => void;
-  onContrast: (v: number) => void;
-  onSaturate: (v: number) => void;
+  value: ImageEditorCorrection;
   disabled?: boolean;
-  onBake: () => void;
+  onChange: (next: ImageEditorCorrection) => void;
+  onReset: () => void;
 }) {
   return (
-    <div className="space-y-3">
-      <SliderField label="亮度" value={brightness} onChange={onBrightness} />
-      <SliderField label="对比度" value={contrast} onChange={onContrast} />
-      <SliderField label="饱和度" value={saturate} onChange={onSaturate} />
-      <EcomButtonPrimary type="button" className="w-full" disabled={disabled} onClick={onBake}>
-        烘焙校正到图片
-      </EcomButtonPrimary>
+    <div className="space-y-2.5">
+      <CorrectionRow
+        label="垂直"
+        value={value.vertical}
+        min={0}
+        max={100}
+        disabled={disabled}
+        onChange={(vertical) => onChange({ ...value, vertical })}
+      />
+      <CorrectionRow
+        label="水平"
+        value={value.horizontal}
+        min={0}
+        max={100}
+        disabled={disabled}
+        onChange={(horizontal) => onChange({ ...value, horizontal })}
+      />
+      <CorrectionRow
+        label="中心"
+        value={value.center}
+        min={0}
+        max={100}
+        disabled={disabled}
+        onChange={(center) => onChange({ ...value, center })}
+      />
+      <CorrectionRow
+        label="旋转"
+        value={value.rotate}
+        min={-45}
+        max={45}
+        disabled={disabled}
+        onChange={(rotate) => onChange({ ...value, rotate })}
+      />
+      <EcomButtonSecondary type="button" className="mt-1 w-full text-[12px]" disabled={disabled} onClick={onReset}>
+        <RotateCcw className="mr-1.5 h-3.5 w-3.5" aria-hidden />
+        重置
+      </EcomButtonSecondary>
+    </div>
+  );
+}
+
+function CorrectionRow({
+  label,
+  value,
+  min,
+  max,
+  disabled,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  disabled?: boolean;
+  onChange: (v: number) => void;
+}) {
+  const set = (next: number) => onChange(Math.min(max, Math.max(min, Math.round(next))));
+  return (
+    <div className="flex items-center gap-2">
+      <span className="w-8 shrink-0 text-[11px] text-[var(--ie-ink)]">{label}</span>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        value={value}
+        disabled={disabled}
+        aria-label={label}
+        className="h-1 min-w-0 flex-1 accent-[var(--ie-border)]"
+        onChange={(e) => set(Number(e.target.value))}
+      />
+      <span className="inline-flex h-7 shrink-0 items-center rounded-md bg-[var(--ie-cream-muted)] pl-1">
+        <input
+          type="number"
+          min={min}
+          max={max}
+          value={value}
+          disabled={disabled}
+          aria-label={`${label}数值`}
+          className="w-8 bg-transparent text-center text-[11px] text-[var(--ie-ink)] outline-none"
+          onChange={(e) => set(Number(e.target.value))}
+        />
+        <span className="flex flex-col pr-0.5">
+          <button
+            type="button"
+            disabled={disabled || value >= max}
+            className="text-[var(--ie-subtle)] hover:text-[var(--ie-ink)] disabled:opacity-30"
+            aria-label={`${label}增加`}
+            onClick={() => set(value + 1)}
+          >
+            <ChevronUp className="h-3 w-3" aria-hidden />
+          </button>
+          <button
+            type="button"
+            disabled={disabled || value <= min}
+            className="text-[var(--ie-subtle)] hover:text-[var(--ie-ink)] disabled:opacity-30"
+            aria-label={`${label}减少`}
+            onClick={() => set(value - 1)}
+          >
+            <ChevronDown className="h-3 w-3" aria-hidden />
+          </button>
+        </span>
+      </span>
     </div>
   );
 }
