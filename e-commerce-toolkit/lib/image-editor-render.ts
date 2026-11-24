@@ -1,4 +1,4 @@
-import { clipPathForImageEditorShape } from "@/lib/image-editor-shape-mask";
+import { clipPathForImageEditorShape, clipPathForImageEditorShapeMeet } from "@/lib/image-editor-shape-mask";
 import type { ImageEditorTransform } from "@/lib/image-editor-transform";
 
 export type RenderImageEditorOptions = ImageEditorTransform & {
@@ -73,20 +73,24 @@ export async function renderImageEditorFrame(
   return canvas.toDataURL("image/png");
 }
 
-/** 从原图裁一块（轴对齐），输出为预览 dataURL */
+/** 裁切窗口像素 1:1 画出，形状按预览 meet 裁切（与中栏亮区一致） */
 export async function renderImageEditorCropRegion(
   src: string,
   crop: { x: number; y: number; w: number; h: number },
   previewMaxEdge = 1600,
+  shapeMask: ImageEditorTransform["shapeMask"] = "none",
 ): Promise<string> {
   const img = await loadImage(src);
-  let outW = Math.max(1, Math.round(crop.w));
-  let outH = Math.max(1, Math.round(crop.h));
+  const srcW = Math.max(1, crop.w);
+  const srcH = Math.max(1, crop.h);
+  let outW = Math.max(1, Math.round(srcW));
+  let outH = Math.max(1, Math.round(srcH));
   const maxEdge = Math.max(outW, outH);
+  let scaleOut = 1;
   if (maxEdge > previewMaxEdge) {
-    const s = previewMaxEdge / maxEdge;
-    outW = Math.max(1, Math.round(outW * s));
-    outH = Math.max(1, Math.round(outH * s));
+    scaleOut = previewMaxEdge / maxEdge;
+    outW = Math.max(1, Math.round(outW * scaleOut));
+    outH = Math.max(1, Math.round(outH * scaleOut));
   }
   const canvas = document.createElement("canvas");
   canvas.width = outW;
@@ -95,17 +99,12 @@ export async function renderImageEditorCropRegion(
   if (!ctx) throw new Error("无法创建画布");
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, outW, outH);
-  ctx.drawImage(
-    img,
-    crop.x,
-    crop.y,
-    Math.max(1, crop.w),
-    Math.max(1, crop.h),
-    0,
-    0,
-    outW,
-    outH,
-  );
+  ctx.save();
+  if (shapeMask && shapeMask !== "none") {
+    clipPathForImageEditorShapeMeet(ctx, outW, outH, shapeMask);
+  }
+  ctx.drawImage(img, crop.x, crop.y, srcW, srcH, 0, 0, outW, outH);
+  ctx.restore();
   return canvas.toDataURL("image/png");
 }
 

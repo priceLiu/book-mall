@@ -11,7 +11,24 @@ export {
   getImageEditorShapeDef,
 } from "@/lib/image-editor-shape-catalog";
 
-/** 在已有 ctx.save() 内调用：按形状裁剪，随后可继续绘制 */
+/** 与预览 SVG `preserveAspectRatio="xMidYMid meet"` 相同的形状裁切 */
+export function clipPathForImageEditorShapeMeet(
+  ctx: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  shape: ImageEditorShapeMaskId,
+) {
+  if (shape === "none") return;
+  const def = getImageEditorShapeDef(shape);
+  if (!def?.pathD) return;
+  const s = Math.min(w / 100, h / 100);
+  ctx.translate((w - 100 * s) / 2, (h - 100 * s) / 2);
+  ctx.scale(s, s);
+  ctx.clip(new Path2D(def.pathD));
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+}
+
+/** 铺满画布拉伸形状（非预览路径） */
 export function clipPathForImageEditorShape(
   ctx: CanvasRenderingContext2D,
   w: number,

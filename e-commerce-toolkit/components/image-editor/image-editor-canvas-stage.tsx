@@ -273,7 +273,7 @@ export function ImageEditorCanvasStage({
                     <img
                       src={cropPreviewUrl}
                       alt="裁切预览"
-                      className="absolute inset-0 z-[12] h-full w-full rounded-lg object-cover"
+                      className="pointer-events-none absolute inset-0 z-[12] h-full w-full rounded-lg object-fill"
                       draggable={false}
                     />
                   ) : null}

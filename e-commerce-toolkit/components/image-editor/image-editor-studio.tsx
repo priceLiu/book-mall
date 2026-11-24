@@ -348,10 +348,15 @@ export function ImageEditorStudio() {
     if (!imageUrl || !rect) return;
     setCanvasW(Math.max(1, Math.round(rect.w)));
     setCanvasH(Math.max(1, Math.round(rect.h)));
-    void renderImageEditorCropRegion(imageUrl, rect)
+    void renderImageEditorCropRegion(
+      imageUrl,
+      rect,
+      1600,
+      adjustTab === "shape" ? shapeMask : "none",
+    )
       .then((url) => setCropPreviewUrl(url))
       .catch(() => setCropPreviewUrl(null));
-  }, [imageUrl]);
+  }, [adjustTab, imageUrl, shapeMask]);
 
   useEffect(() => {
     if (naturalW > 0 && naturalH > 0) {
@@ -584,29 +589,31 @@ export function ImageEditorStudio() {
     if (!imageUrl) return;
     setBusy(true);
     try {
-      const out = await exportImageEditorFrame(imageUrl, {
-        canvasW,
-        canvasH,
-        rotateDeg,
-        flipH,
-        flipV,
-        shapeMask: adjustTab === "shape" ? shapeMask : "none",
-        fitInside: losslessResize,
-        filterStyle: activeFilterStyle,
-      });
+      const rect = cropRectRef.current ?? {
+        x: 0,
+        y: 0,
+        w: naturalW || canvasW,
+        h: naturalH || canvasH,
+      };
+      const shape = adjustTab === "shape" ? shapeMask : "none";
+      const outW = Math.max(1, Math.round(rect.w));
+      const outH = Math.max(1, Math.round(rect.h));
+      const out = await renderImageEditorCropRegion(imageUrl, rect, 8192, shape);
       if (adjustTab === "shape" && shapeMask !== "none") {
         setShapeMask("none");
       }
       setImageUrl(out);
       setDisplayUrl(out);
-      setNaturalW(canvasW);
-      setNaturalH(canvasH);
+      setNaturalW(outW);
+      setNaturalH(outH);
+      setCanvasW(outW);
+      setCanvasH(outH);
       persistImageUrlRef.current = out;
       setSessionPersistUrl(out);
       setRotateDeg(0);
       setFlipH(false);
       setFlipV(false);
-      pushHistory(out, canvasW, canvasH);
+      pushHistory(out, outW, outH);
       toast({ title: "已应用", message: "画布修改已写入当前图", variant: "success" });
     } catch (e) {
       await alert({
