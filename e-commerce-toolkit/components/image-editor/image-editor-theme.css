@@ -1,0 +1,27 @@
+/**
+ * 图片编辑页 · 奶油白底 + 焦黑描边（本页内覆盖品牌蓝）
+ */
+[data-image-editor-theme] {
+  --ie-cream: #fffbf5;
+  --ie-cream-deep: #f5efe6;
+  --ie-cream-muted: #ebe3d8;
+  --ie-canvas-well: #ede6dc;
+  --ie-border: #3a322c;
+  --ie-border-soft: #cfc5b8;
+  --ie-ink: #2a2420;
+  --ie-muted: #5c544c;
+  --ie-subtle: #8a8178;
+  --ie-divider: #e5ddd2;
+
+  --ecom-primary: var(--ie-ink);
+  --ecom-primary-focus: var(--ie-border);
+  --ecom-primary-on-dark: var(--ie-cream);
+  --ecom-chrome-accent: var(--ie-border);
+  --ecom-outline-border: var(--ie-border);
+  --ecom-outline-text: var(--ie-ink);
+  --ecom-outline-hover-bg: var(--ie-cream-muted);
+  --ecom-parchment: var(--ie-cream-deep);
+  --ecom-ink: var(--ie-ink);
+
+  accent-color: var(--ie-border);
+}

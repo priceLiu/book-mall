@@ -66,6 +66,11 @@ pnpm dev:all:clean                  # 杀占用端口 + 清各子站 .next + 再
 - Platform API：`book-mall/app/api/sso/tools/ecom/outfit-video/*`
 - 技术契约：`book-mall/doc/ecom/video-workflow-template-spec.md`（`ecom-video-workflow/v1` · 模板 `outfit-v1`）
 
+### 电商工具箱 · 图片编辑
+
+- 路由：**http://localhost:3007/ecom/image-editor**（侧栏「图片处理」分组 · 裁剪 / 抠图 / 调色 / AI 消除）
+- 复用 Platform API：`/api/sso/tools/ecom/image-processing/{models,edit}` · 局部裁剪为前端 Canvas
+
 ### 电商工具箱 · 图片分层 Studio
 
 - 路由：**http://localhost:3007/ecom/image-layer**（营销侧栏 · Seedream 5.0 Pro）

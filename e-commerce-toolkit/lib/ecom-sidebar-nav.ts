@@ -13,6 +13,7 @@ import {
   Layers,
   Megaphone,
   MessageSquareText,
+  Pencil,
   Package,
   Rocket,
   ScrollText,
@@ -115,6 +116,7 @@ function imageModuleIcon(id: string): LucideIcon {
   if (id === "product-creation") return LayoutGrid;
   if (id === "product-image-set") return Layers;
   if (id === "main-image-hit-replica") return Copy;
+  if (id === "image-editor") return Pencil;
   if (id === "ai-detail-page") return ScrollText;
   if (id === "detail-page-creation") return ScrollText;
   if (
@@ -193,9 +195,15 @@ const ECOM_NAV_SECTIONS: ReadonlyArray<{
     ],
   },
   {
-    subheading: "模特与修图",
+    subheading: "图片处理",
     links: [
       { kind: "module", id: "image-layer" },
+      { kind: "module", id: "image-editor" },
+    ],
+  },
+  {
+    subheading: "模特与修图",
+    links: [
       { kind: "module", id: "model-shot" },
       { kind: "module", id: "model-tryon" },
       {

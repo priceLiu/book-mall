@@ -126,6 +126,16 @@ export const ECOM_MODULES: EcomModuleDef[] = [
     tile: "light",
   },
   {
+    id: "image-editor",
+    title: "图片编辑",
+    tagline: "裁剪尺寸 · 抠图 · 调色 · AI 消除（电商工作台）",
+    href: "/ecom/image-editor",
+    kind: "image",
+    toolKey: "ecom-toolkit__image-editor",
+    action: "edit",
+    tile: "light",
+  },
+  {
     id: "media-decompose",
     title: "拆图拆视频",
     tagline: "图片/视频反推拆解 · 分镜与生图提示词",

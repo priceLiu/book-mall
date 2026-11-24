@@ -108,6 +108,7 @@ const SOURCE_MODULE_LABELS: Record<string, string> = {
   "video-mirror-selfie": "户外对镜自拍",
   "video-dance-swap": "卡点跳舞换装",
   "image-layer": "图片处理",
+  "image-editor": "图片编辑",
   "detail-page-suite": "服装详情套图（模板）",
   "detail-page-suite-hit": "学竞品结构 · 原创详情",
   "detail-page-suite-replica": "产品详情页套图复刻",
