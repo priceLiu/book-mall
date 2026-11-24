@@ -4,6 +4,8 @@ import type { ImageEditorTransform } from "@/lib/image-editor-transform";
 export type RenderImageEditorOptions = ImageEditorTransform & {
   /** 预览最大边长，减小 dataURL 体积 */
   previewMaxEdge?: number;
+  /** 尺寸调整：图片拉满目标像素，不留白 */
+  stretch?: boolean;
 };
 
 function loadImage(src: string): Promise<HTMLImageElement> {
@@ -65,8 +67,8 @@ export async function renderImageEditorFrame(
   const scale = opts.fitInside
     ? Math.min(outW / iw, outH / ih)
     : Math.max(outW / iw, outH / ih);
-  const dw = iw * scale;
-  const dh = ih * scale;
+  const dw = opts.stretch ? outW : iw * scale;
+  const dh = opts.stretch ? outH : ih * scale;
   ctx.drawImage(img, -dw / 2, -dh / 2, dw, dh);
   ctx.restore();
 

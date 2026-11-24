@@ -1,5 +1,23 @@
 export type ImageEditorCropRect = { x: number; y: number; w: number; h: number };
 
+export function cropRectForRatio(
+  naturalW: number,
+  naturalH: number,
+  ratioW: number,
+  ratioH: number,
+): ImageEditorCropRect {
+  const nw = Math.max(1, naturalW);
+  const nh = Math.max(1, naturalH);
+  const target = ratioW / Math.max(0.0001, ratioH);
+  const image = nw / nh;
+  if (image > target) {
+    const w = nh * target;
+    return { x: (nw - w) / 2, y: 0, w, h: nh };
+  }
+  const h = nw / target;
+  return { x: 0, y: (nh - h) / 2, w: nw, h };
+}
+
 export function fullImageCropRect(naturalW: number, naturalH: number): ImageEditorCropRect {
   return { x: 0, y: 0, w: Math.max(1, naturalW), h: Math.max(1, naturalH) };
 }

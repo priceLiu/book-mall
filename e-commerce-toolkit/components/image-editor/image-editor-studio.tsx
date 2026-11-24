@@ -20,7 +20,6 @@ import {
   submitImageProcessingEdit,
 } from "@/lib/ecom-image-processing-api";
 import {
-  dimensionsForImageEditorRatio,
   readImageEditorCustomPresets,
   writeImageEditorCustomPresets,
 } from "@/lib/image-editor-presets";
@@ -31,7 +30,7 @@ import {
   type ImageEditorSessionSnapshot,
 } from "@/lib/image-editor-persist";
 import { exportImageEditorFrame, renderImageEditorCropRegion, renderImageEditorFrame } from "@/lib/image-editor-render";
-import { fullImageCropRect, type ImageEditorCropRect } from "@/lib/image-editor-crop-rect";
+import { cropRectForRatio, fullImageCropRect, type ImageEditorCropRect } from "@/lib/image-editor-crop-rect";
 import { takeImageEditorImportUrl } from "@/lib/image-editor-session";
 import { stepRotateDeg } from "@/lib/image-editor-transform";
 import { cn } from "@/lib/utils";
@@ -104,6 +103,7 @@ export function ImageEditorStudio() {
   const [cropPreviewUrl, setCropPreviewUrl] = useState<string | null>(null);
   const [cropRect, setCropRect] = useState<ImageEditorCropRect | null>(null);
   const cropRectRef = useRef<ImageEditorCropRect | null>(null);
+  const cropDraftRef = useRef<ImageEditorCropRect | null>(null);
   cropRectRef.current = cropRect;
   const hydratedRef = useRef(false);
   const persistImageUrlRef = useRef<string | null>(null);
@@ -231,7 +231,9 @@ export function ImageEditorStudio() {
 
   /** 尺寸 / 比例：画布裁切框与右栏尺寸一体（参照设计室，样式走电商主题） */
   const canvasCropInteract =
-    tool === "adjust" && Boolean(imageUrl) && (adjustTab === "resize" || adjustTab === "ratio");
+    tool === "adjust" && Boolean(imageUrl) && adjustTab === "ratio";
+
+  const resizeInteract = tool === "adjust" && Boolean(imageUrl) && adjustTab === "resize";
 
   const canvasFrameInteract = shapeMaskInteract || canvasCropInteract;
 
@@ -262,7 +264,8 @@ export function ImageEditorStudio() {
         flipH,
         flipV,
         shapeMask: previewClipInRender,
-        fitInside: losslessResize,
+        fitInside: adjustTab === "resize" ? false : losslessResize,
+        stretch: adjustTab === "resize",
         filterStyle: activeFilterStyle,
         previewMaxEdge: 1600,
       })
@@ -288,6 +291,7 @@ export function ImageEditorStudio() {
     losslessResize,
     activeFilterStyle,
     canvasFrameInteract,
+    adjustTab,
   ]);
 
   /** 裁切交互：底图固定在原图档（仅旋转/滤镜），不随裁切框缩放 */
@@ -333,6 +337,43 @@ export function ImageEditorStudio() {
     if (!canvasFrameInteract) setCropPreviewUrl(null);
   }, [canvasFrameInteract]);
 
+  useEffect(() => {
+    if (!canvasCropInteract) {
+      cropDraftRef.current = null;
+      return;
+    }
+    if (!cropDraftRef.current && cropRect) {
+      cropDraftRef.current = { ...cropRect };
+    }
+  }, [canvasCropInteract, cropRect]);
+
+  const cancelResizeEdit = useCallback(() => {
+    const d = adjustDraftRef.current;
+    if (!d) return;
+    setCanvasW(d.w);
+    setCanvasH(d.h);
+    setRotateDeg(d.rotateDeg);
+    setFlipH(d.flipH);
+    setFlipV(d.flipV);
+  }, []);
+
+  const cancelCropEdit = useCallback(() => {
+    const d = cropDraftRef.current;
+    if (!d) return;
+    const next = { ...d };
+    cropRectRef.current = next;
+    setCropRect(next);
+    setCanvasW(Math.max(1, Math.round(next.w)));
+    setCanvasH(Math.max(1, Math.round(next.h)));
+    setCropPreviewUrl(null);
+    const adjust = adjustDraftRef.current;
+    if (adjust) {
+      setRotateDeg(adjust.rotateDeg);
+      setFlipH(adjust.flipH);
+      setFlipV(adjust.flipV);
+    }
+  }, []);
+
   const onCanvasFrameResize = useCallback((w: number, h: number) => {
     setCanvasW(w);
     setCanvasH(h);
@@ -344,6 +385,7 @@ export function ImageEditorStudio() {
       setCropPreviewUrl(null);
       return;
     }
+    if (adjustTab === "resize") return;
     const rect = cropRectRef.current;
     if (!imageUrl || !rect) return;
     setCanvasW(Math.max(1, Math.round(rect.w)));
@@ -511,15 +553,28 @@ export function ImageEditorStudio() {
     },
   });
 
+  const bakeCropPreview = useCallback(
+    (rect: ImageEditorCropRect) => {
+      if (!imageUrl) return;
+      setCanvasW(Math.max(1, Math.round(rect.w)));
+      setCanvasH(Math.max(1, Math.round(rect.h)));
+      void renderImageEditorCropRegion(imageUrl, rect, 1600, "none")
+        .then((url) => setCropPreviewUrl(url))
+        .catch(() => setCropPreviewUrl(null));
+    },
+    [imageUrl],
+  );
+
   const pickRatioPreset = useCallback(
     (rw: number, rh: number) => {
+      if (naturalW < 1 || naturalH < 1) return;
+      const next = cropRectForRatio(naturalW, naturalH, rw, rh);
+      cropRectRef.current = next;
+      setCropRect(next);
       setLockAspect(true);
-      const base = Math.max(canvasW, canvasH, 800);
-      const { width, height } = dimensionsForImageEditorRatio(rw, rh, base);
-      setCanvasW(width);
-      setCanvasH(height);
+      bakeCropPreview(next);
     },
-    [canvasH, canvasW],
+    [bakeCropPreview, naturalH, naturalW],
   );
 
   const captureShapeDraft = useCallback(() => {
@@ -589,6 +644,42 @@ export function ImageEditorStudio() {
     if (!imageUrl) return;
     setBusy(true);
     try {
+      if (adjustTab === "resize") {
+        const outW = Math.max(1, Math.round(canvasW));
+        const outH = Math.max(1, Math.round(canvasH));
+        const out = await renderImageEditorFrame(imageUrl, {
+          canvasW: outW,
+          canvasH: outH,
+          rotateDeg,
+          flipH,
+          flipV,
+          shapeMask: "none",
+          fitInside: false,
+          stretch: true,
+          filterStyle: activeFilterStyle,
+        });
+        setImageUrl(out);
+        setDisplayUrl(out);
+        setNaturalW(outW);
+        setNaturalH(outH);
+        setCanvasW(outW);
+        setCanvasH(outH);
+        persistImageUrlRef.current = out;
+        setSessionPersistUrl(out);
+        setRotateDeg(0);
+        setFlipH(false);
+        setFlipV(false);
+        pushHistory(out, outW, outH);
+        adjustDraftRef.current = {
+          w: outW,
+          h: outH,
+          rotateDeg: 0,
+          flipH: false,
+          flipV: false,
+        };
+        toast({ title: "已应用", message: "图片尺寸已更新", variant: "success" });
+        return;
+      }
       const rect = cropRectRef.current ?? {
         x: 0,
         y: 0,
@@ -614,6 +705,7 @@ export function ImageEditorStudio() {
       setFlipH(false);
       setFlipV(false);
       pushHistory(out, outW, outH);
+      cropDraftRef.current = null;
       toast({ title: "已应用", message: "画布修改已写入当前图", variant: "success" });
     } catch (e) {
       await alert({
@@ -790,10 +882,17 @@ export function ImageEditorStudio() {
               setCanvasH(h);
             }}
             onFreeCrop={() => {
-              if (naturalW > 0 && naturalH > 0) {
+              if (naturalW < 1 || naturalH < 1) return;
+              if (adjustTab === "resize") {
                 setCanvasW(naturalW);
                 setCanvasH(naturalH);
+                return;
               }
+              const next = fullImageCropRect(naturalW, naturalH);
+              cropRectRef.current = next;
+              setCropRect(next);
+              setCanvasW(naturalW);
+              setCanvasH(naturalH);
             }}
             onRotateCw={() => setRotateDeg((d) => stepRotateDeg(d, 45))}
             onRotateCcw={() => setRotateDeg((d) => stepRotateDeg(d, -45))}
@@ -804,14 +903,11 @@ export function ImageEditorStudio() {
                 cancelShapeMaskEdit();
                 return;
               }
-              const d = adjustDraftRef.current;
-              if (d) {
-                setCanvasW(d.w);
-                setCanvasH(d.h);
-                setRotateDeg(d.rotateDeg);
-                setFlipH(d.flipH);
-                setFlipV(d.flipV);
+              if (adjustTab === "resize") {
+                cancelResizeEdit();
+                return;
               }
+              cancelCropEdit();
             }}
             onApply={() => void commitExport()}
             busy={busy}
@@ -961,7 +1057,7 @@ export function ImageEditorStudio() {
           <div
             className={cn(
               "flex min-h-0 min-w-0 flex-1 lg:rounded-xl lg:border lg:border-[var(--ie-border-soft)] lg:bg-[var(--ie-canvas-well)]",
-              canvasFrameInteract ? "overflow-visible" : "overflow-hidden",
+              canvasFrameInteract || resizeInteract ? "overflow-visible" : "overflow-hidden",
             )}
           >
             <ImageEditorCanvasStage
@@ -970,10 +1066,14 @@ export function ImageEditorStudio() {
               busy={busy}
               cropMode={canvasCropInteract}
               canvasCropInteract={canvasCropInteract}
+              resizeInteract={resizeInteract}
               lockAspect={lockAspect}
               shapeMask={previewShapeMask}
               fitInside={losslessResize}
               rotateDeg={rotateDeg}
+              flipH={flipH}
+              flipV={flipV}
+              filterStyle={activeFilterStyle}
               naturalWidth={naturalW}
               naturalHeight={naturalH}
               canvasWidth={canvasW}
@@ -986,7 +1086,9 @@ export function ImageEditorStudio() {
               onOpenFile={() => fileInputRef.current?.click()}
               onActivatePaste={canvasPaste.focusZone}
               shapeMaskInteract={shapeMaskInteract}
-              onShapeMaskCancel={cancelShapeMaskEdit}
+              onShapeMaskCancel={
+                resizeInteract ? cancelResizeEdit : canvasCropInteract ? cancelCropEdit : cancelShapeMaskEdit
+              }
               onShapeMaskConfirm={() => void commitExport()}
               onShapeMaskRotateDeg={setRotateDeg}
               onCanvasResize={onCanvasFrameResize}

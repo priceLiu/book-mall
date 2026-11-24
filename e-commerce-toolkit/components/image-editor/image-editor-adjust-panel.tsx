@@ -6,6 +6,7 @@ import {
   FlipHorizontal,
   FlipVertical,
   HelpCircle,
+  Link2,
   RotateCcw,
   RotateCw,
 } from "lucide-react";
@@ -188,7 +189,7 @@ function AdjustBody(props: Props) {
         <PresetList>
           <PresetRow
             variant="lead"
-            label="自由裁剪"
+            label="自由调整"
             sub={
               props.naturalWidth > 0
                 ? formatImageEditorPresetPixels(props.naturalWidth, props.naturalHeight)
@@ -232,7 +233,58 @@ function AdjustBody(props: Props) {
         </PresetList>
       )}
 
-      <AdjustActionsFooter {...props} showCustomPreset />
+      {props.tab === "resize" ? <PixelSizeFields {...props} /> : null}
+
+      <AdjustActionsFooter {...props} showCustomPreset={props.tab === "resize"} />
+    </div>
+  );
+}
+
+function PixelSizeFields(props: Props) {
+  const field =
+    "min-w-0 flex-1 rounded-lg border border-[var(--ie-border-soft)] bg-[var(--ie-cream)] px-2 py-1.5 text-center text-[12px] text-[var(--ie-ink)] disabled:opacity-40";
+  return (
+    <div className="flex items-center gap-1.5">
+      <input
+        type="number"
+        inputMode="numeric"
+        min={1}
+        max={8192}
+        aria-label="宽度（像素）"
+        disabled={!props.hasImage || props.busy}
+        value={props.targetWidth}
+        className={field}
+        onChange={(e) => props.onWidth(Number(e.target.value) || 1)}
+      />
+      <button
+        type="button"
+        disabled={!props.hasImage || props.busy}
+        title={props.lockAspect ? "已锁定比例" : "锁定比例"}
+        aria-pressed={props.lockAspect}
+        className={cn(
+          "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border disabled:opacity-40",
+          props.lockAspect
+            ? "border-[var(--ie-border)] bg-[var(--ie-cream-muted)] text-[var(--ie-ink)]"
+            : "border-[var(--ie-border-soft)] text-[var(--ie-muted)]",
+        )}
+        onClick={props.onToggleLock}
+      >
+        <Link2 className="h-3.5 w-3.5" aria-hidden />
+      </button>
+      <input
+        type="number"
+        inputMode="numeric"
+        min={1}
+        max={8192}
+        aria-label="高度（像素）"
+        disabled={!props.hasImage || props.busy}
+        value={props.targetHeight}
+        className={field}
+        onChange={(e) => props.onHeight(Number(e.target.value) || 1)}
+      />
+      <span className="inline-flex h-8 shrink-0 items-center rounded-lg border border-[var(--ie-border-soft)] bg-[var(--ie-cream)] px-2 text-[11px] text-[var(--ie-ink)]">
+        像素
+      </span>
     </div>
   );
 }

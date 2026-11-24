@@ -2,7 +2,7 @@
 
 import { useMemo, type PointerEvent as ReactPointerEvent } from "react";
 
-import { Trash2 } from "lucide-react";
+import { Check, RotateCw, Trash2, X } from "lucide-react";
 
 import {
   ImageEditorFrameHandles,
@@ -10,12 +10,18 @@ import {
 } from "@/components/image-editor/image-editor-frame-handles";
 import { ImageEditorShapeMaskChrome } from "@/components/image-editor/image-editor-shape-mask-workspace";
 import { EcomMediaGeneratingBusy } from "@/components/media/ecom-media-generating-busy";
+import {
+  computeCanvasSizeFromHandleDrag,
+  frameScaleFromElement,
+  type ImageEditorFrameResizeHandleId,
+} from "@/lib/image-editor-frame-resize";
 import { imageEditorStageSizeFromNatural } from "@/lib/image-editor-crop-overlay";
 import {
   mapCropRectToStage,
   moveImageEditorCropRect,
   type ImageEditorCropRect,
 } from "@/lib/image-editor-crop-rect";
+import { normalizeRotateDeg } from "@/lib/image-editor-transform";
 import type { ImageEditorShapeMaskId } from "@/lib/image-editor-types";
 import { cn } from "@/lib/utils";
 
@@ -41,9 +47,13 @@ type Props = {
   busy?: boolean;
   cropMode?: boolean;
   canvasCropInteract?: boolean;
+  resizeInteract?: boolean;
   lockAspect?: boolean;
   shapeMask?: ImageEditorShapeMaskId;
   rotateDeg?: number;
+  flipH?: boolean;
+  flipV?: boolean;
+  filterStyle?: string;
   naturalWidth: number;
   naturalHeight: number;
   canvasWidth: number;
@@ -75,9 +85,13 @@ export function ImageEditorCanvasStage({
   busy,
   cropMode,
   canvasCropInteract,
+  resizeInteract,
   lockAspect = true,
   shapeMask = "none",
   rotateDeg = 0,
+  flipH = false,
+  flipV = false,
+  filterStyle,
   naturalWidth,
   naturalHeight,
   canvasWidth,
@@ -106,13 +120,24 @@ export function ImageEditorCanvasStage({
     typeof window !== "undefined" ? Math.min(900, window.innerHeight * 0.72) : 900;
 
   const stagePx = useMemo(() => {
+    if (resizeInteract && canvasWidth > 0 && canvasHeight > 0) {
+      return imageEditorStageSizeFromNatural(canvasWidth, canvasHeight, viewportCap);
+    }
     if (frameInteract && naturalWidth > 0 && naturalHeight > 0) {
       return imageEditorStageSizeFromNatural(naturalWidth, naturalHeight, viewportCap);
     }
     const aspect =
       canvasWidth > 0 && canvasHeight > 0 ? canvasWidth / canvasHeight : 1;
     return { width: undefined as number | undefined, height: undefined as number | undefined, aspect };
-  }, [canvasHeight, canvasWidth, frameInteract, naturalHeight, naturalWidth, viewportCap]);
+  }, [
+    canvasHeight,
+    canvasWidth,
+    frameInteract,
+    naturalHeight,
+    naturalWidth,
+    resizeInteract,
+    viewportCap,
+  ]);
 
   const cropBox = useMemo(() => {
     if (!frameInteract || naturalWidth < 1 || !stagePx.width || !stagePx.height) return null;
@@ -161,6 +186,72 @@ export function ImageEditorCanvasStage({
     document.addEventListener("pointercancel", end);
   };
 
+  const onResizeHandleDown =
+    (handle: ImageEditorFrameResizeHandleId) => (e: ReactPointerEvent<HTMLButtonElement>) => {
+      if (!onCanvasResize || busy) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const frame = e.currentTarget.closest("[data-ie-shape-frame]");
+      const { sx, sy } = frameScaleFromElement(frame, canvasWidth, canvasHeight);
+      onCanvasDragActiveChange?.(true);
+      const startX = e.clientX;
+      const startY = e.clientY;
+      const startW = canvasWidth;
+      const startH = canvasHeight;
+      const pointerId = e.pointerId;
+      const onMove = (ev: PointerEvent) => {
+        if (ev.pointerId !== pointerId) return;
+        const next = computeCanvasSizeFromHandleDrag(
+          handle,
+          startW,
+          startH,
+          (ev.clientX - startX) * sx,
+          (ev.clientY - startY) * sy,
+          lockAspect,
+        );
+        onCanvasResize(next.width, next.height);
+      };
+      const end = (ev: PointerEvent) => {
+        if (ev.pointerId !== pointerId) return;
+        onCanvasDragActiveChange?.(false);
+        document.removeEventListener("pointermove", onMove);
+        document.removeEventListener("pointerup", end);
+        document.removeEventListener("pointercancel", end);
+      };
+      document.addEventListener("pointermove", onMove);
+      document.addEventListener("pointerup", end);
+      document.addEventListener("pointercancel", end);
+    };
+
+  const onResizeRotateDown = (e: ReactPointerEvent<HTMLButtonElement>) => {
+    if (!onShapeMaskRotateDeg || busy) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const frame = e.currentTarget.closest("[data-ie-shape-frame]");
+    if (!frame) return;
+    const rect = frame.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const startPointerAngle = Math.atan2(e.clientY - cy, e.clientX - cx);
+    const startRot = rotateDeg;
+    const pointerId = e.pointerId;
+    const onMove = (ev: PointerEvent) => {
+      if (ev.pointerId !== pointerId) return;
+      const pointerAngle = Math.atan2(ev.clientY - cy, ev.clientX - cx);
+      const deltaDeg = ((pointerAngle - startPointerAngle) * 180) / Math.PI;
+      onShapeMaskRotateDeg(normalizeRotateDeg(startRot + deltaDeg));
+    };
+    const end = (ev: PointerEvent) => {
+      if (ev.pointerId !== pointerId) return;
+      document.removeEventListener("pointermove", onMove);
+      document.removeEventListener("pointerup", end);
+      document.removeEventListener("pointercancel", end);
+    };
+    document.addEventListener("pointermove", onMove);
+    document.addEventListener("pointerup", end);
+    document.addEventListener("pointercancel", end);
+  };
+
   return (
     <div
       className={cn(
@@ -194,17 +285,20 @@ export function ImageEditorCanvasStage({
           <div
             className={cn(
               "relative flex w-full max-w-full items-center justify-center",
-              frameInteract && "pb-12 pt-14",
+              (frameInteract || resizeInteract) && "pb-12 pt-14",
             )}
           >
             <div
               data-ie-shape-frame
               className={cn(
-                "relative shrink-0 overflow-visible rounded-xl border border-[var(--ie-border-soft)] bg-[var(--ie-cream)] shadow-sm",
-                cropMode && !shapeMaskInteract && "ring-2 ring-[var(--ie-border)]/20",
+                "relative shrink-0 overflow-visible",
+                resizeInteract
+                  ? "bg-transparent"
+                  : "rounded-xl border border-[var(--ie-border-soft)] bg-[var(--ie-cream)] shadow-sm",
+                cropMode && !shapeMaskInteract && !resizeInteract && "ring-2 ring-[var(--ie-border)]/20",
               )}
               style={
-                frameInteract && stagePx.width && stagePx.height
+                (frameInteract || resizeInteract) && stagePx.width && stagePx.height
                   ? { width: stagePx.width, height: stagePx.height }
                   : {
                       aspectRatio: "aspect" in stagePx && stagePx.aspect ? `${stagePx.aspect}` : "1",
@@ -216,12 +310,21 @@ export function ImageEditorCanvasStage({
               {/* 底图固定：拖拽裁切框时不动 */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={backdrop}
+                src={resizeInteract ? (imageUrl ?? backdrop) : backdrop}
                 alt="编辑底图"
                 className={cn(
-                  "absolute inset-0 h-full w-full object-contain",
+                  "absolute inset-0 h-full w-full",
+                  resizeInteract ? "object-fill" : "object-contain",
                   showCropResult && "opacity-0",
                 )}
+                style={
+                  resizeInteract
+                    ? {
+                        transform: `rotate(${rotateDeg}deg) scale(${flipH ? -1 : 1}, ${flipV ? -1 : 1})`,
+                        filter: filterStyle,
+                      }
+                    : undefined
+                }
                 draggable={false}
               />
 
@@ -262,6 +365,34 @@ export function ImageEditorCanvasStage({
                     height: cropBox.height,
                   }}
                 >
+                  {canvasCropInteract && onShapeMaskCancel && onShapeMaskConfirm ? (
+                    <div className="pointer-events-none absolute -top-12 left-1/2 z-[40] flex -translate-x-1/2 items-center gap-1 rounded-full border border-[var(--ie-border-soft)] bg-[var(--ie-cream)] px-1.5 py-1 shadow-md">
+                      <button
+                        type="button"
+                        disabled={busy}
+                        className="pointer-events-auto inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] text-[var(--ie-muted)] hover:bg-[var(--ie-cream-muted)] disabled:opacity-40"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onShapeMaskCancel();
+                        }}
+                      >
+                        <X className="h-3.5 w-3.5" aria-hidden />
+                        取消
+                      </button>
+                      <button
+                        type="button"
+                        disabled={busy}
+                        className="pointer-events-auto inline-flex items-center gap-1 rounded-full bg-[var(--ie-ink)] px-2.5 py-1 text-[11px] text-[var(--ie-cream)] hover:opacity-90 disabled:opacity-40"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onShapeMaskConfirm();
+                        }}
+                      >
+                        <Check className="h-3.5 w-3.5" aria-hidden />
+                        确定
+                      </button>
+                    </div>
+                  ) : null}
                   {canvasCropInteract ? <ImageEditorRectCropRuleGrid /> : null}
                   <div
                     className="absolute inset-0 z-[16] cursor-move"
@@ -317,6 +448,14 @@ export function ImageEditorCanvasStage({
                     />
                   ) : null}
                 </div>
+              ) : resizeInteract ? (
+                <div className="pointer-events-none absolute inset-0 z-[18]" aria-hidden>
+                  <div className="absolute inset-y-0 left-1/3 w-px bg-white/75" />
+                  <div className="absolute inset-y-0 left-2/3 w-px bg-white/75" />
+                  <div className="absolute inset-x-0 top-1/3 h-px bg-white/75" />
+                  <div className="absolute inset-x-0 top-2/3 h-px bg-white/75" />
+                  <div className="absolute inset-0 border border-white/90" />
+                </div>
               ) : (
                 <>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -331,6 +470,73 @@ export function ImageEditorCanvasStage({
                   />
                 </>
               )}
+
+              {resizeInteract && onShapeMaskCancel && onShapeMaskConfirm ? (
+                <div className="pointer-events-none absolute -top-12 left-1/2 z-[40] flex -translate-x-1/2 items-center gap-1 rounded-full border border-[var(--ie-border-soft)] bg-[var(--ie-cream)] px-1.5 py-1 shadow-md">
+                  <button
+                    type="button"
+                    disabled={busy}
+                    className="pointer-events-auto inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] text-[var(--ie-muted)] hover:bg-[var(--ie-cream-muted)] disabled:opacity-40"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onShapeMaskCancel();
+                    }}
+                  >
+                    <X className="h-3.5 w-3.5" aria-hidden />
+                    取消
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    className="pointer-events-auto inline-flex items-center gap-1 rounded-full bg-[var(--ie-ink)] px-2.5 py-1 text-[11px] text-[var(--ie-cream)] hover:opacity-90 disabled:opacity-40"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onShapeMaskConfirm();
+                    }}
+                  >
+                    <Check className="h-3.5 w-3.5" aria-hidden />
+                    确定
+                  </button>
+                </div>
+              ) : null}
+              {resizeInteract && onShapeMaskRotateDeg ? (
+                <button
+                  type="button"
+                  aria-label="旋转图片"
+                  disabled={busy}
+                  className="absolute bottom-0 left-1/2 z-[45] flex h-7 w-7 -translate-x-1/2 translate-y-1/2 items-center justify-center rounded-full border border-[var(--ie-border-soft)] bg-[var(--ie-cream)] text-[var(--ie-ink)] shadow-sm disabled:opacity-40"
+                  onPointerDown={onResizeRotateDown}
+                >
+                  <RotateCw className="h-3.5 w-3.5" aria-hidden />
+                </button>
+              ) : null}
+              {resizeInteract && onCanvasResize ? (
+                <div className="pointer-events-none absolute inset-0 z-[40]">
+                  {(
+                    [
+                      ["nw", "left-0 top-0 -translate-x-1/2 -translate-y-1/2 cursor-nwse-resize"],
+                      ["n", "left-1/2 top-0 -translate-x-1/2 -translate-y-1/2 cursor-ns-resize"],
+                      ["ne", "right-0 top-0 translate-x-1/2 -translate-y-1/2 cursor-nesw-resize"],
+                      ["e", "right-0 top-1/2 translate-x-1/2 -translate-y-1/2 cursor-ew-resize"],
+                      ["se", "right-0 bottom-0 translate-x-1/2 translate-y-1/2 cursor-nwse-resize"],
+                      ["s", "left-1/2 bottom-0 -translate-x-1/2 translate-y-1/2 cursor-ns-resize"],
+                      ["sw", "left-0 bottom-0 -translate-x-1/2 translate-y-1/2 cursor-nesw-resize"],
+                      ["w", "left-0 top-1/2 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize"],
+                    ] as const
+                  ).map(([id, pos]) => (
+                    <button
+                      key={id}
+                      type="button"
+                      aria-label={`调整尺寸 ${id}`}
+                      className={cn(
+                        "pointer-events-auto absolute h-2.5 w-2.5 rounded-[2px] border border-[var(--ie-border)] bg-[var(--ie-cream)] shadow-sm",
+                        pos,
+                      )}
+                      onPointerDown={onResizeHandleDown(id)}
+                    />
+                  ))}
+                </div>
+              ) : null}
 
               {busy ? <EcomMediaGeneratingBusy background="light" /> : null}
             </div>
