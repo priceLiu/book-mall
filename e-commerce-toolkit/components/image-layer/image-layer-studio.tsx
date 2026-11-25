@@ -21,6 +21,7 @@ import { ImageLayerExportPreviewDialog } from "@/components/image-layer/image-la
 import { ImageLayerHistoryDialog } from "@/components/image-layer/image-layer-history-dialog";
 import { ImageLayerSaveDialog } from "@/components/image-layer/image-layer-save-dialog";
 import { ImageLayerToolbar } from "@/components/image-layer/image-layer-toolbar";
+import { stashImageEditorImportUrl } from "@/lib/image-editor-session";
 import { ImageLayerUploadZone } from "@/components/image-layer/image-layer-upload-zone";
 import { EcomWorkspaceLayout } from "@/components/layout/ecom-workspace-layout";
 import {
@@ -2086,6 +2087,13 @@ function ImageLayerStudioInner() {
       previewBusy={exportPreviewBusy}
       onPreviewExport={() => void handlePreviewExport()}
       onExport={() => void handleExport()}
+      canOpenImageEditor={Boolean(sourcePreviewUrl)}
+      onOpenImageEditor={() => {
+        const url = sourcePreviewUrl;
+        if (!url) return;
+        stashImageEditorImportUrl(url);
+        window.open("/ecom/image-editor", "_blank", "noopener,noreferrer");
+      }}
     />
   );
 

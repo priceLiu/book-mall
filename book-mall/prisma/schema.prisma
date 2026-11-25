@@ -1022,6 +1022,16 @@ model EcomImageLayerProject {
   @@index([tenantId, visibility, updatedAt])
 }
 
+/// 商品卖点贴纸拆层。全站一份，按贴纸编号，不跟用户走。
+model ImageEditorPosterDecompose {
+  posterId  String   @id
+  /// pending | ready
+  status    String
+  pack      Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 /// 电商工具箱 · 详情页套图模板（按平台复制的系统种子 + 用户自定义）
 model EcomDetailPageSuiteTemplate {
   id            String    @id @default(cuid())

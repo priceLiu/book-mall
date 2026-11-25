@@ -1,5 +1,5 @@
-import { statSync } from "node:fs";
-import { join } from "node:path";
+import { realpathSync, statSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { PrismaClient } from "@prisma/client";
 import { isPrismaConnectionUnavailable, toDbUnavailableError } from "@/lib/db-unavailable";
 import {
@@ -41,11 +41,18 @@ type PrismaGlobal = {
 const globalForPrisma = globalThis as unknown as PrismaGlobal;
 
 function generatedClientStamp(): string {
-  const directCandidates = [
-    join(process.cwd(), "node_modules/.prisma/client/index.js"),
+  const candidates = [
     join(process.cwd(), "node_modules/.prisma/client/default.js"),
+    join(process.cwd(), "node_modules/.prisma/client/index.js"),
   ];
-  for (const p of directCandidates) {
+  try {
+    // pnpm 把生成物放在 @prisma/client 旁边，不在 node_modules/.prisma
+    const clientEntry = realpathSync(join(process.cwd(), "node_modules/@prisma/client/default.js"));
+    candidates.unshift(join(dirname(clientEntry), "../.prisma/client/default.js"));
+  } catch {
+    /* 直连安装时走上面的路径 */
+  }
+  for (const p of candidates) {
     try {
       return String(statSync(p).mtimeMs);
     } catch {
@@ -144,6 +151,7 @@ function buildPrismaClient(urlOverride?: string): PrismaClient {
 const REQUIRED_PRISMA_DELEGATES = [
   "aiSpaceFavorite",
   "ecomMediaDecomposeProject",
+  "imageEditorPosterDecompose",
 ] as const;
 
 function prismaClientHasRequiredDelegates(client: PrismaClient): boolean {
@@ -182,7 +190,7 @@ function ensurePrismaClient(): PrismaClient {
     !prismaClientHasRequiredDelegates(next)
   ) {
     console.error(
-      "[prisma] Client 缺少必要 model delegate（如 aiSpaceFavorite / ecomMediaDecomposeProject）；请在 book-mall 执行 pnpm db:generate 并重启 dev:all。",
+      "[prisma] Client 缺少必要 model delegate（如 aiSpaceFavorite / imageEditorPosterDecompose）；请在 book-mall 执行 pnpm db:generate 并重启 dev:all。",
     );
   }
   return next;

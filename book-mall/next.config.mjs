@@ -7,8 +7,9 @@ const nextConfig = {
       dynamic: 0,
       static: 0,
     },
-    /** archiver@8 的 package exports 与 webpack 不兼容，服务端 API 外置加载 */
-    serverComponentsExternalPackages: ["archiver"],
+    /** archiver@8 的 package exports 与 webpack 不兼容，服务端 API 外置加载。
+     * Prisma 也外置：webpack 会把生成前的 Client 冻在内存里，新 model 会变成 undefined。 */
+    serverComponentsExternalPackages: ["archiver", "@prisma/client", ".prisma/client"],
     /** standalone 镜像：显式打入首页 V2 组件与静态资源目录，避免漏追踪导致运行期 404 */
     outputFileTracingIncludes: {
       "/home-v2": [

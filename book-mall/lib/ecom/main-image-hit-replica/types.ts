@@ -101,6 +101,7 @@ export const DEFAULT_MAIN_IMAGE_HIT_REPLICA_SETTINGS: MainImageHitReplicaSetting
   imageRatio: "1:1",
   outputResolution: "2K",
   imageGenSize: "1:1_2K",
+  visionModelKey: "qwen3.8-max",
 };
 
 export function hitReplicaAspectToEcomRatio(ratio: string): EcomImageRatio {

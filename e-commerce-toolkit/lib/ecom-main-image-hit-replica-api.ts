@@ -1,6 +1,7 @@
 import { ecomBookFetch } from "@/lib/ecom-book-fetch";
 import type {
   MainImageHitReplicaProject,
+  MainImageHitReplicaResult,
   MainImageHitReplicaSummary,
 } from "@/lib/main-image-hit-replica-types";
 

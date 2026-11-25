@@ -14,8 +14,11 @@ import {
   type MainImageHitReplicaOutput,
   type MainImageHitReplicaProject,
   type MainImageHitReplicaReference,
+  type MainImageHitReplicaResult,
   type MainImageHitReplicaSettings,
 } from "./types";
+
+import { withMainImageHitReplicaOutputLock } from "./project-output-lock";
 
 type Row = {
   id: string;
@@ -202,6 +205,24 @@ export async function uploadMainImageHitReplicaRef(
     sortIndex: refs.length,
   });
   return updateMainImageHitReplicaProject(userId, projectId, { references: refs });
+}
+
+export async function patchMainImageHitReplicaResultSlot(
+  userId: string,
+  projectId: string,
+  resultId: string,
+  patch: Partial<MainImageHitReplicaResult>,
+): Promise<MainImageHitReplicaProject | null> {
+  return withMainImageHitReplicaOutputLock(projectId, async () => {
+    const existing = await getMainImageHitReplicaProject(userId, projectId);
+    if (!existing) return null;
+    const results = existing.output.results.map((r) =>
+      r.id === resultId ? { ...r, ...patch } : r,
+    );
+    return updateMainImageHitReplicaProject(userId, projectId, {
+      output: { results },
+    });
+  });
 }
 
 export async function removeMainImageHitReplicaRef(

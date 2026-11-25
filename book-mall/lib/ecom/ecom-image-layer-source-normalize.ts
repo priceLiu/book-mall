@@ -61,6 +61,13 @@ export function resolveSeedreamLayerTargetSize(w: number, h: number): { width: n
 
   let tw = w;
   let th = h;
+  const short = Math.min(tw, th);
+  if (short < 512) {
+    const scale = 512 / short;
+    tw = Math.ceil(w * scale);
+    th = Math.ceil(h * scale);
+  }
+
   let pixels = tw * th;
 
   if (pixels < SEEDREAM_LAYER_MIN_PIXELS) {
@@ -84,6 +91,7 @@ async function encodeSeedreamLayerJpeg(buf: Buffer, width: number, height: numbe
   for (let attempt = 0; attempt < 6; attempt++) {
     const out = await sharp(buf, { failOn: "none" })
       .rotate()
+      .flatten({ background: "#ffffff" })
       .resize(width, height, { fit: "fill" })
       .jpeg({ quality, mozjpeg: true })
       .toBuffer();
@@ -114,8 +122,9 @@ export async function ensureSeedreamLayerDecomposeImageUrl(opts: {
 
   const { width, height } = resolveSeedreamLayerTargetSize(w, h);
   const needsResize = width !== w || height !== h;
+  const needsFlatten = meta.hasAlpha === true;
   const needsTranscode =
-    meta.format !== "jpeg" && meta.format !== "jpg" && meta.format !== "png";
+    needsFlatten || (meta.format !== "jpeg" && meta.format !== "jpg" && meta.format !== "png");
 
   if (!needsResize && !needsTranscode && input.length <= SEEDREAM_LAYER_MAX_BYTES) {
     const ossKey = tryParseManagedOssObjectKey(opts.imageUrl.trim());

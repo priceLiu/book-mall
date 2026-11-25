@@ -27,6 +27,9 @@ export type ImageEditorSessionSnapshot = {
   correctRotate?: number;
   imageUrl: string | null;
   imageOmitted?: boolean;
+  textOverlayJson?: string | null;
+  textExtrasJson?: string | null;
+  selectedTextLayerId?: string | null;
 };
 
 export function readImageEditorSession(): ImageEditorSessionSnapshot | null {

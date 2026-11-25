@@ -1,16 +1,19 @@
 "use client";
 
 import Image from "next/image";
-import { ChevronDown, ChevronUp, Link2, Plus, X } from "lucide-react";
+import { ChevronDown, ChevronUp, Link2, Loader2, Plus } from "lucide-react";
 import { useCallback, useRef, useState, type RefObject } from "react";
 
 import { useDialogs } from "@/components/dialogs/dialog-provider";
 import { useImageDropPaste } from "@/hooks/use-image-drop-paste";
 import { IMAGE_UPLOAD_ACCEPT } from "@/lib/image-upload-utils";
+import { EcomRefImageThumb } from "@/components/media/ecom-ref-image-thumb";
 import { EcomMediaGeneratingBusy } from "@/components/media/ecom-media-generating-busy";
 import { EcomWorkspaceTitleHeading } from "@/components/layout/ecom-workspace-title-heading";
 import {
+  ECOM_WORKSPACE_RESULT_COLUMN_CLASS,
   ECOM_WORKSPACE_RESULT_GRID_CLASS,
+  ECOM_WORKSPACE_RESULT_LABEL_CLASS,
   ecomWorkspaceResultShellClass,
 } from "@/lib/ecom-workspace-result-grid";
 import {
@@ -22,20 +25,24 @@ import {
 import { hitReplicaAspectToCssRatio } from "@/lib/main-image-hit-replica-settings";
 import { cn } from "@/lib/utils";
 
+type UploadRole = "reference" | "product";
+
 type Props = {
   project: MainImageHitReplicaProject;
   ratio: string;
-  refBusy?: boolean;
+  uploadingRole?: UploadRole | null;
+  uploadProgress?: number | null;
   replicating?: boolean;
-  onUpload: (file: File, role: "reference" | "product") => Promise<void>;
-  onRemoveRef: (refId: string, role: "reference" | "product") => void;
+  onUpload: (file: File, role: UploadRole) => Promise<void>;
+  onRemoveRef: (refId: string, role: UploadRole) => void;
   onSaveReferences: (references: MainImageHitReplicaReference[]) => void | Promise<void>;
 };
 
 export function MainImageHitReplicaContentPanel({
   project,
   ratio,
-  refBusy,
+  uploadingRole = null,
+  uploadProgress = null,
   replicating,
   onUpload,
   onRemoveRef,
@@ -77,7 +84,10 @@ export function MainImageHitReplicaContentPanel({
     [alert],
   );
 
-  const uploadDisabled = Boolean(refBusy || replicating);
+  const productUploading = uploadingRole === "product";
+  const refUploading = uploadingRole === "reference";
+  const productZoneDisabled = productUploading || Boolean(replicating);
+  const refZoneDisabled = refUploading || Boolean(replicating);
   const productSlotsLeft = MAIN_IMAGE_HIT_REPLICA_MAX_PRODUCT - productRefs.length;
   const refSlotsLeft = MAIN_IMAGE_HIT_REPLICA_MAX_REF - referenceRefs.length;
 
@@ -97,22 +107,51 @@ export function MainImageHitReplicaContentPanel({
             <span className="text-[10px] text-[#86868b]">（选填）</span>
           </div>
           {productRefs.length > 0 ? (
-            <div className="mb-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {productRefs.map((ref) => (
-                <RefThumbCard
+            <>
+            <input
+              ref={productInputRef}
+              type="file"
+              accept={IMAGE_UPLOAD_ACCEPT}
+              className="hidden"
+              multiple={productSlotsLeft > 1}
+              disabled={productZoneDisabled || productSlotsLeft <= 0}
+              onChange={(e) => {
+                const list = e.target.files;
+                if (list?.length) void uploadMany(Array.from(list), "product");
+                e.target.value = "";
+              }}
+            />
+            <div className="mb-3 flex gap-2 overflow-x-auto pb-1">
+              {productRefs.map((ref, i) => (
+                <HitReplicaRefThumb
                   key={ref.id}
-                  label={ref.label || "产品图"}
+                  caption={ref.label?.trim() || `产品${i + 1}`}
                   url={ref.ossUrl}
-                  disabled={refBusy || replicating}
+                  removeDisabled={replicating}
                   onRemove={() => onRemoveRef(ref.id, "product")}
                 />
               ))}
+              {productSlotsLeft > 0 ? (
+                <HitReplicaRefAddTile
+                  disabled={productZoneDisabled}
+                  uploading={productUploading}
+                  uploadProgress={productUploading ? uploadProgress : null}
+                  multiple={productSlotsLeft > 1}
+                  ariaLabel="继续上传产品图"
+                  onOpenPicker={() => productInputRef.current?.click()}
+                  onFiles={(files) => void uploadMany(files, "product")}
+                  onError={pasteError}
+                />
+              ) : null}
             </div>
+            </>
           ) : null}
-          {productSlotsLeft > 0 ? (
+          {productRefs.length === 0 && productSlotsLeft > 0 ? (
             <HitReplicaPasteUploadZone
               inputRef={productInputRef}
-              disabled={uploadDisabled}
+              disabled={productZoneDisabled}
+              uploading={productUploading}
+              uploadProgress={productUploading ? uploadProgress : null}
               multiple={productSlotsLeft > 1}
               title="上传产品图"
               hint="需要换产品时上传；不换产品可跳过"
@@ -173,18 +212,21 @@ export function MainImageHitReplicaContentPanel({
             <>
               <div className="mb-3 flex gap-2 overflow-x-auto pb-1">
                 {referenceRefs.map((ref, i) => (
-                  <RefThumbTile
+                  <HitReplicaRefThumb
                     key={ref.id}
                     caption={`图${i + 1}`}
                     url={ref.ossUrl}
-                    disabled={refBusy || replicating}
+                    removeDisabled={replicating}
                     onRemove={() => onRemoveRef(ref.id, "reference")}
                   />
                 ))}
                 {refSlotsLeft > 0 ? (
                   <HitReplicaRefAddTile
-                    disabled={uploadDisabled}
+                    disabled={refZoneDisabled}
+                    uploading={refUploading}
+                    uploadProgress={refUploading ? uploadProgress : null}
                     multiple={refSlotsLeft > 1}
+                    ariaLabel="继续上传参考图"
                     onOpenPicker={() => refInputRef.current?.click()}
                     onFiles={(files) => void uploadMany(files, "reference")}
                     onError={pasteError}
@@ -219,7 +261,7 @@ export function MainImageHitReplicaContentPanel({
                           </span>
                           <input
                             type="text"
-                            disabled={refBusy || replicating}
+                            disabled={replicating}
                             placeholder="参考要求（选填）"
                             value={draft}
                             className="w-full rounded-lg border border-[#e8e8ed] bg-white px-2.5 py-2 text-[11px] text-[#1d1d1f] placeholder:text-[#c7c7cc] focus:border-[var(--ecom-chrome-accent)] focus:outline-none"
@@ -248,25 +290,29 @@ export function MainImageHitReplicaContentPanel({
               </div>
             </>
           ) : null}
-          <input
-            ref={refInputRef}
-            type="file"
-            accept={IMAGE_UPLOAD_ACCEPT}
-            className="hidden"
-            multiple={refSlotsLeft > 1}
-            disabled={uploadDisabled || refSlotsLeft <= 0}
-            onChange={(e) => {
-              const list = e.target.files;
-              if (list?.length) {
-                void uploadMany(Array.from(list), "reference");
-              }
-              e.target.value = "";
-            }}
-          />
+          {referenceRefs.length > 0 ? (
+            <input
+              ref={refInputRef}
+              type="file"
+              accept={IMAGE_UPLOAD_ACCEPT}
+              className="hidden"
+              multiple={refSlotsLeft > 1}
+              disabled={refZoneDisabled || refSlotsLeft <= 0}
+              onChange={(e) => {
+                const list = e.target.files;
+                if (list?.length) {
+                  void uploadMany(Array.from(list), "reference");
+                }
+                e.target.value = "";
+              }}
+            />
+          ) : null}
           {referenceRefs.length === 0 && refSlotsLeft > 0 ? (
             <HitReplicaPasteUploadZone
               inputRef={refInputRef}
-              disabled={uploadDisabled}
+              disabled={refZoneDisabled}
+              uploading={refUploading}
+              uploadProgress={refUploading ? uploadProgress : null}
               multiple
               title="上传参考图"
               hint={`支持复刻套图，最多上传 ${MAIN_IMAGE_HIT_REPLICA_MAX_REF} 张`}
@@ -281,56 +327,52 @@ export function MainImageHitReplicaContentPanel({
           <section>
             <h3 className="mb-3 text-[11px] font-semibold text-[#1d1d1f]">复刻结果</h3>
             <div className={ECOM_WORKSPACE_RESULT_GRID_CLASS}>
-              {results.map((row) => {
-                const refThumb = referenceRefs.find((r) => r.id === row.sourceRefId)?.ossUrl;
-                return (
-                  <article
-                    key={row.id}
-                    className="overflow-hidden rounded-xl border border-[#e8e8ed] bg-white"
+              {results.map((row) => (
+                <article
+                  key={row.id}
+                  className={cn(
+                    "flex min-w-0 flex-col overflow-hidden",
+                    ECOM_WORKSPACE_RESULT_COLUMN_CLASS,
+                  )}
+                >
+                  <div
+                    className={cn(
+                      "relative w-full",
+                      ecomWorkspaceResultShellClass(),
+                    )}
+                    style={{ aspectRatio: hitReplicaAspectToCssRatio(ratio) }}
                   >
-                    <div
-                      className={cn(
-                        "relative w-full bg-[#f5f5f7]",
-                        ecomWorkspaceResultShellClass,
-                      )}
-                      style={{ aspectRatio: hitReplicaAspectToCssRatio(ratio) }}
-                    >
-                      {row.status === "generating" ? (
-                        <EcomMediaGeneratingBusy background="light" />
-                      ) : row.imageUrl ? (
-                        <Image
-                          src={row.imageUrl}
-                          alt={`复刻 ${row.index}`}
-                          fill
-                          className="object-contain"
-                          unoptimized
-                        />
-                      ) : refThumb ? (
-                        <Image
-                          src={refThumb}
-                          alt="参考"
-                          fill
-                          className="object-contain opacity-40"
-                          unoptimized
-                        />
-                      ) : (
-                        <PendingResultPlaceholder />
-                      )}
-                    </div>
-                    <p className="border-t border-[#f0f0f2] px-2 py-1.5 text-[10px] text-[#86868b]">
-                      {row.status === "failed"
-                        ? row.failMessage ?? "生成失败"
+                    {row.status === "generating" ? (
+                      <EcomMediaGeneratingBusy background="light" />
+                    ) : row.imageUrl ? (
+                      <Image
+                        src={row.imageUrl}
+                        alt={`复刻 ${row.index}`}
+                        fill
+                        className="object-contain"
+                        unoptimized
+                      />
+                    ) : row.status === "failed" ? (
+                      <PendingResultPlaceholder label="生成失败" />
+                    ) : (
+                      <PendingResultPlaceholder />
+                    )}
+                  </div>
+                  <p className={ECOM_WORKSPACE_RESULT_LABEL_CLASS}>
+                    {row.status === "failed"
+                      ? row.failMessage ?? "生成失败"
+                      : row.status === "generating"
+                        ? `生成中 · #${row.index}`
                         : `复刻 #${row.index}`}
-                    </p>
-                  </article>
-                );
-              })}
+                  </p>
+                </article>
+              ))}
             </div>
           </section>
         ) : (
           <div className="flex items-center gap-2 rounded-lg border border-dashed border-[#e8e8ed] px-4 py-8 text-[11px] text-[#86868b]">
             <Link2 className="h-4 w-4 shrink-0" />
-            上传参考图并在右侧点「一键复刻爆款图」后，结果将展示在此
+            上传参考图并在右下「一键复刻爆款图（N）」后，成片将按统一规格追加展示在此
           </div>
         )}
       </div>
@@ -338,10 +380,65 @@ export function MainImageHitReplicaContentPanel({
   );
 }
 
-function PendingResultPlaceholder() {
+function PendingResultPlaceholder({ label = "待出图" }: { label?: string }) {
   return (
     <div className="flex h-full items-center justify-center text-[11px] text-[#86868b]">
-      待出图
+      {label}
+    </div>
+  );
+}
+
+function HitReplicaUploadProgress({
+  progress,
+  label = "正在上传…",
+}: {
+  progress: number | null;
+  label?: string;
+}) {
+  return (
+    <div className="mb-2 w-full max-w-xs space-y-1">
+      <div
+        className={cn(
+          "ecom-upload-progress",
+          typeof progress !== "number" && "ecom-upload-progress-indeterminate",
+        )}
+      >
+        <span
+          style={
+            typeof progress === "number"
+              ? { width: `${Math.min(100, Math.max(0, progress))}%` }
+              : undefined
+          }
+        />
+      </div>
+      <p className="text-[10px] text-[#0071e3]">
+        {typeof progress === "number" && progress >= 100 ? "完成" : label}
+      </p>
+    </div>
+  );
+}
+
+function HitReplicaRefThumb({
+  caption,
+  url,
+  removeDisabled,
+  onRemove,
+}: {
+  caption: string;
+  url: string;
+  removeDisabled?: boolean;
+  onRemove: () => void;
+}) {
+  return (
+    <div className="w-[72px] shrink-0">
+      <EcomRefImageThumb
+        src={url}
+        alt={caption}
+        size={72}
+        removeLabel={`删除${caption}`}
+        onRemove={removeDisabled ? undefined : onRemove}
+      />
+      <p className="mt-1 truncate text-center text-[10px] text-[#86868b]">{caption}</p>
     </div>
   );
 }
@@ -350,6 +447,8 @@ function HitReplicaPasteUploadZone({
   title,
   hint,
   disabled,
+  uploading,
+  uploadProgress,
   multiple,
   inputRef,
   onOpenPicker,
@@ -359,6 +458,8 @@ function HitReplicaPasteUploadZone({
   title: string;
   hint: string;
   disabled?: boolean;
+  uploading?: boolean;
+  uploadProgress?: number | null;
   multiple?: boolean;
   inputRef: RefObject<HTMLInputElement>;
   onOpenPicker: () => void;
@@ -403,7 +504,11 @@ function HitReplicaPasteUploadZone({
       tabIndex={disabled ? -1 : 0}
       aria-label={title}
       aria-disabled={disabled}
+      aria-busy={uploading}
     >
+      {uploading ? (
+        <HitReplicaUploadProgress progress={uploadProgress ?? null} />
+      ) : null}
       <input
         ref={inputRef}
         type="file"
@@ -418,7 +523,11 @@ function HitReplicaPasteUploadZone({
         }}
         onClick={(e) => e.stopPropagation()}
       />
-      <Plus className="h-6 w-6 text-[#86868b]" />
+      {uploading ? (
+        <Loader2 className="h-6 w-6 animate-spin text-[#0071e3]" aria-hidden />
+      ) : (
+        <Plus className="h-6 w-6 text-[#86868b]" />
+      )}
       <span className="text-[11px] font-medium text-[#424245]">{title}</span>
       <span className="max-w-md text-[10px] leading-relaxed text-[#86868b]">{hint}</span>
       <span className="text-[10px] text-[#c7c7cc]">
@@ -434,13 +543,19 @@ function HitReplicaPasteUploadZone({
 
 function HitReplicaRefAddTile({
   disabled,
+  uploading,
+  uploadProgress,
   multiple,
+  ariaLabel,
   onOpenPicker,
   onFiles,
   onError,
 }: {
   disabled?: boolean;
+  uploading?: boolean;
+  uploadProgress?: number | null;
   multiple?: boolean;
+  ariaLabel: string;
   onOpenPicker: () => void;
   onFiles: (files: File[]) => void | Promise<void>;
   onError: (title: string, message: string) => void;
@@ -453,94 +568,50 @@ function HitReplicaRefAddTile({
   });
 
   return (
-    <div
-      {...dropZoneProps}
-      title={pasteReady ? "支持粘贴图片" : "继续上传参考图"}
-      className={cn(
-        "flex h-[72px] w-[72px] shrink-0 cursor-pointer items-center justify-center rounded-lg border border-dashed outline-none transition-colors",
-        dragOver
-          ? "border-[var(--ecom-chrome-accent)] bg-[#f0f6ff]"
-          : "border-[#d2d2d7] text-[#86868b] hover:border-[var(--ecom-chrome-accent)]",
-        disabled && "pointer-events-none opacity-50",
-      )}
-      role="button"
-      tabIndex={disabled ? -1 : 0}
-      aria-label="继续上传参考图"
-      onClick={() => {
-        if (disabled) return;
-        focusZone();
-        onOpenPicker();
-      }}
-      onKeyDown={(e) => {
-        if (disabled) return;
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
+    <div className="relative w-[72px] shrink-0">
+      <div
+        {...dropZoneProps}
+        title={pasteReady ? "支持粘贴图片" : ariaLabel}
+        className={cn(
+          "flex h-[72px] w-[72px] cursor-pointer flex-col items-center justify-center gap-0.5 rounded-lg border border-dashed p-1 outline-none transition-colors",
+          dragOver
+            ? "border-[var(--ecom-chrome-accent)] bg-[#f0f6ff]"
+            : "border-[#d2d2d7] text-[#86868b] hover:border-[var(--ecom-chrome-accent)]",
+          disabled && "pointer-events-none opacity-50",
+        )}
+        role="button"
+        tabIndex={disabled ? -1 : 0}
+        aria-label={ariaLabel}
+        aria-busy={uploading}
+        onClick={() => {
+          if (disabled) return;
           focusZone();
           onOpenPicker();
-        }
-      }}
-    >
-      <Plus className="h-5 w-5" />
-    </div>
-  );
-}
-
-function RefThumbTile({
-  caption,
-  url,
-  disabled,
-  onRemove,
-}: {
-  caption: string;
-  url: string;
-  disabled?: boolean;
-  onRemove: () => void;
-}) {
-  return (
-    <div className="relative w-[72px] shrink-0">
-      <div className="relative h-[72px] overflow-hidden rounded-lg border border-[#e8e8ed] bg-white">
-        <Image src={url} alt={caption} fill className="object-cover" unoptimized />
-        <button
-          type="button"
-          disabled={disabled}
-          className="absolute right-0.5 top-0.5 rounded-full bg-black/55 p-0.5 text-white hover:bg-black/75 disabled:opacity-40"
-          aria-label={`删除${caption}`}
-          onClick={onRemove}
-        >
-          <X className="h-2.5 w-2.5" />
-        </button>
-      </div>
-      <p className="mt-1 text-center text-[10px] text-[#86868b]">{caption}</p>
-    </div>
-  );
-}
-
-function RefThumbCard({
-  label,
-  url,
-  disabled,
-  onRemove,
-}: {
-  label: string;
-  url: string;
-  disabled?: boolean;
-  onRemove: () => void;
-}) {
-  return (
-    <div className="relative overflow-hidden rounded-xl border border-[#e8e8ed] bg-[#fafafa]">
-      <h4 className="px-2 pt-2 text-[10px] font-medium text-[#6e6e73]">{label}</h4>
-      <div className="relative m-2 aspect-square overflow-hidden rounded-lg bg-white">
-        <Image src={url} alt={label} fill className="object-contain" unoptimized />
-      </div>
-      <button
-        type="button"
-        disabled={disabled}
-        className="absolute right-2 top-2 rounded-full bg-black/50 p-1 text-white hover:bg-black/70 disabled:opacity-40"
-        aria-label="删除"
-        onClick={onRemove}
+        }}
+        onKeyDown={(e) => {
+          if (disabled) return;
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            focusZone();
+            onOpenPicker();
+          }
+        }}
       >
-        <X className="h-3 w-3" />
-      </button>
+        {uploading ? (
+          <>
+            <div className="ecom-upload-progress h-1 w-full">
+              <span
+                style={{
+                  width: `${Math.min(100, Math.max(0, uploadProgress ?? 10))}%`,
+                }}
+              />
+            </div>
+            <Loader2 className="h-4 w-4 animate-spin text-[#0071e3]" />
+          </>
+        ) : (
+          <Plus className="h-5 w-5" />
+        )}
+      </div>
     </div>
   );
 }

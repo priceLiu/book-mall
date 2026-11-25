@@ -9,6 +9,9 @@ import { EcomAssetPickerDialog } from "@/components/media/ecom-asset-picker-dial
 import { ImageEditorAdjustPanel } from "@/components/image-editor/image-editor-adjust-panel";
 import { ImageEditorCanvasPanel } from "@/components/image-editor/image-editor-canvas-panel";
 import { ImageEditorCanvasStage } from "@/components/image-editor/image-editor-canvas-stage";
+import { ImageEditorAiFlowerPanel } from "@/components/image-editor/image-editor-ai-flower-panel";
+import { ImageEditorTextInspector } from "@/components/image-editor/image-editor-text-inspector";
+import { ImageEditorTextPanel } from "@/components/image-editor/image-editor-text-panel";
 import { ImageEditorHeader } from "@/components/image-editor/image-editor-header";
 import { ImageEditorToolRail } from "@/components/image-editor/image-editor-tool-rail";
 import "@/components/image-editor/image-editor-theme.css";
@@ -48,6 +51,34 @@ import type {
   ImageEditorShapeMaskId,
   ImageEditorToolId,
 } from "@/lib/image-editor-types";
+import {
+  applyTextLayerStyle,
+  createQuickTextLayer,
+  duplicateImageEditorTextSelection,
+  emptyImageEditorTextDocument,
+  extractTextLayerStyle,
+  isTextGrouped,
+  layersSharingGroup,
+  patchImageEditorTextExtras,
+  patchImageEditorTextLayer,
+  removeImageEditorTextSelection,
+  syncTextDocumentExportSize,
+  updateImageEditorTextContent,
+  type ImageEditorTextDocument,
+  type ImageEditorTextQuickKind,
+  type ImageEditorTextStyleClipboard,
+} from "@/lib/image-editor-text";
+import { applyImageEditorFlower } from "@/lib/image-editor-text-flower";
+import { flattenImageEditorTextLayers } from "@/lib/image-editor-flatten-text";
+import {
+  createImageEditorTextFromTemplate,
+  expandLegacyDecorGroups,
+  expandLegacySellingGroups,
+  imageEditorTextTemplateById,
+  placeOriginalSellingPoster,
+  replaceSellingGroupWithDecompose,
+} from "@/lib/image-editor-text-templates";
+import { ensureSellingPosterDecompose } from "@/lib/image-editor-selling-decompose-api";
 
 async function urlToDataUrl(url: string): Promise<string> {
   const res = await fetch(url);
@@ -119,6 +150,7 @@ export function ImageEditorStudio() {
   const adjustDraftRef = useRef<{ w: number; h: number; rotateDeg: number; flipH: boolean; flipV: boolean } | null>(
     null,
   );
+  const textStyleClipboardRef = useRef<ImageEditorTextStyleClipboard | null>(null);
   const shapeDraftRef = useRef<{
     w: number;
     h: number;
@@ -127,6 +159,13 @@ export function ImageEditorStudio() {
     flipH: boolean;
     flipV: boolean;
   } | null>(null);
+  const [textDoc, setTextDoc] = useState<ImageEditorTextDocument>(() =>
+    emptyImageEditorTextDocument(DEFAULT_CANVAS),
+  );
+  const [selectedTextLayerId, setSelectedTextLayerId] = useState<string | null>(null);
+  const [selectionIds, setSelectionIds] = useState<string[]>([]);
+  const [aiFlowerOpen, setAiFlowerOpen] = useState(false);
+  const [editingTextLayerId, setEditingTextLayerId] = useState<string | null>(null);
 
   const filterStyle = useMemo(
     () =>
@@ -207,6 +246,19 @@ export function ImageEditorStudio() {
       setContrast(snap.contrast);
       setSaturate(snap.saturate);
       setErasePrompt(snap.erasePrompt);
+      if (snap.textOverlayJson) {
+        try {
+          const overlay = JSON.parse(snap.textOverlayJson) as ImageEditorTextDocument["overlay"];
+          const extras = snap.textExtrasJson
+            ? (JSON.parse(snap.textExtrasJson) as ImageEditorTextDocument["extras"])
+            : {};
+          setTextDoc({ overlay, extras });
+          setSelectedTextLayerId(snap.selectedTextLayerId ?? null);
+          setEditingTextLayerId(null);
+        } catch {
+          setTextDoc(emptyImageEditorTextDocument(snapCanvasOk ? snap.canvasW : DEFAULT_CANVAS));
+        }
+      }
       if (snap.imageOmitted) {
         toast({
           title: "会话图片未保存",
@@ -310,6 +362,243 @@ export function ImageEditorStudio() {
     canvasFrameInteract,
     adjustTab,
   ]);
+
+  const textInteract = tool === "text" && Boolean(imageUrl);
+  const textExportW = naturalW > 0 ? naturalW : canvasW;
+  const textExportH = naturalH > 0 ? naturalH : canvasH;
+  const selectedTextLayer = textDoc.overlay.layers.find((l) => l.id === selectedTextLayerId);
+
+  useEffect(() => {
+    setTextDoc((d) => syncTextDocumentExportSize(d, textExportW));
+  }, [textExportW]);
+
+  const legacySellingIds = textDoc.overlay.layers
+    .filter((layer) => layer.text.includes("\n") && textDoc.extras[layer.id]?.templateId?.startsWith("selling-") && !textDoc.extras[layer.id]?.groupId)
+    .map((layer) => layer.id)
+    .join(",");
+  useEffect(() => {
+    if (!legacySellingIds) return;
+    const result = expandLegacySellingGroups(textDoc, textExportH);
+    if (result.doc === textDoc) return;
+    setTextDoc(result.doc);
+    setSelectedTextLayerId((id) => (id && result.replaced[id]) || id);
+  }, [legacySellingIds, textDoc, textExportH]);
+
+  const legacyDecorIds = textDoc.overlay.layers
+    .filter((layer) => {
+      const extras = textDoc.extras[layer.id];
+      return Boolean(extras?.templateId) && !extras?.groupId && !extras?.role && !extras?.mark;
+    })
+    .map((layer) => layer.id)
+    .join(",");
+  useEffect(() => {
+    if (!legacyDecorIds) return;
+    const result = expandLegacyDecorGroups(textDoc);
+    if (result.doc === textDoc) return;
+    setTextDoc(result.doc);
+    setSelectedTextLayerId((id) => (id && result.replaced[id]) || id);
+  }, [legacyDecorIds, textDoc]);
+
+  useEffect(() => {
+    if (tool !== "text") setEditingTextLayerId(null);
+  }, [tool]);
+
+  const membersOf = useCallback(
+    (id: string) => {
+      const extras = textDoc.extras[id];
+      if (isTextGrouped(extras) && extras?.groupId) {
+        return layersSharingGroup(textDoc.overlay.layers, textDoc.extras, extras.groupId).map((layer) => layer.id);
+      }
+      return [id];
+    },
+    [textDoc],
+  );
+
+  const handleSelectTextLayer = useCallback(
+    (id: string | null, extra?: { additive?: boolean }) => {
+      const prev = selectedTextLayerId;
+      if (id && id !== prev && textStyleClipboardRef.current && !extra?.additive) {
+        const clip = textStyleClipboardRef.current;
+        setTextDoc((d) => applyTextLayerStyle(d, id, clip));
+        textStyleClipboardRef.current = null;
+        toast({ title: "已套用样式", variant: "success" });
+      }
+      if (!id) {
+        setSelectedTextLayerId(null);
+        setSelectionIds([]);
+        setEditingTextLayerId(null);
+        return;
+      }
+      const members = membersOf(id);
+      if (extra?.additive) {
+        setSelectionIds((current) => {
+          const base = current.length ? current : prev ? membersOf(prev) : [];
+          const hasAll = members.every((member) => base.includes(member));
+          const next = hasAll ? base.filter((member) => !members.includes(member)) : [...base, ...members.filter((member) => !base.includes(member))];
+          return next.length ? next : members;
+        });
+      } else {
+        setSelectionIds(members);
+      }
+      setSelectedTextLayerId(id);
+      if (!extra?.additive) setEditingTextLayerId(null);
+    },
+    [membersOf, selectedTextLayerId, toast],
+  );
+
+  const handleEditTextLayer = useCallback((id: string | null) => {
+    setEditingTextLayerId(id);
+    if (id) setSelectedTextLayerId(id);
+  }, []);
+
+  const onCopyTextStyle = useCallback(
+    (id: string) => {
+      const layer = textDoc.overlay.layers.find((l) => l.id === id);
+      if (!layer) return;
+      textStyleClipboardRef.current = extractTextLayerStyle(layer, textDoc.extras[id]);
+      toast({ title: "已复制样式", message: "选中其他文字块即可套用" });
+    },
+    [textDoc, toast],
+  );
+
+  const deleteTextSelection = useCallback((id: string) => {
+    setTextDoc((d) => removeImageEditorTextSelection(d, id));
+    setSelectedTextLayerId((cur) => (cur === id ? null : cur));
+    setEditingTextLayerId((cur) => (cur === id ? null : cur));
+  }, []);
+
+  const mergeTextSelection = useCallback(async () => {
+    const id = selectedTextLayerId;
+    const src = displayUrl ?? imageUrl;
+    if (!id || !src || naturalW < 1 || naturalH < 1) throw new Error("当前没有可合并的图片");
+    const extras = textDoc.extras[id];
+    const ids = selectionIds.length
+      ? selectionIds
+      : isTextGrouped(extras) && extras?.groupId
+        ? layersSharingGroup(textDoc.overlay.layers, textDoc.extras, extras.groupId).map((layer) => layer.id)
+        : [id];
+    const url = await flattenImageEditorTextLayers(src, naturalW, naturalH, ids);
+    applyUrl(url, naturalW, naturalH);
+    setTextDoc((d) => ids.reduce((doc, layerId) => removeImageEditorTextSelection(doc, layerId), d));
+    setSelectedTextLayerId(null);
+    setSelectionIds([]);
+    setEditingTextLayerId(null);
+  }, [applyUrl, displayUrl, imageUrl, naturalH, naturalW, selectedTextLayerId, selectionIds, textDoc]);
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Delete" && event.key !== "Backspace") return;
+      if (!textInteract || !selectedTextLayerId || editingTextLayerId) return;
+      if (document.querySelector("[role='dialog']")) return;
+      const target = event.target instanceof HTMLElement ? event.target : null;
+      if (target?.closest("input, textarea, select, [contenteditable='true']")) return;
+      event.preventDefault();
+      deleteTextSelection(selectedTextLayerId);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [deleteTextSelection, editingTextLayerId, selectedTextLayerId, textInteract]);
+
+  const onTextAiFlower = useCallback((id: string) => {
+    setSelectedTextLayerId(id);
+    setTool("text");
+    setAiFlowerOpen(true);
+  }, []);
+
+  const onPickTextTemplate = useCallback(
+    (templateId: string) => {
+      if (!imageUrl) return;
+      setAiFlowerOpen(false);
+      const template = imageEditorTextTemplateById(templateId);
+      if (template?.poster) {
+        const posterSrc = template.poster;
+        const posterId = posterSrc.match(/(\d{10})\.png$/)?.[1];
+        const img = new Image();
+        img.onload = () => {
+          let primary = "";
+          let ids: string[] = [];
+          setTextDoc((prev) => {
+            const synced = syncTextDocumentExportSize(prev, textExportW);
+            const placed = placeOriginalSellingPoster(synced, {
+              src: posterSrc,
+              imgW: img.naturalWidth,
+              imgH: img.naturalHeight,
+              exportW: textExportW,
+              exportH: textExportH,
+              posterId,
+            });
+            primary = placed.layerId;
+            ids = placed.layerIds;
+            return placed.doc;
+          });
+          setSelectedTextLayerId(primary || null);
+          setSelectionIds(ids);
+          setEditingTextLayerId(null);
+        };
+        img.onerror = () => {
+          void alert({ title: "无法添加卖点", message: "这张卖点图没有加载成功。", variant: "error" });
+        };
+        img.src = posterSrc;
+        return;
+      }
+      setTextDoc((prev) => {
+        const synced = syncTextDocumentExportSize(prev, textExportW);
+        const { doc, layerId } = createImageEditorTextFromTemplate(synced, templateId, textExportW, textExportH);
+        setSelectedTextLayerId(layerId);
+        setSelectionIds([layerId]);
+        setEditingTextLayerId(null);
+        return doc;
+      });
+    },
+    [alert, imageUrl, textExportH, textExportW],
+  );
+
+  const onUngroupSelling = useCallback(
+    async (posterId: string, groupId: string) => {
+      try {
+        const pack = await ensureSellingPosterDecompose(posterId);
+        let primary = "";
+        let ids: string[] = [];
+        setTextDoc((prev) => {
+          const placed = replaceSellingGroupWithDecompose(prev, {
+            groupId,
+            sample: "商品卖点",
+            imgW: pack.imgW,
+            imgH: pack.imgH,
+            layers: pack.layers,
+            exportW: textExportW,
+            exportH: textExportH,
+          });
+          primary = placed.layerId;
+          ids = placed.layerIds;
+          return placed.layerIds.length ? placed.doc : prev;
+        });
+        if (primary) {
+          setSelectedTextLayerId(primary);
+          setSelectionIds(ids);
+          setEditingTextLayerId(null);
+        }
+      } catch (e) {
+        const message = e instanceof Error ? e.message : "这张卖点没有拆开";
+        await alert({ title: "无法取消组合", message, variant: "error" });
+      }
+    },
+    [alert, textExportH, textExportW],
+  );
+
+  const onAddQuickText = useCallback(
+    (kind: ImageEditorTextQuickKind) => {
+      if (!imageUrl) return;
+      setTextDoc((prev) => {
+        const synced = syncTextDocumentExportSize(prev, textExportW);
+        const { doc, layerId } = createQuickTextLayer(synced, kind, textExportW, textExportH);
+        setSelectedTextLayerId(layerId);
+        setEditingTextLayerId(layerId);
+        return doc;
+      });
+    },
+    [imageUrl, textExportH, textExportW],
+  );
 
   /** 裁切交互：底图固定在原图档（仅旋转/滤镜），不随裁切框缩放 */
   useEffect(() => {
@@ -450,6 +739,9 @@ export function ImageEditorStudio() {
     setHistoryIdx(-1);
     adjustDraftRef.current = null;
     shapeDraftRef.current = null;
+    setTextDoc(emptyImageEditorTextDocument(DEFAULT_CANVAS));
+    setSelectedTextLayerId(null);
+    setEditingTextLayerId(null);
     persistImageUrlRef.current = null;
     setSessionPersistUrl(null);
     writeImageEditorSession({
@@ -514,6 +806,9 @@ export function ImageEditorStudio() {
       correctHorizontal: correction.horizontal,
       correctCenter: correction.center,
       correctRotate: correction.rotate,
+      textOverlayJson: textDoc.overlay.layers.length ? JSON.stringify(textDoc.overlay) : null,
+      textExtrasJson: Object.keys(textDoc.extras).length ? JSON.stringify(textDoc.extras) : null,
+      selectedTextLayerId,
       imageUrl: sessionPersistUrl ?? (imageUrl?.startsWith("http") || imageUrl?.startsWith("data:") ? imageUrl : null),
       imageOmitted: Boolean(imageUrl) && !sessionPersistUrl && !imageUrl?.startsWith("http") && !imageUrl?.startsWith("data:") ? true : undefined,
     };
@@ -538,6 +833,8 @@ export function ImageEditorStudio() {
     imageUrl,
     sessionPersistUrl,
     correction,
+    textDoc,
+    selectedTextLayerId,
   ]);
 
   useEffect(() => {
@@ -974,12 +1271,41 @@ export function ImageEditorStudio() {
           />
         );
       case "text":
+        if (aiFlowerOpen && selectedTextLayer) {
+          const flowerExtras = textDoc.extras[selectedTextLayer.id] ?? {};
+          return (
+            <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-[var(--ie-border-soft)] bg-[var(--ie-cream)] px-3 py-3 shadow-sm">
+              <ImageEditorAiFlowerPanel
+                layer={selectedTextLayer}
+                extras={flowerExtras}
+                disabled={!imageUrl || busy}
+                onBack={() => setAiFlowerOpen(false)}
+                onContent={(text) => setTextDoc((d) => updateImageEditorTextContent(d, selectedTextLayer.id, text))}
+                onFont={(fontFamily) => setTextDoc((d) => patchImageEditorTextLayer(d, selectedTextLayer.id, { fontFamily }))}
+                onBold={() =>
+                  setTextDoc((d) =>
+                    patchImageEditorTextLayer(d, selectedTextLayer.id, {
+                      fontWeight: selectedTextLayer.fontWeight === "normal" ? "bold" : "normal",
+                    }),
+                  )
+                }
+                onItalic={() =>
+                  setTextDoc((d) =>
+                    patchImageEditorTextExtras(d, selectedTextLayer.id, { italic: !flowerExtras.italic }),
+                  )
+                }
+                onGenerate={(flowerId) => {
+                  setTextDoc((d) => applyImageEditorFlower(d, selectedTextLayer.id, flowerId));
+                  toast({ title: "已套用花字", message: "样式已写到当前文字" });
+                }}
+              />
+            </div>
+          );
+        }
         return (
-          <ToolPanelCard title="文字">
-            <p className="text-[11px] leading-relaxed text-[var(--ie-subtle)]">
-              画布文字与营销文案叠层，请使用主图/详情模块的「文案排版编辑器」。此处将后续接入同款叠层能力。
-            </p>
-          </ToolPanelCard>
+          <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-[var(--ie-border-soft)] bg-[var(--ie-cream)] px-3 py-3 shadow-sm">
+            <ImageEditorTextPanel disabled={!imageUrl || busy} onAdd={onAddQuickText} onPickTemplate={onPickTextTemplate} />
+          </div>
         );
       case "erase":
         return (
@@ -1148,19 +1474,68 @@ export function ImageEditorStudio() {
               cropDragging={canvasFrameDragging}
               onCanvasDragActiveChange={onCanvasDragActiveChange}
               onClearImage={() => void clearImage()}
+              textInteract={textInteract}
+              textOverlay={textDoc.overlay}
+              textExtras={textDoc.extras}
+              selectedTextLayerId={selectedTextLayerId}
+              selectedTextLayerIds={selectionIds}
+              editingTextLayerId={editingTextLayerId}
+              onSelectTextLayer={handleSelectTextLayer}
+              onEditTextLayer={handleEditTextLayer}
+              onTextLayerPatch={(id, patch) => setTextDoc((d) => patchImageEditorTextLayer(d, id, patch))}
+              onTextExtrasPatch={(id, patch) => setTextDoc((d) => patchImageEditorTextExtras(d, id, patch))}
+              onTextContent={(id, text) => setTextDoc((d) => updateImageEditorTextContent(d, id, text))}
+              onTextDuplicate={(id) => {
+                setTextDoc((d) => {
+                  const { doc, layerId } = duplicateImageEditorTextSelection(d, id);
+                  setSelectedTextLayerId(layerId);
+                  return doc;
+                });
+              }}
+              onTextDelete={deleteTextSelection}
+              onTextCopyStyle={onCopyTextStyle}
+              onTextAiFlower={onTextAiFlower}
             />
           </div>
 
-          <div className="shrink-0 border-t border-[var(--ie-border-soft)] lg:border-t-0">
-            <ImageEditorCanvasPanel
-              width={canvasW}
-              height={canvasH}
-              lockAspect={lockAspect}
-              disabled={!imageUrl || busy}
-              onWidth={setTargetWidth}
-              onHeight={setTargetHeight}
-              onToggleLock={() => setLockAspect((v) => !v)}
-            />
+          <div className="flex min-h-0 w-full shrink-0 flex-col overflow-hidden border-t border-[var(--ie-border-soft)] lg:h-full lg:w-[300px] lg:self-stretch lg:border-l lg:border-t-0">
+            {tool === "text" ? (
+              <ImageEditorTextInspector
+                doc={textDoc}
+                selectedLayer={selectedTextLayer}
+                exportW={textExportW}
+                exportH={textExportH}
+                disabled={!imageUrl || busy}
+                onChange={setTextDoc}
+                onDuplicate={
+                  selectedTextLayer
+                    ? () => {
+                        const id = selectedTextLayer.id;
+                        setTextDoc((d) => {
+                          const { doc, layerId } = duplicateImageEditorTextSelection(d, id);
+                          setSelectedTextLayerId(layerId);
+                          return doc;
+                        });
+                      }
+                    : undefined
+                }
+                onAiFlower={selectedTextLayer ? () => onTextAiFlower(selectedTextLayer.id) : undefined}
+                onMergeLayers={mergeTextSelection}
+                onUngroupSelling={onUngroupSelling}
+                selectionIds={selectionIds}
+                onDeleteLayer={deleteTextSelection}
+              />
+            ) : (
+              <ImageEditorCanvasPanel
+                width={canvasW}
+                height={canvasH}
+                lockAspect={lockAspect}
+                disabled={!imageUrl || busy}
+                onWidth={setTargetWidth}
+                onHeight={setTargetHeight}
+                onToggleLock={() => setLockAspect((v) => !v)}
+              />
+            )}
           </div>
         </div>
       </div>

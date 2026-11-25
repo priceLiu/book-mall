@@ -22,7 +22,10 @@ import {
   type ImageEditorCropRect,
 } from "@/lib/image-editor-crop-rect";
 import { normalizeRotateDeg } from "@/lib/image-editor-transform";
+import { ImageEditorTextOverlay } from "@/components/image-editor/image-editor-text-overlay";
+import type { ImageEditorTextLayerExtras } from "@/lib/image-editor-text";
 import type { ImageEditorShapeMaskId } from "@/lib/image-editor-types";
+import type { EcomCopyOverlay, EcomCopyOverlayLayer } from "@private/ecom-copy-overlay";
 import { cn } from "@/lib/utils";
 
 type DropZoneProps = {
@@ -76,6 +79,21 @@ type Props = {
   onShapeMaskResize?: (width: number, height: number) => void;
   onCanvasDragActiveChange?: (active: boolean) => void;
   onClearImage?: () => void;
+  textInteract?: boolean;
+  textOverlay?: EcomCopyOverlay;
+  textExtras?: Record<string, ImageEditorTextLayerExtras>;
+  selectedTextLayerId?: string | null;
+  editingTextLayerId?: string | null;
+  onSelectTextLayer?: (id: string | null, extra?: { additive?: boolean }) => void;
+  selectedTextLayerIds?: string[];
+  onEditTextLayer?: (id: string | null) => void;
+  onTextLayerPatch?: (id: string, patch: Partial<EcomCopyOverlayLayer>) => void;
+  onTextExtrasPatch?: (id: string, patch: Partial<ImageEditorTextLayerExtras>) => void;
+  onTextContent?: (id: string, text: string) => void;
+  onTextDuplicate?: (id: string) => void;
+  onTextDelete?: (id: string) => void;
+  onTextCopyStyle?: (id: string) => void;
+  onTextAiFlower?: (id: string) => void;
 };
 
 function composeFrameImageStyle(base: string, correction?: string, filter?: string) {
@@ -126,6 +144,21 @@ export function ImageEditorCanvasStage({
   onShapeMaskResize,
   onCanvasDragActiveChange,
   onClearImage,
+  textInteract,
+  textOverlay,
+  textExtras,
+  selectedTextLayerId,
+  selectedTextLayerIds,
+  editingTextLayerId,
+  onSelectTextLayer,
+  onEditTextLayer,
+  onTextLayerPatch,
+  onTextExtrasPatch,
+  onTextContent,
+  onTextDuplicate,
+  onTextDelete,
+  onTextCopyStyle,
+  onTextAiFlower,
 }: Props) {
   const frameInteract = Boolean(shapeMaskInteract || canvasCropInteract);
   const empty = !imageUrl && !displayUrl;
@@ -400,7 +433,8 @@ export function ImageEditorCanvasStage({
                       width: "100%",
                       maxHeight: "min(72vh, 900px)",
                     }),
-                transform: correctionInteract ? `scale(${zoom / 100})` : undefined,
+                transform: `scale(${zoom / 100})`,
+                transformOrigin: "center center",
               }}
             >
               {/* 底图固定：拖拽裁切框时不动 */}
@@ -679,6 +713,38 @@ export function ImageEditorCanvasStage({
                 </div>
               ) : null}
 
+              {textInteract &&
+              textOverlay &&
+              onSelectTextLayer &&
+              onEditTextLayer &&
+              onTextLayerPatch &&
+              onTextExtrasPatch &&
+              onTextContent &&
+              onTextDuplicate &&
+              onTextDelete &&
+              onTextCopyStyle &&
+              onTextAiFlower ? (
+                <ImageEditorTextOverlay
+                  overlay={textOverlay}
+                  extras={textExtras ?? {}}
+                  naturalWidth={naturalWidth}
+                  naturalHeight={naturalHeight}
+                  selectedLayerId={selectedTextLayerId ?? null}
+                  selectedLayerIds={selectedTextLayerIds}
+                  editingLayerId={editingTextLayerId ?? null}
+                  disabled={busy}
+                  onSelectLayer={onSelectTextLayer}
+                  onEditLayer={onEditTextLayer}
+                  onUpdateLayer={onTextLayerPatch}
+                  onUpdateExtras={onTextExtrasPatch}
+                  onUpdateText={onTextContent}
+                  onDuplicate={onTextDuplicate}
+                  onDelete={onTextDelete}
+                  onCopyStyle={onTextCopyStyle}
+                  onAiFlower={onTextAiFlower}
+                />
+              ) : null}
+
               {busy ? <EcomMediaGeneratingBusy background="light" /> : null}
             </div>
           </div>
@@ -706,7 +772,7 @@ export function ImageEditorCanvasStage({
           </div>
         )}
       </div>
-      {correctionInteract && backdrop ? (
+      {backdrop ? (
         <div
           className="absolute bottom-3 right-3 z-[70] flex items-end gap-2"
           onPointerDown={(e) => e.stopPropagation()}

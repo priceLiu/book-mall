@@ -466,10 +466,15 @@ function DetailPageSuiteReplicaStudioInner() {
       const existing = backgroundGen.tasks.find((t) => t.id === taskId);
       const wasRunning = existing?.status === "running";
 
+      if (existing?.status === "running" && fireOpts?.fire === false) {
+        return;
+      }
       if (existing && existing.status !== "running") {
-        if (fireOpts?.fire === false) return;
         backgroundGen.dismissTask(taskId);
       }
+
+      /** 本轮拆解须先见到 decomposing/polishing，勿把上一轮 decomposed 误判为完成 */
+      let sawInFlightThisRun = wasRunning;
 
       backgroundGen.registerTask({
         id: taskId,
@@ -485,7 +490,20 @@ function DetailPageSuiteReplicaStudioInner() {
             applyReplicaProject(p);
             const err = replicaDecomposeFailMessage(p.meta);
             if (err) return { status: "failed" as const, error: err };
-            if (isReplicaDecomposeDone(p.meta)) return { status: "succeeded" as const };
+            if (isReplicaDecomposeInFlight(p.meta)) {
+              sawInFlightThisRun = true;
+              const copy = replicaDecomposeStatusCopy(p.meta);
+              return {
+                status: "running" as const,
+                ...(copy?.detail ? { detail: copy.detail } : {}),
+              };
+            }
+            if (isReplicaDecomposeDone(p.meta)) {
+              if (!sawInFlightThisRun) {
+                return { status: "running" as const };
+              }
+              return { status: "succeeded" as const };
+            }
             return { status: "running" as const };
           } catch {
             return { status: "running" as const };
@@ -794,13 +812,13 @@ function DetailPageSuiteReplicaStudioInner() {
     await saveSellpointsFromDraft();
     setDecomposing(true);
     try {
-      startReplicaDecomposeBackgroundJob(project.id, {
+      const updated = await decomposeDetailPageSuiteReplica(project.id, {
         visionModelKey,
         chatModelKey: chatModelKey || undefined,
-        fire: true,
+        async: true,
       });
-      const refreshed = await getDetailPageSuiteReplicaProject(project.id).catch(() => null);
-      if (refreshed) setProject(refreshed);
+      setProject(updated);
+      startReplicaDecomposeBackgroundJob(project.id, { fire: false });
       toast({
         title: "已开始拆解",
         message: "可在页面查看进度；超过约 3 分钟将收至右下角继续后台执行。",

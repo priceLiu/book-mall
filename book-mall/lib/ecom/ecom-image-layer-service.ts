@@ -285,6 +285,9 @@ export async function decomposeImageLayer(opts: {
   bboxes?: Array<[number, number, number, number]>;
   size?: string;
   modelKey?: string;
+  /** 不传则用图片分层的默认拆分说明 */
+  prompt?: string;
+  clientPage?: string;
 }): Promise<ImageLayerStack> {
   await assertEcomToolkitGatewayAccess(opts.userId);
   const layerModel = resolveEcomImageLayerModelKey(opts.modelKey);
@@ -303,7 +306,7 @@ export async function decomposeImageLayer(opts: {
   } catch (e) {
     throw new Error(e instanceof Error ? e.message : "原图预处理失败");
   }
-  const prompt = buildDecomposePrompt(opts.bboxes ?? []);
+  const prompt = opts.prompt?.trim() || buildDecomposePrompt(opts.bboxes ?? []);
   const size = opts.size?.trim() || "auto";
 
   let layers: SeedreamLayerItem[];
@@ -316,7 +319,7 @@ export async function decomposeImageLayer(opts: {
       image: publicUrl,
       size,
       outputFormat: "jpeg",
-      clientPage: "ecom/image-layer/decompose",
+      clientPage: opts.clientPage?.trim() || "ecom/image-layer/decompose",
     });
     layers = result.layers;
     logId = result.logId;

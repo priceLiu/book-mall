@@ -1,9 +1,8 @@
 "use client";
 
-import { ChevronDown, ChevronUp, Cpu, HelpCircle, Loader2 } from "lucide-react";
+import { ChevronDown, ChevronUp, HelpCircle, Loader2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
-import { EcomButtonSecondary } from "@/components/ui/ecom-button";
 import { updateMainImageHitReplicaProject } from "@/lib/ecom-main-image-hit-replica-api";
 import {
   MAIN_IMAGE_HIT_REPLICA_CATEGORY_OPTIONS,
@@ -18,27 +17,20 @@ import {
   MAIN_IMAGE_HIT_REPLICA_RESOLUTION_OPTIONS,
   type MainImageHitReplicaOutputResolution,
 } from "@/lib/main-image-hit-replica-settings";
-import type { StoryboardGatewayModel } from "@/lib/storyboard-types";
 import { cn } from "@/lib/utils";
 
 type Props = {
   project: MainImageHitReplicaProject;
   disabled?: boolean;
   replicating?: boolean;
-  imageModels: StoryboardGatewayModel[];
-  imageModelKey: string;
   onProjectChange: () => void | Promise<void>;
-  onOpenModelPicker: () => void;
 };
 
 export function MainImageHitReplicaConfigSidebar({
   project,
   disabled,
   replicating,
-  imageModels,
-  imageModelKey,
   onProjectChange,
-  onOpenModelPicker,
 }: Props) {
   const [settingsOpen, setSettingsOpen] = useState(true);
   const [globalReq, setGlobalReq] = useState(project.settings.globalRequirements ?? "");
@@ -88,8 +80,8 @@ export function MainImageHitReplicaConfigSidebar({
                 className={cn(
                   "rounded-lg border px-2 py-2 text-left text-[11px] leading-snug transition-colors",
                   selected
-                    ? "border-[var(--ecom-chrome-accent)] bg-[var(--ecom-content-selected-bg)] text-[#1d1d1f]"
-                    : "border-[#e8e8ed] bg-white text-[#424245] hover:border-[var(--ecom-chrome-accent)]",
+                    ? "border-[#1d1d1f] bg-[#fafafa] text-[#1d1d1f] ring-2 ring-[#1d1d1f]/15"
+                    : "border-[#e8e8ed] bg-white text-[#424245] hover:border-[#d2d2d7]",
                 )}
                 onClick={() => void persistSettings({ replicaCategory: opt.id })}
               >
@@ -126,8 +118,8 @@ export function MainImageHitReplicaConfigSidebar({
                 className={cn(
                   "rounded-xl border px-3 py-2.5 text-left transition-colors",
                   selected
-                    ? "border-[var(--ecom-chrome-accent)] bg-[var(--ecom-content-selected-bg)]"
-                    : "border-[#e8e8ed] bg-white hover:border-[var(--ecom-chrome-accent)]",
+                    ? "border-[#1d1d1f] bg-[#fafafa] ring-2 ring-[#1d1d1f]/15"
+                    : "border-[#e8e8ed] bg-white hover:border-[#d2d2d7]",
                 )}
                 onClick={() => void persistSettings({ replicaDegree: opt.id })}
               >
@@ -227,20 +219,6 @@ export function MainImageHitReplicaConfigSidebar({
                 }
               />
             </div>
-            <EcomButtonSecondary
-              size="sm"
-              type="button"
-              className="w-full justify-center gap-1.5"
-              disabled={disabled || replicating}
-              onClick={onOpenModelPicker}
-            >
-              <Cpu className="h-3.5 w-3.5" />
-              生图模型
-              <span className="text-[#86868b]">
-                {imageModels.find((m) => m.modelKey === imageModelKey)?.displayName ??
-                  imageModelKey}
-              </span>
-            </EcomButtonSecondary>
           </div>
         ) : null}
       </div>

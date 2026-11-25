@@ -23,11 +23,13 @@ export async function POST(req: Request, ctx: Ctx) {
 
   try {
     await assertEcomToolkitGatewayAccess(auth.userId);
+    const pendingSlots = Array.isArray(body.pendingSlots) ? body.pendingSlots : undefined;
     const result = await replicateMainImageHitBatch({
       userId: auth.userId,
       projectId: id,
       modelKey: typeof body.modelKey === "string" ? body.modelKey : undefined,
       visionModelKey: typeof body.visionModelKey === "string" ? body.visionModelKey : undefined,
+      pendingSlots,
     });
     return ecomJson({
       project: result.project,

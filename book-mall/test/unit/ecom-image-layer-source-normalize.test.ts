@@ -17,6 +17,13 @@ describe("resolveSeedreamLayerTargetSize", () => {
     expect(width * height).toBeLessThanOrEqual(SEEDREAM_LAYER_MAX_PIXELS);
   });
 
+  it("raises the short side of a wide sticker to at least 512", () => {
+    const { width, height } = resolveSeedreamLayerTargetSize(355, 93);
+    expect(Math.min(width, height)).toBeGreaterThanOrEqual(512);
+    expect(width / height).toBeGreaterThan(3);
+    expect(width * height).toBeLessThanOrEqual(SEEDREAM_LAYER_MAX_PIXELS);
+  });
+
   it("rejects extreme aspect ratio", () => {
     expect(() => resolveSeedreamLayerTargetSize(1000, 10)).toThrow(/宽高比/);
   });

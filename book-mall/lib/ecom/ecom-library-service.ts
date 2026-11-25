@@ -183,6 +183,7 @@ const IMAGE_MODULE_IDS = [
   "hand-craft",
   "model-shot",
   "image-layer",
+  "image-editor",
 ] as const;
 const VIDEO_MODULE_IDS = [
   "storyboard-micro-drama",

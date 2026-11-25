@@ -9,6 +9,7 @@ import {
   Layers,
   LayoutGrid,
   Paintbrush,
+  Pencil,
   Plus,
   Save,
   Trash2,
@@ -61,6 +62,8 @@ type Props = {
   previewBusy?: boolean;
   onPreviewExport: () => void;
   onExport: () => void;
+  onOpenImageEditor?: () => void;
+  canOpenImageEditor?: boolean;
 };
 
 export function ImageLayerToolbar({
@@ -90,6 +93,8 @@ export function ImageLayerToolbar({
   previewBusy,
   onPreviewExport,
   onExport,
+  onOpenImageEditor,
+  canOpenImageEditor,
 }: Props) {
   const canUseTools = hasPreview && !anyBusy;
   const canDecomposeBbox = canUseTools && !hasStack;
@@ -222,6 +227,14 @@ export function ImageLayerToolbar({
               disabled={!hasStack || anyBusy}
               onClick={onExport}
             />
+            {onOpenImageEditor ? (
+              <EcomIconButton
+                label="图片编辑"
+                icon={Pencil}
+                disabled={!canOpenImageEditor || anyBusy}
+                onClick={onOpenImageEditor}
+              />
+            ) : null}
           </EcomIconToolbarGroup>
 
           <ToolbarDivider />
