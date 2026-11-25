@@ -501,6 +501,83 @@ async function presentPack(posterId: string, pack: SellingDecomposePack): Promis
   return task;
 }
 
+type ContentFrame = { x: number; y: number; w: number; h: number };
+
+/**
+ * 卖点原图常常又小又贴边，图层拆分会直接拒绝。
+ * 先放大，再在四周留白，画布短边至少 768。位置以后按这块内容区换算回原图。
+ */
+async function prepareSellingDecomposePng(buf: Buffer): Promise<{ png: Buffer; frame: ContentFrame }> {
+  const meta = await sharp(buf, { failOn: "none" }).rotate().metadata();
+  const srcW = meta.width ?? 1;
+  const srcH = meta.height ?? 1;
+  const scale = Math.max(1, 640 / Math.min(srcW, srcH));
+  let contentW = Math.max(1, Math.round(srcW * scale));
+  let contentH = Math.max(1, Math.round(srcH * scale));
+  let padX = Math.round(contentW * 0.12);
+  let padY = Math.round(contentH * 0.12);
+  let canvasW = contentW + padX * 2;
+  let canvasH = contentH + padY * 2;
+  if (Math.min(canvasW, canvasH) < 768) {
+    if (canvasW <= canvasH) {
+      const extra = 768 - canvasW;
+      padX += Math.ceil(extra / 2);
+    } else {
+      const extra = 768 - canvasH;
+      padY += Math.ceil(extra / 2);
+    }
+    canvasW = contentW + padX * 2;
+    canvasH = contentH + padY * 2;
+  }
+  const maxPixels = 4_000_000;
+  if (canvasW * canvasH > maxPixels) {
+    const fit = Math.sqrt(maxPixels / (canvasW * canvasH));
+    contentW = Math.max(1, Math.round(contentW * fit));
+    contentH = Math.max(1, Math.round(contentH * fit));
+    padX = Math.max(8, Math.round(padX * fit));
+    padY = Math.max(8, Math.round(padY * fit));
+    canvasW = contentW + padX * 2;
+    canvasH = contentH + padY * 2;
+  }
+  const artwork = await sharp(buf, { failOn: "none" })
+    .rotate()
+    .flatten({ background: "#ffffff" })
+    .resize(contentW, contentH, { fit: "fill" })
+    .png()
+    .toBuffer();
+  const png = await sharp({
+    create: { width: canvasW, height: canvasH, channels: 3, background: "#ffffff" },
+  })
+    .composite([{ input: artwork, left: padX, top: padY }])
+    .png()
+    .toBuffer();
+  return {
+    png,
+    frame: { x: padX / canvasW, y: padY / canvasH, w: contentW / canvasW, h: contentH / canvasH },
+  };
+}
+
+function remapBox(
+  box: { x: number; y: number; w: number; h: number },
+  frame: ContentFrame,
+): { x: number; y: number; w: number; h: number } | null {
+  const coversCanvas = box.w > 0.9 && box.h > 0.9;
+  const inset = frame.w < 0.92 || frame.h < 0.92;
+  if (coversCanvas && inset) return null;
+  const x1 = (box.x - frame.x) / frame.w;
+  const y1 = (box.y - frame.y) / frame.h;
+  const x2 = (box.x + box.w - frame.x) / frame.w;
+  const y2 = (box.y + box.h - frame.y) / frame.h;
+  const left = Math.min(1, Math.max(0, Math.min(x1, x2)));
+  const top = Math.min(1, Math.max(0, Math.min(y1, y2)));
+  const right = Math.min(1, Math.max(0, Math.max(x1, x2)));
+  const bottom = Math.min(1, Math.max(0, Math.max(y1, y2)));
+  const w = right - left;
+  const h = bottom - top;
+  if (w < 0.02 || h < 0.02) return null;
+  return { x: left, y: top, w, h };
+}
+
 function boxOf(layer: ImageLayerStackItem, index: number, count: number): { x: number; y: number; w: number; h: number } {
   const n = layer.bbox?.normalized;
   if (n && n.length >= 4) {
@@ -519,28 +596,293 @@ function boxOf(layer: ImageLayerStackItem, index: number, count: number): { x: n
   return { x: 0, y: index * h, w: 1, h };
 }
 
-function toPack(imgW: number, imgH: number, items: ImageLayerStackItem[]): SellingDecomposePack {
+function toPack(
+  imgW: number,
+  imgH: number,
+  items: ImageLayerStackItem[],
+  frame?: ContentFrame,
+): SellingDecomposePack {
   const ordered = [...items].sort((a, b) => a.zIndex - b.zIndex);
-  const layers = ordered.map((layer, index) => {
+  const layers = ordered.flatMap((layer, index) => {
     const name = layer.name?.trim() ?? "";
     const role = classifySellingLayer(name, layer.isBackground ? "background" : "block");
-    const box = boxOf(layer, index, ordered.length);
-    return {
-      role: role.role,
-      url: layer.url,
-      name,
-      text: role.text,
-      z: layer.zIndex,
-      ...box,
-    };
+    const raw = boxOf(layer, index, ordered.length);
+    const box = frame ? remapBox(raw, frame) : raw;
+    if (!box) return [];
+    return [
+      {
+        role: role.role,
+        url: layer.url,
+        name,
+        text: role.text,
+        z: layer.zIndex,
+        ...box,
+      },
+    ];
   });
   return normalizePack({ imgW, imgH, layers });
 }
 
-async function claimPending(posterId: string): Promise<"ready" | "pending" | "claimed"> {
+type LocalPiece = {
+  role: SellingDecomposeRole;
+  name: string;
+  text: string;
+  color?: string;
+  png?: Buffer;
+  z: number;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+};
+
+function hexByte(n: number): string {
+  return Math.max(0, Math.min(255, Math.round(n))).toString(16).padStart(2, "0");
+}
+
+/**
+ * 模型拒收又小又贴边的贴纸时，按透明底和中间空隙拆开：
+ * 色块留下形状，勾改成可编辑的 ✓，文字仍用原图上的字形。
+ */
+export async function buildLocalSellingPieces(
+  buf: Buffer,
+): Promise<{ imgW: number; imgH: number; pieces: LocalPiece[] } | null> {
+  const { data, info } = await sharp(buf, { failOn: "none" }).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const width = info.width ?? 0;
+  const height = info.height ?? 0;
+  if (width < 8 || height < 8) return null;
+  const pixels = data;
+  const cols = new Int32Array(width);
+  let minX = width;
+  let maxX = -1;
+  let minY = height;
+  let maxY = -1;
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      if ((pixels[(y * width + x) * 4 + 3] ?? 0) < 20) continue;
+      cols[x] += 1;
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+    }
+  }
+  if (maxX <= minX) return null;
+  let gapStart = -1;
+  let best = { x: 0, len: 0 };
+  for (let x = minX; x <= maxX; x += 1) {
+    if (cols[x] === 0) {
+      if (gapStart < 0) gapStart = x;
+    } else if (gapStart >= 0) {
+      const len = x - gapStart;
+      if (len > best.len) best = { x: gapStart, len };
+      gapStart = -1;
+    }
+  }
+  if (best.len < 4 || best.x <= minX + 4 || best.x + best.len >= maxX - 4) return null;
+
+  const bounds = (x0: number, x1: number, pred?: (byte: number) => boolean) => {
+    let left = width;
+    let right = -1;
+    let top = height;
+    let bottom = -1;
+    let n = 0;
+    for (let y = 0; y < height; y += 1) {
+      for (let x = x0; x < x1; x += 1) {
+        const byte = (y * width + x) * 4;
+        if ((pixels[byte + 3] ?? 0) < 20) continue;
+        if (pred && !pred(byte)) continue;
+        n += 1;
+        if (x < left) left = x;
+        if (x > right) right = x;
+        if (y < top) top = y;
+        if (y > bottom) bottom = y;
+      }
+    }
+    if (n < 8 || right < left) return null;
+    return { x: left, y: top, w: right - left + 1, h: bottom - top + 1 };
+  };
+
+  const isCheck = (byte: number) => {
+    const r = pixels[byte] ?? 0;
+    const g = pixels[byte + 1] ?? 0;
+    const b = pixels[byte + 2] ?? 0;
+    return b > r + 25 && b > g + 8 && b > 90;
+  };
+
+  const icon = bounds(minX, best.x);
+  const text = bounds(best.x + best.len, maxX + 1);
+  if (!icon || !text) return null;
+
+  const checkMask = new Uint8Array(width * height);
+  let cr = 0;
+  let cg = 0;
+  let cb = 0;
+  let cn = 0;
+  for (let y = icon.y; y < icon.y + icon.h; y += 1) {
+    for (let x = icon.x; x < icon.x + icon.w; x += 1) {
+      const byte = (y * width + x) * 4;
+      if ((pixels[byte + 3] ?? 0) < 20 || !isCheck(byte)) continue;
+      checkMask[y * width + x] = 1;
+      cr += pixels[byte] ?? 0;
+      cg += pixels[byte + 1] ?? 0;
+      cb += pixels[byte + 2] ?? 0;
+      cn += 1;
+    }
+  }
+  if (cn >= 12) {
+    const grown = new Uint8Array(checkMask);
+    for (let y = icon.y; y < icon.y + icon.h; y += 1) {
+      for (let x = icon.x; x < icon.x + icon.w; x += 1) {
+        if (checkMask[y * width + x]) {
+          grown[y * width + x] = 1;
+          continue;
+        }
+        let near = false;
+        for (let dy = -1; dy <= 1 && !near; dy += 1) {
+          for (let dx = -1; dx <= 1; dx += 1) {
+            const xx = x + dx;
+            const yy = y + dy;
+            if (xx < 0 || yy < 0 || xx >= width || yy >= height) continue;
+            if (checkMask[yy * width + xx]) {
+              near = true;
+              break;
+            }
+          }
+        }
+        if (!near) continue;
+        const byte = (y * width + x) * 4;
+        const lum = ((pixels[byte] ?? 0) + (pixels[byte + 1] ?? 0) + (pixels[byte + 2] ?? 0)) / 3;
+        if (lum > 110) grown[y * width + x] = 1;
+      }
+    }
+    checkMask.set(grown);
+  }
+
+  let yr = 0;
+  let yg = 0;
+  let yb = 0;
+  let yn = 0;
+  for (let y = icon.y; y < icon.y + icon.h; y += 1) {
+    for (let x = icon.x; x < icon.x + icon.w; x += 1) {
+      const byte = (y * width + x) * 4;
+      if ((pixels[byte + 3] ?? 0) < 200 || checkMask[y * width + x]) continue;
+      const r = pixels[byte] ?? 0;
+      const g = pixels[byte + 1] ?? 0;
+      const b = pixels[byte + 2] ?? 0;
+      if (!(r > 180 && g > 160 && b < 170 && r > b + 40)) continue;
+      yr += r;
+      yg += g;
+      yb += b;
+      yn += 1;
+    }
+  }
+  const fillR = yn ? Math.round(yr / yn) : 255;
+  const fillG = yn ? Math.round(yg / yn) : 220;
+  const fillB = yn ? Math.round(yb / yn) : 60;
+
+  const crop = async (box: { x: number; y: number; w: number; h: number }, paintCheck: boolean) => {
+    const out = Buffer.alloc(box.w * box.h * 4);
+    for (let y = 0; y < box.h; y += 1) {
+      for (let x = 0; x < box.w; x += 1) {
+        const sx = box.x + x;
+        const sy = box.y + y;
+        const si = (sy * width + sx) * 4;
+        const di = (y * box.w + x) * 4;
+        if (paintCheck && checkMask[sy * width + sx]) {
+          out[di] = fillR;
+          out[di + 1] = fillG;
+          out[di + 2] = fillB;
+          out[di + 3] = 255;
+          continue;
+        }
+        out[di] = pixels[si] ?? 0;
+        out[di + 1] = pixels[si + 1] ?? 0;
+        out[di + 2] = pixels[si + 2] ?? 0;
+        out[di + 3] = pixels[si + 3] ?? 0;
+      }
+    }
+    return sharp(out, { raw: { width: box.w, height: box.h, channels: 4 } }).png().toBuffer();
+  };
+
+  const boxOf = (box: { x: number; y: number; w: number; h: number }) => ({
+    x: box.x / width,
+    y: box.y / height,
+    w: box.w / width,
+    h: box.h / height,
+  });
+  const pieces: LocalPiece[] = [
+    {
+      role: "block",
+      name: "色块",
+      text: "",
+      png: await crop(icon, cn >= 12),
+      z: 1,
+      ...boxOf(icon),
+    },
+    {
+      role: "block",
+      name: "文字图层",
+      text: "",
+      png: await crop(text, false),
+      z: 2,
+      ...boxOf(text),
+    },
+  ];
+  if (cn >= 12) {
+    const checkBox = bounds(icon.x, icon.x + icon.w, isCheck);
+    if (checkBox) {
+      pieces.push({
+        role: "mark",
+        name: "勾",
+        text: "✓",
+        color: `#${hexByte(cr / cn)}${hexByte(cg / cn)}${hexByte(cb / cn)}`,
+        z: 3,
+        ...boxOf(checkBox),
+      });
+    }
+  }
+  return { imgW: width, imgH: height, pieces };
+}
+
+function vendorRefusedLayerSplit(message: string): boolean {
+  return /原图无法用于图层拆分|image content could not be processed for layer decomposition/i.test(message);
+}
+
+async function packFromLocalPieces(posterId: string, file: Buffer): Promise<SellingDecomposePack | null> {
+  const built = await buildLocalSellingPieces(file);
+  if (!built || built.pieces.length < 2) return null;
+  const layers: SellingDecomposeLayer[] = [];
+  for (const piece of built.pieces) {
+    const url = piece.png
+      ? await uploadCanvasUserBuffer({
+          userId: `poster-${posterId}`,
+          buf: piece.png,
+          contentType: "image/png",
+          ext: "png",
+        })
+      : "";
+    layers.push({
+      role: piece.role,
+      url,
+      name: piece.name,
+      text: piece.text,
+      ...(piece.color ? { color: piece.color } : {}),
+      z: piece.z,
+      x: piece.x,
+      y: piece.y,
+      w: piece.w,
+      h: piece.h,
+    });
+  }
+  return normalizePack({ imgW: built.imgW, imgH: built.imgH, layers });
+}
+
+async function claimPending(posterId: string): Promise<"ready" | "pending" | "claimed" | "local"> {
   const row = await prisma.imageEditorPosterDecompose.findUnique({ where: { posterId } });
   if (row?.status === "ready" && asPack(row.pack)) return "ready";
   if (row?.status === "pending" && Date.now() - row.updatedAt.getTime() < PENDING_MS) return "pending";
+  const localOnly = row?.status === "refused";
   if (row) {
     await prisma.imageEditorPosterDecompose.delete({ where: { posterId } }).catch(() => undefined);
   }
@@ -549,38 +891,55 @@ async function claimPending(posterId: string): Promise<"ready" | "pending" | "cl
       data: { posterId, status: "pending" },
     });
     failReason.delete(posterId);
-    return "claimed";
+    return localOnly ? "local" : "claimed";
   } catch {
     return "pending";
   }
 }
 
-function startJob(posterId: string, userId: string, file: Buffer, imgW: number, imgH: number) {
+function startJob(posterId: string, userId: string, file: Buffer, imgW: number, imgH: number, localOnly = false) {
   if (jobs.has(posterId)) return;
   const task = (async () => {
-    try {
-      const sourceImageUrl = await uploadCanvasUserBuffer({
-        userId,
-        buf: file,
-        contentType: "image/png",
-        ext: "png",
-      });
-      const stack = await decomposeImageLayer({
-        userId,
-        sourceImageUrl,
-        prompt: SELLING_DECOMPOSE_PROMPT,
-        clientPage: "ecom/image-editor/selling-decompose",
-        modelKey: "doubao-seedream-5-0-pro",
-        size: "auto",
-      });
-      const items = [stack.background, ...stack.layers];
-      const pack = await presentPack(posterId, toPack(imgW, imgH, items));
+    const saveReady = async (pack: SellingDecomposePack) => {
       await prisma.imageEditorPosterDecompose.update({
         where: { posterId },
         data: { status: "ready", pack },
       });
+    };
+    try {
+      if (!localOnly) {
+        try {
+          const framed = await prepareSellingDecomposePng(file);
+          const sourceImageUrl = await uploadCanvasUserBuffer({
+            userId,
+            buf: framed.png,
+            contentType: "image/png",
+            ext: "png",
+          });
+          const stack = await decomposeImageLayer({
+            userId,
+            sourceImageUrl,
+            prompt: SELLING_DECOMPOSE_PROMPT,
+            clientPage: "ecom/image-editor/selling-decompose",
+            modelKey: "doubao-seedream-5-0-pro",
+            size: "auto",
+          });
+          const items = [stack.background, ...stack.layers];
+          await saveReady(await presentPack(posterId, toPack(imgW, imgH, items, framed.frame)));
+          return;
+        } catch (e) {
+          const message = e instanceof Error ? e.message : "";
+          if (!vendorRefusedLayerSplit(message)) throw e;
+        }
+      }
+      const local = await packFromLocalPieces(posterId, file);
+      if (!local) {
+        throw new Error("原图无法用于图层拆分。请使用清晰的 PNG/JPEG（边长与总像素在官方限制内，宽高比不超过 16:1），或换一张图后重试。");
+      }
+      await saveReady(await presentPack(posterId, local));
     } catch (e) {
       const message = e instanceof Error ? e.message : "拆分失败";
+      console.error("[selling-decompose]", posterId, e);
       failReason.set(posterId, message);
       await prisma.imageEditorPosterDecompose.delete({ where: { posterId } }).catch(() => undefined);
     }
@@ -610,6 +969,6 @@ export async function beginSellingDecompose(opts: {
     if (pack) return { status: "ready", pack };
   }
   if (claim === "pending") return { status: "pending" };
-  startJob(opts.posterId, opts.userId, opts.file, size.w, size.h);
+  startJob(opts.posterId, opts.userId, opts.file, size.w, size.h, claim === "local");
   return { status: "pending" };
 }

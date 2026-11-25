@@ -28,6 +28,7 @@ import { imageEditorFlowerStyle } from "@/lib/image-editor-text-flower";
 import { imageEditorHighlightStyle } from "@/lib/image-editor-text-highlights";
 import { imageEditorTextTemplateById, isImageEditorShapeKind } from "@/lib/image-editor-text-templates";
 import { warpBoxSize, warpPathD } from "@/lib/image-editor-text-warps";
+import { normalizeRotateDeg } from "@/lib/image-editor-transform";
 import { DecorShape, SellingLine, SellingPointCard, ShapeTextArt, decorBoxEm, type SellingMarkHandle } from "@/components/image-editor/image-editor-text-template-art";
 import { cn } from "@/lib/utils";
 
@@ -523,6 +524,98 @@ export function ImageEditorTextOverlay({
     document.addEventListener("pointercancel", end, true);
   };
 
+  const beginLayerRotate = (e: React.PointerEvent<HTMLButtonElement>, layerIds: string[]) => {
+    if (disabled || !layerIds.length) return;
+    e.stopPropagation();
+    e.preventDefault();
+    dragArmRef.current = null;
+    setDrag(null);
+    resizingRef.current = true;
+    const frame = e.currentTarget.closest<HTMLElement>("[data-text-frame], [data-text-group]");
+    const rect = frame?.getBoundingClientRect();
+    const contentRect = contentElRef.current?.getBoundingClientRect();
+    if (!rect || !contentRect) {
+      resizingRef.current = false;
+      return;
+    }
+    const c = contentRef.current;
+    const pivotX = rect.left + rect.width / 2;
+    const pivotY = rect.top + rect.height / 2;
+    const startAngle = Math.atan2(e.clientY - pivotY, e.clientX - pivotX);
+    const scaleX = contentRect.width > 1 && c.w > 0 ? contentRect.width / c.w : 1;
+    const scaleY = contentRect.height > 1 && c.h > 0 ? contentRect.height / c.h : 1;
+    const orbit = layerIds.length > 1;
+    const members = layerIds.flatMap((id) => {
+      const layer = overlay.layers.find((item) => item.id === id);
+      const node = contentElRef.current?.querySelector<HTMLElement>(`[data-layer-id="${CSS.escape(id)}"]`);
+      if (!layer || !node) return [];
+      const box = node.getBoundingClientRect();
+      const anchor = textLayoutSpec(resolveTextLayout(layer, extras[id]));
+      if (extras[id]?.role === "decor" || extras[id]?.role === "label") {
+        anchor.ax = 0.5;
+        anchor.ay = 0.5;
+      }
+      return [
+        {
+          id,
+          ax: anchor.ax,
+          ay: anchor.ay,
+          boxW: Math.max(1, node.offsetWidth),
+          boxH: Math.max(1, node.offsetHeight),
+          cx: box.left + box.width / 2,
+          cy: box.top + box.height / 2,
+          rotate: extras[id]?.rotateDeg ?? 0,
+        },
+      ];
+    });
+    if (!members.length) {
+      resizingRef.current = false;
+      return;
+    }
+    const pointerId = e.pointerId;
+    const prevCursor = document.body.style.cursor;
+    document.body.style.cursor = "grabbing";
+    try {
+      e.currentTarget.setPointerCapture(pointerId);
+    } catch {
+      /* ignore */
+    }
+    const onMove = (ev: PointerEvent) => {
+      if (ev.pointerId !== pointerId) return;
+      const angle = Math.atan2(ev.clientY - pivotY, ev.clientX - pivotX);
+      const delta = angle - startAngle;
+      const cos = Math.cos(delta);
+      const sin = Math.sin(delta);
+      const deg = (delta * 180) / Math.PI;
+      for (const member of members) {
+        if (orbit) {
+          const dx = member.cx - pivotX;
+          const dy = member.cy - pivotY;
+          const nextCx = pivotX + dx * cos - dy * sin;
+          const nextCy = pivotY + dx * sin + dy * cos;
+          const contentX = (nextCx - contentRect.left) / scaleX;
+          const contentY = (nextCy - contentRect.top) / scaleY;
+          updateLayer(member.id, {
+            nx: clamp((contentX + member.ax * member.boxW - member.boxW / 2) / Math.max(1, c.w), -1, 2),
+            ny: clamp((contentY + member.ay * member.boxH - member.boxH / 2) / Math.max(1, c.h), -1, 2),
+          });
+        }
+        onUpdateExtras(member.id, { rotateDeg: normalizeRotateDeg(member.rotate + deg) });
+      }
+    };
+    const end = (ev: PointerEvent) => {
+      if (ev.pointerId !== pointerId) return;
+      resizingRef.current = false;
+      document.body.style.cursor = prevCursor;
+      document.removeEventListener("pointermove", onMove, true);
+      document.removeEventListener("pointerup", end, true);
+      document.removeEventListener("pointercancel", end, true);
+    };
+    document.addEventListener("pointermove", onMove, true);
+    document.addEventListener("pointerup", end, true);
+    document.addEventListener("pointercancel", end, true);
+  };
+
   return (
     <div
       ref={rootRef}
@@ -979,7 +1072,11 @@ export function ImageEditorTextOverlay({
                         onPointerDown={(ev) => beginTextResize(ev, layer, id)}
                       />
                     ))}
-                    <RotateHandle className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-[calc(100%+10px)]" />
+                    <RotateHandle
+                      className="absolute bottom-0 left-1/2 translate-y-[calc(100%+10px)]"
+                      disabled={disabled}
+                      onPointerDown={(ev) => beginLayerRotate(ev, [layer.id])}
+                    />
                   </>
                 ) : null}
               </div>
@@ -1018,6 +1115,16 @@ export function ImageEditorTextOverlay({
                 onPointerDown={(event) => beginGroupResize(event, id)}
               />
             ))}
+            <RotateHandle
+              className="absolute bottom-0 left-1/2 translate-y-[calc(100%+10px)]"
+              disabled={disabled}
+              onPointerDown={(event) =>
+                beginLayerRotate(
+                  event,
+                  layersSharingGroup(overlay.layers, extras, selectedGroupId).map((item) => item.id),
+                )
+              }
+            />
           </div>
         ) : null}
       </div>
@@ -1148,12 +1255,31 @@ function ToolbarIconBtn({
   );
 }
 
-function RotateHandle({ className }: { className: string }) {
+function RotateHandle({
+  className,
+  disabled,
+  onPointerDown,
+}: {
+  className: string;
+  disabled?: boolean;
+  onPointerDown: (event: React.PointerEvent<HTMLButtonElement>) => void;
+}) {
   return (
-    <div className={cn("pointer-events-none", className)}>
-      <span className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-white bg-white text-[var(--ie-ink)] shadow-sm">
-        <RotateCw className="h-3 w-3" aria-hidden />
-      </span>
-    </div>
+    <button
+      type="button"
+      data-text-handle="1"
+      data-text-rotate="1"
+      aria-label="旋转"
+      title="旋转"
+      disabled={disabled}
+      style={{ touchAction: "none" }}
+      className={cn(
+        "pointer-events-auto z-30 inline-flex h-5 w-5 -translate-x-1/2 cursor-grab touch-none items-center justify-center rounded-full border border-[#d8d8dc] bg-white text-[var(--ie-ink)] shadow-sm active:cursor-grabbing disabled:opacity-40",
+        className,
+      )}
+      onPointerDown={onPointerDown}
+    >
+      <RotateCw className="h-3 w-3" aria-hidden />
+    </button>
   );
 }

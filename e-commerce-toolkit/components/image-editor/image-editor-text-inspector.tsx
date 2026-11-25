@@ -17,6 +17,7 @@ import {
   Combine,
   Group,
   Link2,
+  Loader2,
   RotateCcw,
   Ungroup,
   Strikethrough,
@@ -215,7 +216,8 @@ function InspectorBody({
           type="button"
           disabled={disabled || splitting}
           className={cn(
-            "inline-flex h-8 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-lg border text-[12px] font-medium disabled:opacity-40",
+            "inline-flex h-8 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-lg border text-[12px] font-medium",
+            splitting ? "opacity-100" : "disabled:opacity-40",
             showingUngroup
               ? "border-[var(--ie-ink)] bg-transparent text-[var(--ie-ink)]"
               : "border-[var(--ie-ink)] bg-[var(--ie-ink)] text-[var(--ie-cream)]",
@@ -243,7 +245,13 @@ function InspectorBody({
             onChange(groupTextLayers(doc, picked.length ? picked : [layer.id]));
           }}
         >
-          {showingUngroup ? <Ungroup className="h-3.5 w-3.5" /> : <Group className="h-3.5 w-3.5" />}
+          {splitting ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : showingUngroup ? (
+            <Ungroup className="h-3.5 w-3.5" />
+          ) : (
+            <Group className="h-3.5 w-3.5" />
+          )}
           {splitting ? "拆分中" : showingUngroup ? "取消组合" : "组合"}
         </button>
         <button

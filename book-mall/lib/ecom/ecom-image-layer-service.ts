@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 
 import { uploadCanvasUserBuffer } from "@/lib/canvas/canvas-oss";
+import { fetchEcomVendorImageBuffer } from "@/lib/ecom/ecom-vendor-image-download";
 import { assertEcomToolkitGatewayAccess } from "@/lib/ecom/ecom-gateway-auth";
 import {
   buildBatchEditPrompt,
@@ -121,22 +122,14 @@ async function rehostImageForVendor(userId: string, url: string): Promise<string
     }
   }
 
-  const res = await fetch(url, {
-    method: "GET",
-    signal: AbortSignal.timeout(45_000),
-    redirect: "follow",
+  const ext = /\.jpe?g(\?|$)/i.test(url) ? "jpg" : "png";
+  const buf = await fetchEcomVendorImageBuffer(url);
+  return uploadCanvasUserBuffer({
+    userId,
+    ext,
+    buf,
+    contentType: ext === "jpg" ? "image/jpeg" : "image/png",
   });
-  if (!res.ok) {
-    throw new Error(`参考图不可被厂商拉取（HTTP ${res.status}），请重新上传后重试`);
-  }
-  const buf = Buffer.from(await res.arrayBuffer());
-  const contentType = res.headers.get("content-type") ?? "image/png";
-  const ext = contentType.includes("jpeg")
-    ? "jpg"
-    : contentType.includes("webp")
-      ? "webp"
-      : "png";
-  return uploadCanvasUserBuffer({ userId, ext, buf, contentType });
 }
 
 async function persistVendorImage(

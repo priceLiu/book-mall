@@ -40,6 +40,7 @@ function isRetryableDownloadError(err: unknown): boolean {
   if (err instanceof Error) {
     if (/HTTP 429|HTTP 5\d\d/.test(err.message)) return true;
     if (/成图内容为空/.test(err.message)) return true;
+    if (/fetch failed|Failed to fetch/i.test(err.message)) return true;
   }
   return false;
 }
