@@ -77,7 +77,11 @@ export async function removeMainImageHitReplicaRef(
 
 export async function replicateMainImageHit(
   projectId: string,
-  opts?: { modelKey?: string; visionModelKey?: string },
+  opts?: {
+    modelKey?: string;
+    visionModelKey?: string;
+    pendingSlots?: MainImageHitReplicaResult[];
+  },
 ): Promise<{
   project: MainImageHitReplicaProject;
   generated: number;

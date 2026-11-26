@@ -1079,7 +1079,9 @@ export function ImageEditorCutoutWorkspace({
     }
     try {
       const bytes = encodeCutoutPsd({ name: "抠图", width, height, rgba });
-      const blob = new Blob([bytes], { type: "image/vnd.adobe.photoshop" });
+      const payload = new ArrayBuffer(bytes.byteLength);
+      new Uint8Array(payload).set(bytes);
+      const blob = new Blob([payload], { type: "image/vnd.adobe.photoshop" });
       const href = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = href;

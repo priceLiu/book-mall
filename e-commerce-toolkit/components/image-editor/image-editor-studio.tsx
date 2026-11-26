@@ -1088,9 +1088,9 @@ export function ImageEditorStudio() {
       const dataUrl = await urlToDataUrl(imageUrl);
       const res = await submitImageProcessingEdit({
         mode: "bg-remove",
-        model: bgModel || undefined,
         model: imageEditorModel,
         generativeModel: imageEditorModel,
+        sourceImageDataUrl: dataUrl,
       });
       const next = res.imageUrls[0];
       if (!next) throw new Error("未返回结果");
@@ -1114,9 +1114,9 @@ export function ImageEditorStudio() {
       const dataUrl = await urlToDataUrl(imageUrl);
       const res = await submitImageProcessingEdit({
         mode: "enhancer",
-        model: enhancerModel || undefined,
         model: imageEditorModel,
         generativeModel: imageEditorModel,
+        sourceImageDataUrl: dataUrl,
       });
       const next = res.imageUrls[0];
       if (!next) throw new Error("未返回结果");
