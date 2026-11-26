@@ -180,6 +180,12 @@ async function ensurePublicImageUrl(
   throw new Error("不支持的图片格式");
 }
 
+function bufferCopy(bytes: Uint8Array) {
+  const copy = new ArrayBuffer(bytes.byteLength);
+  new Uint8Array(copy).set(bytes);
+  return Buffer.from(copy);
+}
+
 async function downloadToOss(opts: {
   userId: string;
   url: string;
@@ -201,7 +207,7 @@ async function downloadToOss(opts: {
       ? "webp"
       : "png";
   if (opts.transformBuffer) {
-    buf = await opts.transformBuffer(buf);
+    buf = bufferCopy(await opts.transformBuffer(buf));
     contentType = "image/png";
     ext = "png";
   }
@@ -435,7 +441,7 @@ async function runSeedreamSingleImage(opts: {
     let url = img.url;
     if (!url && img.b64) {
       let buf = Buffer.from(img.b64, "base64");
-      if (opts.transformBuffer) buf = await opts.transformBuffer(buf);
+      if (opts.transformBuffer) buf = bufferCopy(await opts.transformBuffer(buf));
       const ossUrl = await uploadCanvasUserBuffer({
         userId: opts.userId,
         ext: "png",
