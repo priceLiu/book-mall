@@ -109,6 +109,8 @@ export function ImageEditorStudio() {
   const { alert, confirm, toast } = useDialogs();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [tool, setTool] = useState<ImageEditorToolId>("adjust");
+  const [leftPanelOpen, setLeftPanelOpen] = useState(true);
+  const [rightPanelOpen, setRightPanelOpen] = useState(true);
   const [adjustTab, setAdjustTab] = useState<ImageEditorAdjustTab>("resize");
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [displayUrl, setDisplayUrl] = useState<string | null>(null);
@@ -1412,14 +1414,20 @@ export function ImageEditorStudio() {
           onOpenFile={() => fileInputRef.current?.click()}
           onDownload={download}
           onOpenNewTab={openInNewTab}
+          leftCollapsed={!leftPanelOpen}
+          rightCollapsed={!rightPanelOpen}
+          onToggleLeft={() => setLeftPanelOpen((open) => !open)}
+          onToggleRight={() => setRightPanelOpen((open) => !open)}
         />
 
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row lg:gap-2 lg:p-2">
           <div className="flex max-h-[50vh] min-h-0 w-full shrink-0 flex-row overflow-hidden lg:max-h-none lg:w-auto">
             <ImageEditorToolRail active={tool} disabled={busy} onSelect={setTool} />
-            <aside className="ecom-scrollbar-thin flex min-h-0 w-[min(100%,320px)] flex-1 flex-col overflow-y-auto bg-transparent p-2 pt-0 lg:w-[332px] lg:shrink-0">
-              {toolPanel}
-            </aside>
+            {leftPanelOpen ? (
+              <aside className="ecom-scrollbar-thin flex min-h-0 w-[min(100%,320px)] flex-1 flex-col overflow-y-auto bg-transparent p-2 pt-0 lg:w-[332px] lg:shrink-0">
+                {toolPanel}
+              </aside>
+            ) : null}
           </div>
 
           <div
@@ -1498,7 +1506,12 @@ export function ImageEditorStudio() {
             />
           </div>
 
-          <div className="flex min-h-0 w-full shrink-0 flex-col overflow-hidden border-t border-[var(--ie-border-soft)] lg:h-full lg:w-[300px] lg:self-stretch lg:border-l lg:border-t-0">
+          <div
+            className={cn(
+              "flex min-h-0 w-full shrink-0 flex-col overflow-hidden border-t border-[var(--ie-border-soft)] lg:h-full lg:w-[300px] lg:self-stretch lg:border-l lg:border-t-0",
+              !rightPanelOpen && "hidden",
+            )}
+          >
             {tool === "text" ? (
               <ImageEditorTextInspector
                 doc={textDoc}

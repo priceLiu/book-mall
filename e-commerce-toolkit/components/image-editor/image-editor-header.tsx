@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronDown, Download, Redo2, Undo2, Upload } from "lucide-react";
+import { ChevronDown, Download, PanelLeft, PanelRight, Redo2, Undo2, Upload } from "lucide-react";
 import { useState } from "react";
 
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
@@ -16,6 +16,10 @@ type Props = {
   onOpenFile: () => void;
   onDownload: () => void;
   onOpenNewTab: () => void;
+  leftCollapsed: boolean;
+  rightCollapsed: boolean;
+  onToggleLeft: () => void;
+  onToggleRight: () => void;
 };
 
 export function ImageEditorHeader({
@@ -27,11 +31,21 @@ export function ImageEditorHeader({
   onOpenFile,
   onDownload,
   onOpenNewTab,
+  leftCollapsed,
+  rightCollapsed,
+  onToggleLeft,
+  onToggleRight,
 }: Props) {
   const [fileOpen, setFileOpen] = useState(false);
 
   return (
-    <header className="flex shrink-0 flex-wrap items-center gap-3 border-b border-[var(--ie-border-soft)] bg-[var(--ie-cream)] px-3 py-2 lg:px-4">
+    <header className="relative flex shrink-0 flex-wrap items-center gap-3 border-b border-[var(--ie-border-soft)] bg-[var(--ie-cream)] px-3 py-2 lg:px-4">
+      <PanelSideSwitch
+        leftCollapsed={leftCollapsed}
+        rightCollapsed={rightCollapsed}
+        onToggleLeft={onToggleLeft}
+        onToggleRight={onToggleRight}
+      />
       <div className="flex min-w-0 items-center gap-2.5">
         <span className="text-[13px] font-semibold text-[var(--ie-ink)]">电商设计室</span>
         <div className="hidden items-center gap-1 md:flex">
@@ -91,6 +105,70 @@ export function ImageEditorHeader({
         </EcomButtonPrimary>
       </div>
     </header>
+  );
+}
+
+function PanelSideSwitch({
+  leftCollapsed,
+  rightCollapsed,
+  onToggleLeft,
+  onToggleRight,
+}: {
+  leftCollapsed: boolean;
+  rightCollapsed: boolean;
+  onToggleLeft: () => void;
+  onToggleRight: () => void;
+}) {
+  return (
+    <div
+      role="group"
+      aria-label="侧栏开关"
+      className="absolute left-1/2 top-1/2 z-10 flex -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-lg border border-[var(--ie-border)] bg-[var(--ie-cream)] shadow-[0_1px_0_#fff,0_1px_2px_rgba(42,36,32,0.12)]"
+    >
+      <SideSwitchButton
+        pressed={leftCollapsed}
+        label={leftCollapsed ? "展开左栏" : "收起左栏"}
+        icon={PanelLeft}
+        onClick={onToggleLeft}
+      />
+      <span className="w-px self-stretch bg-[var(--ie-border-soft)]" aria-hidden />
+      <SideSwitchButton
+        pressed={rightCollapsed}
+        label={rightCollapsed ? "展开右栏" : "收起右栏"}
+        icon={PanelRight}
+        onClick={onToggleRight}
+      />
+    </div>
+  );
+}
+
+function SideSwitchButton({
+  pressed,
+  label,
+  icon: Icon,
+  onClick,
+}: {
+  pressed: boolean;
+  label: string;
+  icon: typeof PanelLeft;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={pressed}
+      aria-label={label}
+      title={label}
+      className={cn(
+        "inline-flex h-8 w-11 items-center justify-center transition-colors",
+        pressed
+          ? "bg-[var(--ie-ink)] text-[var(--ie-cream)] shadow-[inset_0_2px_4px_rgba(0,0,0,0.35)]"
+          : "bg-[var(--ie-cream)] text-[var(--ie-ink)] shadow-[inset_0_1px_0_#fff] hover:bg-[var(--ie-cream-muted)]",
+      )}
+      onClick={onClick}
+    >
+      <Icon className="h-4 w-4" aria-hidden />
+    </button>
   );
 }
 

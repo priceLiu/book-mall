@@ -15,7 +15,6 @@ import {
   frameScaleFromElement,
   type ImageEditorFrameResizeHandleId,
 } from "@/lib/image-editor-frame-resize";
-import { imageEditorStageSizeFromNatural } from "@/lib/image-editor-crop-overlay";
 import {
   mapCropRectToStage,
   moveImageEditorCropRect,
@@ -244,28 +243,98 @@ export function ImageEditorCanvasStage({
     document.addEventListener("pointerup", end);
   };
 
-  const viewportCap =
-    typeof window !== "undefined" ? Math.min(900, window.innerHeight * 0.72) : 900;
+  const frameRef = useRef<HTMLDivElement>(null);
+  const wellRef = useRef<HTMLDivElement>(null);
+  const [measuredFrame, setMeasuredFrame] = useState({ w: 0, h: 0 });
+  const [wellBox, setWellBox] = useState({ w: 0, h: 0 });
+  /** 记为 100% 的中间可用宽度。侧栏收起后宽度变了，显示比例跟着变。 */
+  const [fitAvail, setFitAvail] = useState(0);
+  const savedShownRef = useRef<number | null>(null);
+
+  const stageAspect =
+    resizeInteract && canvasWidth > 0 && canvasHeight > 0
+      ? canvasWidth / canvasHeight
+      : frameInteract && naturalWidth > 0 && naturalHeight > 0
+        ? naturalWidth / naturalHeight
+        : canvasWidth > 0 && canvasHeight > 0
+          ? canvasWidth / canvasHeight
+          : 1;
+
+  useEffect(() => {
+    const el = wellRef.current;
+    if (!el) return;
+    const read = () => {
+      const w = el.clientWidth;
+      const h = el.clientHeight;
+      setWellBox((prev) => (prev.w === w && prev.h === h ? prev : { w, h }));
+    };
+    read();
+    const ro = new ResizeObserver(read);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [empty]);
+
+  useEffect(() => {
+    const el = frameRef.current;
+    if (!el) return;
+    const read = () => {
+      const w = Math.round(el.offsetWidth);
+      const h = Math.round(el.offsetHeight);
+      setMeasuredFrame((prev) => (prev.w === w && prev.h === h ? prev : { w, h }));
+    };
+    read();
+    const ro = new ResizeObserver(read);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [empty, stageAspect, zoom]);
+
+  const frameLayout = useMemo(() => {
+    const padX = 48;
+    const availW = Math.max(1, wellBox.w - padX);
+    const width = Math.max(1, Math.round(availW * (zoom / 100)));
+    const height = Math.max(1, Math.round(width / stageAspect));
+    const shownZoom =
+      fitAvail > 0 ? Math.max(1, Math.round((zoom * availW) / fitAvail)) : Math.round(zoom);
+    return { width, height, availW, shownZoom };
+  }, [fitAvail, stageAspect, wellBox.w, zoom]);
+
+  useEffect(() => {
+    if (wellBox.w > 48 && fitAvail === 0) setFitAvail(wellBox.w - 48);
+  }, [fitAvail, wellBox.w]);
+
+  const stepShownZoom = (delta: number) => {
+    setZoom((z) => {
+      const avail = Math.max(1, wellBox.w - 48);
+      const base = fitAvail > 0 ? fitAvail : avail;
+      const shown = Math.round((z * avail) / base);
+      const next = Math.min(400, Math.max(25, shown + delta));
+      return (next * base) / avail;
+    });
+  };
+
+  const applyShownZoom = (shown: number) => {
+    const avail = Math.max(1, wellBox.w - 48);
+    const base = fitAvail > 0 ? fitAvail : avail;
+    setZoom((shown * base) / avail);
+  };
+
+  const toggleFitZoom = () => {
+    const shown = frameLayout.shownZoom;
+    if (shown > 102) {
+      savedShownRef.current = shown;
+      applyShownZoom(100);
+      return;
+    }
+    const saved = savedShownRef.current;
+    if (saved != null && saved > 102) applyShownZoom(saved);
+  };
 
   const stagePx = useMemo(() => {
-    if (resizeInteract && canvasWidth > 0 && canvasHeight > 0) {
-      return imageEditorStageSizeFromNatural(canvasWidth, canvasHeight, viewportCap);
+    if (measuredFrame.w < 8 || measuredFrame.h < 8) {
+      return { width: undefined as number | undefined, height: undefined as number | undefined, aspect: stageAspect };
     }
-    if (frameInteract && naturalWidth > 0 && naturalHeight > 0) {
-      return imageEditorStageSizeFromNatural(naturalWidth, naturalHeight, viewportCap);
-    }
-    const aspect =
-      canvasWidth > 0 && canvasHeight > 0 ? canvasWidth / canvasHeight : 1;
-    return { width: undefined as number | undefined, height: undefined as number | undefined, aspect };
-  }, [
-    canvasHeight,
-    canvasWidth,
-    frameInteract,
-    naturalHeight,
-    naturalWidth,
-    resizeInteract,
-    viewportCap,
-  ]);
+    return { width: measuredFrame.w, height: measuredFrame.h, aspect: stageAspect };
+  }, [measuredFrame.h, measuredFrame.w, stageAspect]);
 
   const cropBox = useMemo(() => {
     if (!frameInteract || naturalWidth < 1 || !stagePx.width || !stagePx.height) return null;
@@ -383,7 +452,7 @@ export function ImageEditorCanvasStage({
   return (
     <div
       className={cn(
-        "relative flex min-h-0 flex-1 flex-col bg-[var(--ie-cream-deep)] outline-none",
+        "relative flex h-full min-h-0 w-full min-w-0 flex-1 flex-col bg-[var(--ie-cream-deep)] outline-none",
         dragOver && empty && "ring-2 ring-inset ring-[var(--ie-border)]/25",
       )}
       {...(empty ? dropZoneProps : { tabIndex: dropZoneProps?.tabIndex })}
@@ -404,19 +473,24 @@ export function ImageEditorCanvasStage({
         </button>
       ) : null}
 
-      <div className="flex min-h-0 flex-1 flex-col items-center justify-center p-6">
+      <div className={cn("relative min-h-0 min-w-0 flex-1", empty && "flex items-center justify-center p-6")}>
         {backdrop && pasteReady ? (
-          <p className="mb-2 text-[10px] text-[var(--ie-subtle)]">⌘V / Ctrl+V 粘贴图片 · 支持拖入文件</p>
+          <p className="pointer-events-none absolute left-0 right-0 top-2 z-[5] text-center text-[10px] text-[var(--ie-subtle)]">⌘V / Ctrl+V 粘贴图片 · 支持拖入文件</p>
         ) : null}
 
         {backdrop ? (
           <div
-            className={cn(
-              "relative flex w-full max-w-full items-center justify-center",
-              (frameInteract || resizeInteract || correctionInteract) && "pb-12 pt-14",
-            )}
+            ref={wellRef}
+            className="ecom-scrollbar-thin absolute inset-0 overflow-auto [scrollbar-gutter:stable]"
           >
             <div
+              className={cn(
+                "flex min-h-full w-max min-w-full items-center justify-center px-6 pb-16 pt-6",
+                (frameInteract || resizeInteract || correctionInteract) && "pb-20 pt-14",
+              )}
+            >
+            <div
+              ref={frameRef}
               data-ie-shape-frame
               className={cn(
                 "relative shrink-0 overflow-visible",
@@ -426,15 +500,8 @@ export function ImageEditorCanvasStage({
                 cropMode && !shapeMaskInteract && !resizeInteract && "ring-2 ring-[var(--ie-border)]/20",
               )}
               style={{
-                ...((frameInteract || resizeInteract) && stagePx.width && stagePx.height
-                  ? { width: stagePx.width, height: stagePx.height }
-                  : {
-                      aspectRatio: "aspect" in stagePx && stagePx.aspect ? `${stagePx.aspect}` : "1",
-                      width: "100%",
-                      maxHeight: "min(72vh, 900px)",
-                    }),
-                transform: `scale(${zoom / 100})`,
-                transformOrigin: "center center",
+                width: frameLayout.width,
+                height: frameLayout.height,
               }}
             >
               {/* 底图固定：拖拽裁切框时不动 */}
@@ -747,6 +814,7 @@ export function ImageEditorCanvasStage({
 
               {busy ? <EcomMediaGeneratingBusy background="light" /> : null}
             </div>
+            </div>
           </div>
         ) : (
           <div
@@ -830,22 +898,24 @@ export function ImageEditorCanvasStage({
               type="button"
               aria-label="缩小"
               className="inline-flex h-8 w-7 items-center justify-center"
-              onClick={() => setZoom((z) => Math.max(25, z - 10))}
+              onClick={() => stepShownZoom(-10)}
             >
               <Minus className="h-3.5 w-3.5" aria-hidden />
             </button>
             <button
               type="button"
               className="min-w-10 px-1 text-center"
-              onClick={() => setZoom(100)}
+              aria-label={frameLayout.shownZoom > 102 ? "回到 100%" : "恢复放大"}
+              title={frameLayout.shownZoom > 102 ? "回到 100%" : "恢复放大"}
+              onClick={toggleFitZoom}
             >
-              {zoom}%
+              {frameLayout.shownZoom}%
             </button>
             <button
               type="button"
               aria-label="放大"
               className="inline-flex h-8 w-7 items-center justify-center"
-              onClick={() => setZoom((z) => Math.min(200, z + 10))}
+              onClick={() => stepShownZoom(10)}
             >
               <Plus className="h-3.5 w-3.5" aria-hidden />
             </button>
