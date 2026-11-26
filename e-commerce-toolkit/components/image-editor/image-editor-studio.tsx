@@ -13,6 +13,8 @@ import { ImageEditorAiFlowerPanel } from "@/components/image-editor/image-editor
 import { ImageEditorTextInspector } from "@/components/image-editor/image-editor-text-inspector";
 import { ImageEditorTextPanel } from "@/components/image-editor/image-editor-text-panel";
 import { ImageEditorHeader } from "@/components/image-editor/image-editor-header";
+import { ImageEditorEraseLayer, type ImageEditorEraseLayerHandle } from "@/components/image-editor/image-editor-erase-layer";
+import { ERASE_TARGETS, ImageEditorErasePanel, type EraseTargetId } from "@/components/image-editor/image-editor-erase-panel";
 import { ImageEditorCutoutWorkspace } from "@/components/image-editor/image-editor-cutout-workspace";
 import { ImageEditorToolRail } from "@/components/image-editor/image-editor-tool-rail";
 import "@/components/image-editor/image-editor-theme.css";
@@ -20,6 +22,8 @@ import { EcomWorkspaceLayout } from "@/components/layout/ecom-workspace-layout";
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
 import { IMAGE_UPLOAD_ACCEPT } from "@/lib/image-upload-utils";
 import { submitImageProcessingEdit } from "@/lib/ecom-image-processing-api";
+import { ecomMediaFetchUrl } from "@/lib/ecom-media-download";
+import { eraseImageLayerRegion } from "@/lib/ecom-image-layer-api";
 import {
   readImageEditorCustomPresets,
   writeImageEditorCustomPresets,
@@ -90,6 +94,39 @@ async function urlToDataUrl(url: string): Promise<string> {
   });
 }
 
+async function sampleImage(url: string): Promise<Uint8ClampedArray | null> {
+  try {
+    const res = await fetch(ecomMediaFetchUrl(url));
+    if (!res.ok) return null;
+    const bitmap = await createImageBitmap(await res.blob());
+    const canvas = document.createElement("canvas");
+    canvas.width = 48;
+    canvas.height = 48;
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    if (!ctx) return null;
+    ctx.drawImage(bitmap, 0, 0, 48, 48);
+    bitmap.close();
+    return ctx.getImageData(0, 0, 48, 48).data;
+  } catch {
+    return null;
+  }
+}
+
+/** 结果和原图几乎一样，视为没有识别到要消除的内容。 */
+async function imagesNearlyUnchanged(before: string, after: string): Promise<boolean> {
+  const [a, b] = await Promise.all([sampleImage(before), sampleImage(after)]);
+  if (!a || !b || a.length !== b.length) return false;
+  let diff = 0;
+  let n = 0;
+  for (let i = 0; i < a.length; i += 4) {
+    diff += Math.abs((a[i] ?? 0) - (b[i] ?? 0));
+    diff += Math.abs((a[i + 1] ?? 0) - (b[i + 1] ?? 0));
+    diff += Math.abs((a[i + 2] ?? 0) - (b[i + 2] ?? 0));
+    n += 3;
+  }
+  return n > 0 && diff / n < 6;
+}
+
 function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -128,6 +165,13 @@ export function ImageEditorStudio() {
   const [historyIdx, setHistoryIdx] = useState(-1);
   const [modelsLoaded, setModelsLoaded] = useState(false);
   const [erasePrompt, setErasePrompt] = useState("移除画面中的干扰物体");
+  const [eraseTab, setEraseTab] = useState<"manual" | "ai">("ai");
+  const [eraseBrush, setEraseBrush] = useState(25);
+  const [eraseTargets, setEraseTargets] = useState<Record<string, boolean>>({});
+  const [eraseRunning, setEraseRunning] = useState(false);
+  const [eraseProgress, setEraseProgress] = useState(0);
+  const [eraseNotice, setEraseNotice] = useState<string | null>(null);
+  const eraseLayerRef = useRef<ImageEditorEraseLayerHandle>(null);
   const [cutoutOpen, setCutoutOpen] = useState(false);
   const [cutoutSubject, setCutoutSubject] = useState("portrait");
   const [cutoutResultUrl, setCutoutResultUrl] = useState<string | null>(null);
@@ -1133,21 +1177,34 @@ export function ImageEditorStudio() {
     }
   };
 
-  const runErase = async () => {
-    if (!imageUrl) return;
-    setBusy(true);
+  useEffect(() => {
+    if (!eraseRunning) return;
+    setEraseProgress(8);
+    const timer = window.setInterval(() => {
+      setEraseProgress((value) => (value >= 92 ? value : value + Math.max(1, Math.round((92 - value) * 0.12))));
+    }, 450);
+    return () => window.clearInterval(timer);
+  }, [eraseRunning]);
+
+  useEffect(() => {
+    if (!eraseNotice) return;
+    const timer = window.setTimeout(() => setEraseNotice(null), 6000);
+    return () => window.clearTimeout(timer);
+  }, [eraseNotice]);
+
+  const runManualErase = async () => {
+    if (!imageUrl || eraseRunning) return;
+    const mask = eraseLayerRef.current?.hasMarks()
+      ? eraseLayerRef.current.toMaskDataUrl(naturalW || canvasW, naturalH || canvasH)
+      : null;
+    eraseLayerRef.current?.clear();
+    if (!mask) return;
+    setEraseNotice(null);
+    setEraseRunning(true);
     try {
-      const dataUrl = await urlToDataUrl(imageUrl);
-      const res = await submitImageProcessingEdit({
-        mode: "editor",
-        prompt: erasePrompt.trim(),
-        model: imageEditorModel,
-        sourceImageDataUrl: dataUrl,
-      });
-      const next = res.imageUrls[0];
-      if (!next) throw new Error("未返回结果");
-      applyUrl(next, canvasW, canvasH);
-      toast({ title: "消除完成", variant: "success" });
+      const erased = await eraseImageLayerRegion({ sourceImageUrl: imageUrl, maskDataUrl: mask });
+      setEraseProgress(100);
+      applyUrl(erased.imageUrl, canvasW, canvasH);
     } catch (e) {
       await alert({
         title: "消除失败",
@@ -1155,7 +1212,48 @@ export function ImageEditorStudio() {
         variant: "error",
       });
     } finally {
-      setBusy(false);
+      setEraseRunning(false);
+    }
+  };
+
+  const runAutoErase = async (id: EraseTargetId) => {
+    const item = ERASE_TARGETS.find((row) => row.id === id);
+    if (!item) return;
+    if (!imageUrl) {
+      setEraseTargets((prev) => ({ ...prev, [id]: false }));
+      await alert({ title: "无法消除", message: "请先打开一张图片。" });
+      return;
+    }
+    if (eraseRunning) return;
+    setEraseNotice(null);
+    setEraseTargets((prev) => ({ ...prev, [id]: true }));
+    setEraseRunning(true);
+    try {
+      const dataUrl = await urlToDataUrl(imageUrl);
+      const res = await submitImageProcessingEdit({
+        mode: "editor",
+        prompt: `如果画面中有${item.prompt}，只去掉${item.prompt}，用周围画面自然补上，其余物体、构图和颜色都保持不变。如果画面中没有${item.prompt}，请原样返回，不要做任何修改。`,
+        model: imageEditorModel,
+        generativeModel: imageEditorModel,
+        sourceImageDataUrl: dataUrl,
+      });
+      const next = res.imageUrls[0];
+      if (!next) throw new Error("未返回结果");
+      if (await imagesNearlyUnchanged(imageUrl, next)) {
+        setEraseNotice(`未识别到${item.notice}，请尝试手动选择需要消除的区域。`);
+        return;
+      }
+      setEraseProgress(100);
+      applyUrl(next, canvasW, canvasH);
+    } catch (e) {
+      await alert({
+        title: "消除失败",
+        message: e instanceof Error ? e.message : "请稍后重试",
+        variant: "error",
+      });
+    } finally {
+      setEraseTargets((prev) => ({ ...prev, [id]: false }));
+      setEraseRunning(false);
     }
   };
 
@@ -1337,20 +1435,28 @@ export function ImageEditorStudio() {
         );
       case "erase":
         return (
-          <ToolPanelCard title="消除笔">
-            <div className="space-y-3">
-              <p className="text-[11px] text-[var(--ie-subtle)]">用自然语言描述要消除的区域（无需手动画笔）。</p>
-              <textarea
-                className="min-h-[5rem] w-full rounded-lg border border-[var(--ie-border-soft)] bg-[var(--ie-cream)] px-2.5 py-2 text-[11px] text-[var(--ie-ink)]"
-                value={erasePrompt}
-                onChange={(e) => setErasePrompt(e.target.value)}
-              />
-              <EcomButtonPrimary type="button" className="w-full" disabled={!imageUrl || busy} onClick={() => void runErase()}>
-                {busy ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : null}
-                运行消除
-              </EcomButtonPrimary>
-            </div>
-          </ToolPanelCard>
+          <ImageEditorErasePanel
+            tab={eraseTab}
+            onTab={setEraseTab}
+            targets={eraseTargets}
+            onToggleTarget={(id) => {
+              if (eraseRunning) return;
+              if (eraseTargets[id]) {
+                setEraseTargets((prev) => ({ ...prev, [id]: false }));
+                return;
+              }
+              void runAutoErase(id);
+            }}
+            brushSize={eraseBrush}
+            onBrushSize={setEraseBrush}
+            busy={eraseRunning}
+            onReset={() => {
+              setEraseTargets({});
+              setEraseBrush(25);
+              setEraseNotice(null);
+              eraseLayerRef.current?.clear();
+            }}
+          />
         );
       case "cutout":
         return (
@@ -1498,8 +1604,37 @@ export function ImageEditorStudio() {
               "flex min-h-0 min-w-0 flex-1 lg:rounded-xl lg:border lg:border-[var(--ie-border-soft)] lg:bg-[var(--ie-canvas-well)]",
               canvasFrameInteract || resizeInteract ? "overflow-visible" : "overflow-hidden",
               cutoutOpen && "hidden",
+              "relative",
             )}
           >
+            {eraseRunning ? (
+              <div className="absolute left-4 right-4 top-3 z-[80]">
+                <div className="mb-1 flex items-center justify-between text-[11px] text-[var(--ie-muted)]">
+                  <span>正在消除</span>
+                  <span>{eraseProgress}%</span>
+                </div>
+                <div
+                  className="ecom-upload-progress"
+                  role="progressbar"
+                  aria-valuenow={eraseProgress}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                >
+                  <span style={{ width: `${eraseProgress}%` }} />
+                </div>
+              </div>
+            ) : eraseNotice ? (
+              <button
+                type="button"
+                className="absolute left-1/2 top-3 z-[80] flex max-w-[min(92%,440px)] -translate-x-1/2 items-center gap-2 rounded-lg bg-white px-3 py-2 text-left text-[13px] text-[#1d1d1f] shadow-md"
+                onClick={() => setEraseNotice(null)}
+              >
+                <span className="grid h-4 w-4 shrink-0 place-items-center rounded-full bg-[#ff9f0a] text-[11px] font-semibold leading-none text-white">
+                  !
+                </span>
+                {eraseNotice}
+              </button>
+            ) : null}
             <ImageEditorCanvasStage
               imageUrl={imageUrl}
               displayUrl={displayUrl}
@@ -1567,6 +1702,19 @@ export function ImageEditorStudio() {
               onTextDelete={deleteTextSelection}
               onTextCopyStyle={onCopyTextStyle}
               onTextAiFlower={onTextAiFlower}
+              eraseOverlay={
+                tool === "erase" && eraseTab === "manual" && imageUrl ? (
+                  <ImageEditorEraseLayer
+                    ref={eraseLayerRef}
+                    tool="brush"
+                    brushSize={eraseBrush}
+                    disabled={eraseRunning}
+                    imageWidth={naturalW || canvasW}
+                    imageHeight={naturalH || canvasH}
+                    onStrokeEnd={() => void runManualErase()}
+                  />
+                ) : null
+              }
             />
           </div>
 

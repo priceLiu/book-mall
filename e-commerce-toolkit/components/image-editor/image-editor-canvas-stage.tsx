@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 
 import { Check, Hand, Hash, Layers, Minus, Plus, RotateCw, SquareSplitHorizontal, Trash2, X } from "lucide-react";
 
