@@ -261,6 +261,7 @@ export function MarketListClient({ initial }: Props) {
       if (task !== "all") qs.set("task", task);
       const res = await fetch(
         `/api/book-mall/api/gateway/market/models?${qs.toString()}`,
+        { cache: "no-store", credentials: "include" },
       );
       const json = (await res.json()) as MarketListResponse;
       if (res.ok) setData(json);

@@ -58,6 +58,7 @@ async function proxyToBookMall(request: NextRequest, pathSegments: string[]) {
       status: r.status,
       headers: {
         "Content-Type": respContentType,
+        "Cache-Control": "private, no-store",
       },
     });
   } catch (e: unknown) {

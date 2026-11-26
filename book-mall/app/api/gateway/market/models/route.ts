@@ -52,8 +52,11 @@ export async function GET(request: NextRequest) {
     pageSize,
   });
 
-  return NextResponse.json({
-    ...result,
-    heroSlides: featuredHeroSlides(),
-  });
+  return NextResponse.json(
+    {
+      ...result,
+      heroSlides: featuredHeroSlides(),
+    },
+    { headers: { "Cache-Control": "private, no-store" } },
+  );
 }
