@@ -56,7 +56,7 @@ export function ProductImageSetLayoutRefUpload({ projectId, disabled }: Props) {
       className={cn(
         "mt-4 rounded-lg border border-dashed px-3 py-3 outline-none transition-colors",
         dragOver
-          ? "border-[var(--ecom-outline-border)] bg-[#f0f6ff]"
+          ? "border-[var(--ecom-outline-border)] bg-[var(--ecom-content-selected-bg)]"
           : "border-[#c7c7cc] bg-[#fafafa] hover:border-[var(--ecom-outline-border)]/50",
       )}
     >
@@ -73,7 +73,7 @@ export function ProductImageSetLayoutRefUpload({ projectId, disabled }: Props) {
         }}
       />
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-[11px] text-[#6e6e73]">
+        <p className="text-[11px] text-[var(--ecom-muted)]">
           自定义版式参考 · {IMAGE_UPLOAD_DROP_HINT}
           {uploading ? " · 上传中…" : ""}
         </p>
@@ -91,7 +91,7 @@ export function ProductImageSetLayoutRefUpload({ projectId, disabled }: Props) {
         </EcomButtonSecondary>
       </div>
       {dragOver ? (
-        <p className="mt-1 text-[10px] text-[#0071e3]">松开以上传</p>
+        <p className="mt-1 text-[10px] text-[var(--ecom-primary)]">松开以上传</p>
       ) : null}
     </div>
   );

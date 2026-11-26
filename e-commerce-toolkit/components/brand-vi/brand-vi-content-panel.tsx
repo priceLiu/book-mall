@@ -350,13 +350,13 @@ export function BrandViContentPanel({
         ref={scrollRootRef}
         className="ecom-scrollbar-overlay h-full min-h-0 w-full overflow-x-hidden overflow-y-auto overscroll-y-contain [overflow-anchor:none]"
       >
-        <header className="sticky top-0 z-20 border-b border-[#e8e8ed] bg-white px-5 py-3 shadow-[0_1px_0_0_rgba(0,0,0,0.04)]">
+        <header className="sticky top-0 z-20 border-b border-[var(--ecom-divider)] bg-white px-5 py-3 shadow-[0_1px_0_0_rgba(0,0,0,0.04)]">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <EcomWorkspaceTitleHeading
               guideModuleId="vi"
               title={project.title?.trim() || "品牌VI表情包SOP"}
             >
-              <p className="text-[11px] text-[#6e6e73]">
+              <p className="text-[11px] text-[var(--ecom-muted)]">
                 参考图转潮玩盲盒 IP 全案 · 8 步 · 已出 {progress}/{totalSlots} 张
                 {project.meta?.workflow?.heroLockedUrl ? " · 主形象已定稿" : ""}
                 {" · 成图自动入库「我的资产 · 品牌VI表情包SOP」"}
@@ -426,7 +426,7 @@ export function BrandViContentPanel({
           </div>
         </header>
 
-        <section className="border-b border-[#e8e8ed] px-5 py-4">
+        <section className="border-b border-[var(--ecom-divider)] px-5 py-4">
           <BrandViRefUploader
             references={project.references}
             onUpload={onRefUpload}
@@ -438,34 +438,34 @@ export function BrandViContentPanel({
             sketchGenBusy={sketchGenBusy}
             uploadProgress={uploadProgress}
           />
-          <p className="mt-2 text-[11px] leading-relaxed text-[#6e6e73]">
+          <p className="mt-2 text-[11px] leading-relaxed text-[var(--ecom-muted)]">
             可仅上传参考图，或补充下方文字 brief 无图启动；第 1 步定稿的主形象会作为后续每步的参考图。
           </p>
           <div className="mt-4 grid gap-2 sm:grid-cols-3">
-            <label className="block text-[11px] font-medium text-[#6e6e73]">
+            <label className="block text-[11px] font-medium text-[var(--ecom-muted)]">
               品牌名称
               <input
-                className="mt-1 w-full rounded-lg border border-[#e8e8ed] px-2.5 py-1.5 text-[13px] text-[#1d1d1f]"
+                className="mt-1 w-full rounded-lg border border-[var(--ecom-divider)] px-2.5 py-1.5 text-[13px] text-[var(--ecom-ink)]"
                 defaultValue={briefRecord.brandName ?? ""}
                 disabled={disabledAll}
                 onBlur={(e) => void patchBriefField("brandName", e.target.value)}
                 placeholder="例如：某某科技"
               />
             </label>
-            <label className="block text-[11px] font-medium text-[#6e6e73] sm:col-span-2">
+            <label className="block text-[11px] font-medium text-[var(--ecom-muted)] sm:col-span-2">
               角色 / 气质描述
               <input
-                className="mt-1 w-full rounded-lg border border-[#e8e8ed] px-2.5 py-1.5 text-[13px] text-[#1d1d1f]"
+                className="mt-1 w-full rounded-lg border border-[var(--ecom-divider)] px-2.5 py-1.5 text-[13px] text-[var(--ecom-ink)]"
                 defaultValue={briefRecord.characterDescription ?? ""}
                 disabled={disabledAll}
                 onBlur={(e) => void patchBriefField("characterDescription", e.target.value)}
                 placeholder="Q 版博主、软萌、主色绿白…"
               />
             </label>
-            <label className="block text-[11px] font-medium text-[#6e6e73] sm:col-span-3">
+            <label className="block text-[11px] font-medium text-[var(--ecom-muted)] sm:col-span-3">
               主色偏好（可选）
               <input
-                className="mt-1 w-full rounded-lg border border-[#e8e8ed] px-2.5 py-1.5 text-[13px] text-[#1d1d1f]"
+                className="mt-1 w-full rounded-lg border border-[var(--ecom-divider)] px-2.5 py-1.5 text-[13px] text-[var(--ecom-ink)]"
                 defaultValue={briefRecord.primaryColorHint ?? ""}
                 disabled={disabledAll}
                 onBlur={(e) => void patchBriefField("primaryColorHint", e.target.value)}

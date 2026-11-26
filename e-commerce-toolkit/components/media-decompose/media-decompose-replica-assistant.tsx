@@ -727,7 +727,7 @@ export function MediaDecomposeReplicaAssistantProvider({
           <Plus className={ECOM_ASSISTANT_CONTROL_ICON_CLASS} />
         </EcomAssistantIconButton>
         <textarea
-          className="max-h-24 min-h-[2.25rem] flex-1 resize-none rounded-xl border border-[var(--ecom-assistant-input-border)] bg-[var(--ecom-assistant-input-bg)] px-3 py-2 text-sm text-[#1d1d1f] outline-none placeholder:text-[#86868b] focus:border-[var(--ecom-chrome-accent)] disabled:opacity-50"
+          className="max-h-24 min-h-[2.25rem] flex-1 resize-none rounded-xl border border-[var(--ecom-assistant-input-border)] bg-[var(--ecom-assistant-input-bg)] px-3 py-2 text-sm text-[var(--ecom-ink)] outline-none placeholder:text-[var(--ecom-subtle)] focus:border-[var(--ecom-chrome-accent)] disabled:opacity-50"
           rows={1}
           placeholder={replicaComposerPlaceholder({
             modelReady,

@@ -16,7 +16,7 @@ type Props = {
 function adaptStatusLabel(shot: SceneShot): { label: string; className: string } {
   const adapt = shot.outfitStoryboardAdapt;
   if (adapt?.status === "generating") {
-    return { label: "适配中", className: "text-[#0071e3]" };
+    return { label: "适配中", className: "text-[var(--ecom-primary)]" };
   }
   if (adapt?.status === "success") {
     return { label: "已适配", className: "text-[#34c759]" };
@@ -24,7 +24,7 @@ function adaptStatusLabel(shot: SceneShot): { label: string; className: string }
   if (adapt?.status === "failed") {
     return { label: "失败", className: "text-[#ff3b30]" };
   }
-  return { label: "未适配", className: "text-[#86868b]" };
+  return { label: "未适配", className: "text-[var(--ecom-subtle)]" };
 }
 
 export function OutfitShotStoryboardAdaptCell({
@@ -60,7 +60,7 @@ export function OutfitShotStoryboardAdaptCell({
         <p className="text-[10px] leading-snug text-[#ff3b30]">{adapt.failReason}</p>
       ) : null}
       {adapt?.status === "success" && adapt.adjustLogic ? (
-        <p className="line-clamp-3 text-[10px] leading-snug text-[#6e6e73]" title={adapt.adjustLogic}>
+        <p className="line-clamp-3 text-[10px] leading-snug text-[var(--ecom-muted)]" title={adapt.adjustLogic}>
           {adapt.adjustLogic}
         </p>
       ) : null}

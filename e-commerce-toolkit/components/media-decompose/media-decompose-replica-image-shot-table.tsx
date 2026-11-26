@@ -42,14 +42,14 @@ export function MediaDecomposeReplicaImageShotTable({
   }
 
   return (
-    <div className="overflow-x-auto rounded-xl border border-[#e8e8ed]">
+    <div className="overflow-x-auto rounded-xl border border-[var(--ecom-divider)]">
       {mentionRefs && mentionRefs.length > 0 ? (
-        <div className="border-b border-[#e8e8ed] bg-[#fafafa] px-3 py-2.5">
+        <div className="border-b border-[var(--ecom-divider)] bg-[#fafafa] px-3 py-2.5">
           <EcomPromptMentionRefBar refs={mentionRefs} onPreviewImage={onPreviewImage} />
         </div>
       ) : null}
 
-      <div className="divide-y divide-[#e8e8ed]">
+      <div className="divide-y divide-[var(--ecom-divider)]">
         {shots.map((shot) => {
           const imageBusy = generatingImageIndices?.has(shot.index) ?? false;
           const videoBusy = generatingVideoIndices?.has(shot.index) ?? false;
@@ -58,22 +58,22 @@ export function MediaDecomposeReplicaImageShotTable({
           return (
             <section key={shot.index} className="bg-white p-3">
               <header className="mb-2 flex flex-wrap items-center gap-2">
-                <span className="text-xs font-semibold text-[#1d1d1f]">镜 {shot.index}</span>
-                <span className="text-[11px] text-[#6e6e73]">{shot.timeSlice}</span>
+                <span className="text-xs font-semibold text-[var(--ecom-ink)]">镜 {shot.index}</span>
+                <span className="text-[11px] text-[var(--ecom-muted)]">{shot.timeSlice}</span>
                 {shot.sceneDescription?.trim() ? (
-                  <span className="text-[11px] text-[#6e6e73]">· {shot.sceneDescription}</span>
+                  <span className="text-[11px] text-[var(--ecom-muted)]">· {shot.sceneDescription}</span>
                 ) : null}
               </header>
 
               <div className="grid gap-3 lg:grid-cols-[7.5rem_minmax(0,1fr)_auto] lg:items-start">
                 <div className="space-y-1">
-                  <p className="text-[10px] font-medium uppercase tracking-wide text-[#6e6e73]">
+                  <p className="text-[10px] font-medium uppercase tracking-wide text-[var(--ecom-muted)]">
                     分镜图
                   </p>
                   <button
                     type="button"
                     className={cn(
-                      "relative block h-[8.5rem] w-[7.5rem] overflow-hidden rounded-lg border border-[#e8e8ed] bg-[#f5f5f7]",
+                      "relative block h-[8.5rem] w-[7.5rem] overflow-hidden rounded-lg border border-[var(--ecom-divider)] bg-[var(--ecom-parchment)]",
                       shot.imageUrl?.trim() && !imageBusy && "cursor-zoom-in",
                     )}
                     disabled={!shot.imageUrl?.trim() || imageBusy}
@@ -92,7 +92,7 @@ export function MediaDecomposeReplicaImageShotTable({
                         unoptimized
                       />
                     ) : !imageBusy ? (
-                      <span className="flex h-full flex-col items-center justify-center gap-1 text-[#86868b]">
+                      <span className="flex h-full flex-col items-center justify-center gap-1 text-[var(--ecom-subtle)]">
                         <ImageIcon className="h-5 w-5" />
                         <span className="text-[10px]">待生图</span>
                       </span>
@@ -104,7 +104,7 @@ export function MediaDecomposeReplicaImageShotTable({
                 </div>
 
                 <div className="space-y-1 min-w-0">
-                  <p className="text-[10px] font-medium uppercase tracking-wide text-[#6e6e73]">
+                  <p className="text-[10px] font-medium uppercase tracking-wide text-[var(--ecom-muted)]">
                     生图 Prompt
                   </p>
                   <ProductDesignPromptMentionTextarea
@@ -112,7 +112,7 @@ export function MediaDecomposeReplicaImageShotTable({
                     referenceImages={mentionRefs ?? []}
                     disabled={rowDisabled}
                     minHeightClass="min-h-[10rem]"
-                    className="rounded-lg border border-[#e8e8ed] bg-white px-2 py-1.5 text-xs leading-relaxed"
+                    className="rounded-lg border border-[var(--ecom-divider)] bg-white px-2 py-1.5 text-xs leading-relaxed"
                     hideQuickInsert
                     showTopRefBar={false}
                     onChange={(next) => patchShot(shot.index, { imagePrompt: next })}
@@ -141,9 +141,9 @@ export function MediaDecomposeReplicaImageShotTable({
                 </div>
               </div>
 
-              <div className="mt-3 grid gap-3 border-t border-dashed border-[#e8e8ed] pt-3 lg:grid-cols-[7.5rem_minmax(0,1fr)_auto] lg:items-start">
+              <div className="mt-3 grid gap-3 border-t border-dashed border-[var(--ecom-divider)] pt-3 lg:grid-cols-[7.5rem_minmax(0,1fr)_auto] lg:items-start">
                 <div className="space-y-2">
-                  <p className="text-[10px] font-medium uppercase tracking-wide text-[#6e6e73]">
+                  <p className="text-[10px] font-medium uppercase tracking-wide text-[var(--ecom-muted)]">
                     分镜视频
                   </p>
                   <EcomVideoSlot
@@ -168,7 +168,7 @@ export function MediaDecomposeReplicaImageShotTable({
                         onPreviewImage?.(shot.imageUrl!, `镜 ${shot.index} · 生视频首帧`)
                       }
                     >
-                      <p className="mb-1 px-0.5 text-[9px] font-medium text-[#0071e3]">首帧参考</p>
+                      <p className="mb-1 px-0.5 text-[9px] font-medium text-[var(--ecom-primary)]">首帧参考</p>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={shot.imageUrl}
@@ -181,7 +181,7 @@ export function MediaDecomposeReplicaImageShotTable({
                 </div>
 
                 <div className="space-y-1 min-w-0">
-                  <p className="text-[10px] font-medium uppercase tracking-wide text-[#6e6e73]">
+                  <p className="text-[10px] font-medium uppercase tracking-wide text-[var(--ecom-muted)]">
                     视频 Prompt
                   </p>
                   <ProductDesignPromptMentionTextarea
@@ -189,15 +189,15 @@ export function MediaDecomposeReplicaImageShotTable({
                     referenceImages={mentionRefs ?? []}
                     disabled={rowDisabled}
                     minHeightClass="min-h-[10rem]"
-                    className="rounded-lg border border-[#e8e8ed] bg-white px-2 py-1.5 text-xs leading-relaxed"
+                    className="rounded-lg border border-[var(--ecom-divider)] bg-white px-2 py-1.5 text-xs leading-relaxed"
                     hideQuickInsert
                     showTopRefBar={false}
                     onChange={(next) => patchShot(shot.index, { videoPrompt: next })}
                   />
                   {shot.imageUrl?.trim() ? (
-                    <p className="text-[10px] text-[#0071e3]">生视频时将优先带入上方分镜图</p>
+                    <p className="text-[10px] text-[var(--ecom-primary)]">生视频时将优先带入上方分镜图</p>
                   ) : (
-                    <p className="text-[10px] text-[#86868b]">
+                    <p className="text-[10px] text-[var(--ecom-subtle)]">
                       未生成分镜图时将直接用 @人物A / @产品1 等 token 参考生成
                     </p>
                   )}

@@ -508,11 +508,11 @@ export function IpMasterStudio() {
         <EcomWorkspaceTitleHeading
           heading="h1"
           guideModuleId="ip"
-          titleClassName="text-xl font-semibold text-[#1d1d1f]"
+          titleClassName="text-xl font-semibold text-[var(--ecom-ink)]"
           className="text-center"
           title="IP 母版"
         />
-        <p className="max-w-md text-center text-sm text-[#6e6e73]">
+        <p className="max-w-md text-center text-sm text-[var(--ecom-muted)]">
           傻瓜式输入 → 大模型生成结构化模板 → 保存基准图与模板进母版库，供手办 / 品牌 VI 导入。
         </p>
         <EcomButtonPrimary type="button" onClick={() => void handleStartFirst()}>

@@ -59,7 +59,7 @@ const USE_CASES = [
   },
   {
     icon: Smile,
-    color: "text-[#6e6e73]",
+    color: "text-[var(--ecom-muted)]",
     title: "朋友群聊",
     desc: "为群聊、生日吐槽、单身派对、家庭聚会定制梗图。经典上下排版 + Impact 字体依然无可匹敌。",
   },
@@ -140,13 +140,13 @@ export function ImageMemePanel({
 
   return (
     <div className="mt-6 space-y-4 sm:mt-8 sm:space-y-6">
-      <div className="rounded-xl border border-sky-100 bg-sky-50/80 px-3 py-3 text-sm leading-relaxed text-[#1d1d1f] sm:px-4">
+      <div className="rounded-xl border border-sky-100 bg-sky-50/80 px-3 py-3 text-sm leading-relaxed text-[var(--ecom-ink)] sm:px-4">
         为生成图添加 Impact 风格文字，让梗图更清晰易读。经 Gateway 调用 Seedream / KIE 模型生成，无水印。
       </div>
 
       <div className="rounded-2xl border border-[#e5e5ea] bg-white p-4 shadow-sm sm:p-6">
         <div>
-          <p className="text-sm font-medium text-[#1d1d1f]">表情包格式</p>
+          <p className="text-sm font-medium text-[var(--ecom-ink)]">表情包格式</p>
           <div className="mt-2 flex flex-wrap gap-2">
             {MEME_FORMAT_OPTIONS.map((o) => (
               <button
@@ -166,47 +166,47 @@ export function ImageMemePanel({
           </div>
         </div>
 
-        <label className="mt-4 block text-sm font-medium text-[#1d1d1f]">
+        <label className="mt-4 block text-sm font-medium text-[var(--ecom-ink)]">
           描述一下场景
           <textarea
             value={sceneDescription}
             onChange={(e) => setSceneDescription(e.target.value)}
             rows={3}
             placeholder="一只一脸茫然的金毛犬坐在笔记本电脑前，屏幕上显示着 Python 代码。"
-            className="mt-2 w-full resize-y rounded-xl border border-[#d2d2d7] px-4 py-3 text-sm font-normal"
+            className="mt-2 w-full resize-y rounded-xl border border-[var(--ecom-border-soft)] px-4 py-3 text-sm font-normal"
           />
         </label>
 
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
-          <label className="block text-sm font-medium text-[#1d1d1f]">
+          <label className="block text-sm font-medium text-[var(--ecom-ink)]">
             顶部文字（可选）
             <input
               type="text"
               value={topText}
               onChange={(e) => setTopText(e.target.value)}
               placeholder="当你最终"
-              className="mt-1 w-full rounded-lg border border-[#d2d2d7] px-3 py-2.5 text-sm font-normal"
+              className="mt-1 w-full rounded-lg border border-[var(--ecom-border-soft)] px-3 py-2.5 text-sm font-normal"
             />
           </label>
-          <label className="block text-sm font-medium text-[#1d1d1f]">
+          <label className="block text-sm font-medium text-[var(--ecom-ink)]">
             底部文字（可选）
             <input
               type="text"
               value={bottomText}
               onChange={(e) => setBottomText(e.target.value)}
               placeholder="凌晨 3 点修复漏洞"
-              className="mt-1 w-full rounded-lg border border-[#d2d2d7] px-3 py-2.5 text-sm font-normal"
+              className="mt-1 w-full rounded-lg border border-[var(--ecom-border-soft)] px-3 py-2.5 text-sm font-normal"
             />
           </label>
         </div>
 
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="text-sm font-medium text-[#1d1d1f]">文本样式</label>
+            <label className="text-sm font-medium text-[var(--ecom-ink)]">文本样式</label>
             <select
               value={textStyle}
               onChange={(e) => setTextStyle(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-[#d2d2d7] bg-white px-3 py-2.5 text-sm"
+              className="mt-1 w-full rounded-lg border border-[var(--ecom-border-soft)] bg-white px-3 py-2.5 text-sm"
             >
               {MEME_TEXT_STYLE_OPTIONS.map((o) => (
                 <option key={o.id} value={o.id}>
@@ -216,14 +216,14 @@ export function ImageMemePanel({
             </select>
           </div>
           <div>
-            <label className="text-sm font-medium text-[#1d1d1f]">变体</label>
+            <label className="text-sm font-medium text-[var(--ecom-ink)]">变体</label>
             <select
               value={variantCount}
               onChange={(e) => {
                 setVariantCount(e.target.value);
                 setImageCount(e.target.value);
               }}
-              className="mt-1 w-full rounded-lg border border-[#d2d2d7] bg-white px-3 py-2.5 text-sm"
+              className="mt-1 w-full rounded-lg border border-[var(--ecom-border-soft)] bg-white px-3 py-2.5 text-sm"
             >
               {COUNT_OPTIONS.map((o) => (
                 <option key={o.id} value={o.id}>
@@ -268,13 +268,13 @@ export function ImageMemePanel({
       </div>
 
       <section className="rounded-2xl border border-[#e5e5ea] bg-white p-4 sm:p-6">
-        <h3 className="text-lg font-semibold text-[#1d1d1f]">你可以做什么</h3>
+        <h3 className="text-lg font-semibold text-[var(--ecom-ink)]">你可以做什么</h3>
         <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {USE_CASES.map((c) => (
             <div key={c.title} className="rounded-xl border border-[#e5e5ea] bg-[#fafafa] p-4">
               <c.icon className={cn("mb-2 h-5 w-5", c.color)} />
-              <p className="font-medium text-[#1d1d1f]">{c.title}</p>
-              <p className="mt-1 text-sm text-[#6e6e73]">{c.desc}</p>
+              <p className="font-medium text-[var(--ecom-ink)]">{c.title}</p>
+              <p className="mt-1 text-sm text-[var(--ecom-muted)]">{c.desc}</p>
             </div>
           ))}
         </div>

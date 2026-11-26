@@ -54,10 +54,10 @@ export function EcomScrollLoadFooter({
               <span />
             </div>
           </div>
-          <p className="text-center text-xs text-[#86868b]">{loadingLabel}</p>
+          <p className="text-center text-xs text-[var(--ecom-subtle)]">{loadingLabel}</p>
         </div>
       ) : (
-        <p className="text-center text-xs text-[#86868b]">{idleLabel}</p>
+        <p className="text-center text-xs text-[var(--ecom-subtle)]">{idleLabel}</p>
       )}
     </div>
   );

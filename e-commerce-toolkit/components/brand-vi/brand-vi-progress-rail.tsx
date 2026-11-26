@@ -39,7 +39,7 @@ export function BrandViProgressRail({ project, currentStepId, onStepClick }: Pro
               {state === "done" ? <Check className="h-3 w-3" strokeWidth={3} /> : step.short}
             </span>
             <span className={progressRailStepLabelClass(state)}>{step.label}</span>
-            <span className="text-[8px] leading-none text-[#86868b]">
+            <span className="text-[8px] leading-none text-[var(--ecom-subtle)]">
               {done}/{step.count}
             </span>
           </button>

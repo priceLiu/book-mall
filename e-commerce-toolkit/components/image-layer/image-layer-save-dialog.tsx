@@ -82,22 +82,22 @@ export function ImageLayerSaveDialog({
       }}
     >
       <div
-        className="relative flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-[#e8e8ed] bg-white shadow-xl"
+        className="relative flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-[var(--ecom-divider)] bg-white shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <EcomDialogCloseButton disabled={anyBusy} onClick={() => onOpenChange(false)} />
-        <div className="border-b border-[#e8e8ed] px-5 py-4 pr-12">
-          <h2 id="image-layer-save-title" className="text-base font-semibold text-[#1d1d1f]">
+        <div className="border-b border-[var(--ecom-divider)] px-5 py-4 pr-12">
+          <h2 id="image-layer-save-title" className="text-base font-semibold text-[var(--ecom-ink)]">
             保存图片
           </h2>
-          <p className="mt-1 text-[12px] leading-relaxed text-[#6e6e73]">
+          <p className="mt-1 text-[12px] leading-relaxed text-[var(--ecom-muted)]">
             改层 / 重绘 / 擦除后的新图可下载，或保存到「我的资产 · 图片处理」。
           </p>
         </div>
 
         <div className="ecom-scrollbar-thin min-h-0 flex-1 overflow-y-auto px-5 py-4">
           {resultItem ? (
-            <div className="mb-4 overflow-hidden rounded-xl border border-[#e5e7eb] bg-[#f5f5f7]">
+            <div className="mb-4 overflow-hidden rounded-xl border border-[#e5e7eb] bg-[var(--ecom-parchment)]">
               <img
                 src={imageLayerComposeImageSrc(resultItem.url)}
                 alt="当前结果图"
@@ -136,7 +136,7 @@ export function ImageLayerSaveDialog({
           {error ? <p className="mt-3 text-xs text-[#dc2626]">{error}</p> : null}
         </div>
 
-        <div className="flex flex-wrap justify-end gap-2 border-t border-[#e8e8ed] px-5 py-4">
+        <div className="flex flex-wrap justify-end gap-2 border-t border-[var(--ecom-divider)] px-5 py-4">
           {items.length > 1 ? (
             <EcomButtonSecondary
               type="button"

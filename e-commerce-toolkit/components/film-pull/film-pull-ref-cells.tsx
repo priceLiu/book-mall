@@ -4,8 +4,8 @@ function RefThumb({ url, label }: { url: string; label?: string }) {
   return (
     <div className="flex flex-col items-center gap-0.5">
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={url} alt={label ?? ""} className="h-9 w-9 rounded object-cover ring-1 ring-[#e8e8ed]" />
-      {label ? <span className="max-w-[3rem] truncate text-[9px] text-[#6e6e73]">{label}</span> : null}
+      <img src={url} alt={label ?? ""} className="h-9 w-9 rounded object-cover ring-1 ring-[var(--ecom-divider)]" />
+      {label ? <span className="max-w-[3rem] truncate text-[9px] text-[var(--ecom-muted)]">{label}</span> : null}
     </div>
   );
 }
@@ -19,7 +19,7 @@ export function FilmPullRefReadOnlyCell({
 }) {
   const selected = refs.filter((r) => selectedIds.includes(r.id));
   if (selected.length === 0) {
-    return <span className="text-[#86868b]">—</span>;
+    return <span className="text-[var(--ecom-subtle)]">—</span>;
   }
   return (
     <div className="flex flex-wrap gap-1">
@@ -55,7 +55,7 @@ export function FilmPullRefToggleCell({
               type="button"
               disabled={disabled}
               title={`${ref.label ?? ref.id} · 点击取消`}
-              className="rounded-lg p-0.5 ring-2 ring-[#0071e3] transition"
+              className="rounded-lg p-0.5 ring-2 ring-[var(--ecom-primary)] transition"
               onClick={() => onChange(selectedIds.filter((id) => id !== ref.id))}
             >
               <RefThumb url={ref.ossUrl} label={ref.label} />
@@ -63,11 +63,11 @@ export function FilmPullRefToggleCell({
           ))}
         </div>
       ) : (
-        <span className="text-[#86868b]">—</span>
+        <span className="text-[var(--ecom-subtle)]">—</span>
       )}
       {available.length > 0 && !disabled ? (
         <div className="flex flex-wrap items-center gap-1">
-          <span className="text-[9px] text-[#86868b]">可选</span>
+          <span className="text-[9px] text-[var(--ecom-subtle)]">可选</span>
           {available.map((ref) => (
             <button
               key={ref.id}

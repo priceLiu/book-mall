@@ -331,8 +331,8 @@ export function ModelShotStudio() {
     return (
       <EcomWorkspaceLayout fullWidth>
         <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4 px-6 py-16 text-center">
-          <h2 className="text-xl font-semibold text-[#1d1d1f]">服装模特图</h2>
-          <p className="max-w-md text-sm text-[#6e6e73]">
+          <h2 className="text-xl font-semibold text-[var(--ecom-ink)]">服装模特图</h2>
+          <p className="max-w-md text-sm text-[var(--ecom-muted)]">
             上传服装参考图，在右侧配置采集项并生成姿势方案，确认后于中栏批量生成上身展示图。
           </p>
           <EcomButtonSecondary type="button" onClick={() => void handleNewProject()} disabled={loading}>

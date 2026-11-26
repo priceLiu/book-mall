@@ -29,7 +29,7 @@ type Props = {
 };
 
 const textareaClass =
-  "w-full min-h-[120px] resize-y rounded-lg border border-[#d2d2d7] bg-white px-3 py-2 text-[13px] leading-relaxed text-[#1d1d1f] outline-none focus:border-[var(--ecom-outline-border)] focus:ring-1 focus:ring-[#1d1d1f]/15";
+  "w-full min-h-[120px] resize-y rounded-lg border border-[var(--ecom-border-soft)] bg-white px-3 py-2 text-[13px] leading-relaxed text-[var(--ecom-ink)] outline-none focus:border-[var(--ecom-outline-border)] focus:ring-1 focus:ring-[var(--ecom-ink)]/15";
 
 /** 镜头 Prompt 编辑：场景 / 生图 / 生视频 + 分镜表画面内容 */
 export function StoryboardPanelPromptEditDialog({
@@ -112,7 +112,7 @@ export function StoryboardPanelPromptEditDialog({
 
         <div className="ecom-scrollbar-thin min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
           <label className="block space-y-1.5">
-            <span className="text-sm font-medium text-[#1d1d1f]">画面内容（分镜表）</span>
+            <span className="text-sm font-medium text-[var(--ecom-ink)]">画面内容（分镜表）</span>
             <textarea
               className={textareaClass}
               value={visual}
@@ -122,16 +122,16 @@ export function StoryboardPanelPromptEditDialog({
           </label>
 
           {sceneRefCount > 0 ? (
-            <p className="text-[11px] leading-relaxed text-[#86868b]">
+            <p className="text-[11px] leading-relaxed text-[var(--ecom-subtle)]">
               已上传 {sceneRefCount} 张场景参考图；下方「场景 Prompt」写机位与局部差异。保存后生图/成片将按解析结果使用：
-              <span className="mt-1 block whitespace-pre-wrap text-[#6e6e73]">
+              <span className="mt-1 block whitespace-pre-wrap text-[var(--ecom-muted)]">
                 {resolvedScenePreview}
               </span>
             </p>
           ) : null}
 
           <label className="block space-y-1.5">
-            <span className="text-sm font-medium text-[#1d1d1f]">场景 Prompt</span>
+            <span className="text-sm font-medium text-[var(--ecom-ink)]">场景 Prompt</span>
             <textarea
               className={textareaClass}
               value={draft.scenePrompt ?? ""}
@@ -143,7 +143,7 @@ export function StoryboardPanelPromptEditDialog({
           </label>
 
           <label className="block space-y-1.5">
-            <span className="text-sm font-medium text-[#1d1d1f]">生图 Prompt</span>
+            <span className="text-sm font-medium text-[var(--ecom-ink)]">生图 Prompt</span>
             <textarea
               className={textareaClass}
               value={draft.imagePrompt ?? ""}
@@ -155,7 +155,7 @@ export function StoryboardPanelPromptEditDialog({
           </label>
 
           <label className="block space-y-1.5">
-            <span className="text-sm font-medium text-[#1d1d1f]">生视频 Prompt</span>
+            <span className="text-sm font-medium text-[var(--ecom-ink)]">生视频 Prompt</span>
             <textarea
               className={textareaClass}
               value={draft.videoPromptEn ?? ""}

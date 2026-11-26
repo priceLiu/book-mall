@@ -41,7 +41,7 @@ function ReplicaAssetCatalogSection({ catalog }: { catalog: MediaDecomposeReplic
   return (
     <Section title="复刻资产清单">
       {catalog.characterCount != null && catalog.characters.length > 0 ? (
-        <p className="mb-2 text-xs text-[#6e6e73]">
+        <p className="mb-2 text-xs text-[var(--ecom-muted)]">
           出镜人数：{catalog.characterCount}（已逐条列出 {catalog.characters.length} 人）
         </p>
       ) : null}
@@ -49,13 +49,13 @@ function ReplicaAssetCatalogSection({ catalog }: { catalog: MediaDecomposeReplic
         {REPLICA_CATALOG_GROUPS.map(({ key, title }) =>
           catalog[key].length > 0 ? (
             <div key={key}>
-              <p className="mb-1 text-xs font-semibold text-[#1d1d1f]">{title}</p>
+              <p className="mb-1 text-xs font-semibold text-[var(--ecom-ink)]">{title}</p>
               <ul className="list-inside list-disc space-y-2 text-sm text-[#424245]">
                 {catalog[key].map((entry) => (
                   <li key={`${key}-${entry.label}`}>
-                    <span className="font-medium text-[#1d1d1f]">{entry.label}</span>
+                    <span className="font-medium text-[var(--ecom-ink)]">{entry.label}</span>
                     {entry.roleInShot?.trim() ? (
-                      <span className="text-[#6e6e73]">（{entry.roleInShot}）</span>
+                      <span className="text-[var(--ecom-muted)]">（{entry.roleInShot}）</span>
                     ) : null}
                     <span className="whitespace-pre-wrap">：{entry.description}</span>
                   </li>
@@ -67,14 +67,14 @@ function ReplicaAssetCatalogSection({ catalog }: { catalog: MediaDecomposeReplic
       </div>
       {catalog.characterWardrobe && catalog.characterWardrobe.length > 0 ? (
         <div className="mt-3">
-          <p className="mb-1 text-xs font-semibold text-[#1d1d1f]">人物服装</p>
+          <p className="mb-1 text-xs font-semibold text-[var(--ecom-ink)]">人物服装</p>
           <ul className="list-inside list-disc space-y-2 text-sm text-[#424245]">
             {catalog.characterWardrobe.map((entry) => (
               <li key={entry.characterLabel}>
-                <span className="font-medium text-[#1d1d1f]">{entry.characterLabel}</span>
+                <span className="font-medium text-[var(--ecom-ink)]">{entry.characterLabel}</span>
                 <span className="whitespace-pre-wrap">：{entry.garments}</span>
                 {entry.stylingNotes?.trim() ? (
-                  <span className="text-[#6e6e73]">（{entry.stylingNotes}）</span>
+                  <span className="text-[var(--ecom-muted)]">（{entry.stylingNotes}）</span>
                 ) : null}
               </li>
             ))}
@@ -208,7 +208,7 @@ export function MediaDecomposeResultPanel({ structured }: Props) {
   const e = structured.elements;
   const l = e.lighting;
   return (
-    <div className="space-y-4 text-sm text-[#1d1d1f]">
+    <div className="space-y-4 text-sm text-[var(--ecom-ink)]">
       <Section title="画面要素">
         <ul className="list-inside list-disc space-y-1 text-[#424245]">
           <li>主体：{e.subject}</li>
@@ -237,7 +237,7 @@ export function MediaDecomposeResultPanel({ structured }: Props) {
         <ul className="list-inside list-disc space-y-2 text-[#424245]">
           {LIVE_ACTION_REPLICATION_FIELD_KEYS.map((key) => (
             <li key={key}>
-              <span className="font-medium text-[#1d1d1f]">
+              <span className="font-medium text-[var(--ecom-ink)]">
                 {LIVE_ACTION_REPLICATION_FIELD_LABELS[key]}：
               </span>
               <span className="whitespace-pre-wrap">
@@ -254,8 +254,8 @@ export function MediaDecomposeResultPanel({ structured }: Props) {
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div>
-      <h3 className="mb-2 text-sm font-semibold text-[#1d1d1f]">{title}</h3>
-      <div className="whitespace-pre-wrap rounded-lg border border-[#e8e8ed] bg-[#fafafa] p-3 text-sm text-[#424245]">
+      <h3 className="mb-2 text-sm font-semibold text-[var(--ecom-ink)]">{title}</h3>
+      <div className="whitespace-pre-wrap rounded-lg border border-[var(--ecom-divider)] bg-[#fafafa] p-3 text-sm text-[#424245]">
         {children}
       </div>
     </div>
@@ -266,16 +266,16 @@ function CopyBlock({ title, text }: { title: string; text: string }) {
   return (
     <div>
       <div className="mb-2 flex items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold text-[#1d1d1f]">{title}</h3>
+        <h3 className="text-sm font-semibold text-[var(--ecom-ink)]">{title}</h3>
         <button
           type="button"
-          className="text-xs text-[#0071e3] hover:underline"
+          className="text-xs text-[var(--ecom-primary)] hover:underline"
           onClick={() => void navigator.clipboard.writeText(text)}
         >
           复制
         </button>
       </div>
-      <pre className="whitespace-pre-wrap rounded-lg border border-[#e8e8ed] bg-[#fafafa] p-3 text-xs text-[#424245]">
+      <pre className="whitespace-pre-wrap rounded-lg border border-[var(--ecom-divider)] bg-[#fafafa] p-3 text-xs text-[#424245]">
         {text}
       </pre>
     </div>

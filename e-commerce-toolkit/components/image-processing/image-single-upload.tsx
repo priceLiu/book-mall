@@ -93,7 +93,7 @@ export function ImageSingleUpload({
                 e.stopPropagation();
                 onChange(null);
               }}
-              className="text-xs text-[#0071e3] hover:underline"
+              className="text-xs text-[var(--ecom-primary)] hover:underline"
             >
               清除图片
             </button>
@@ -101,8 +101,8 @@ export function ImageSingleUpload({
         ) : (
           <>
             <Icon className="h-10 w-10 text-violet-500" />
-            <p className="mt-3 font-medium text-[#1d1d1f]">{emptyLabel}</p>
-            <p className="mt-1 text-xs text-[#6e6e73]">{emptyHint}</p>
+            <p className="mt-3 font-medium text-[var(--ecom-ink)]">{emptyLabel}</p>
+            <p className="mt-1 text-xs text-[var(--ecom-muted)]">{emptyHint}</p>
           </>
         )}
       </button>

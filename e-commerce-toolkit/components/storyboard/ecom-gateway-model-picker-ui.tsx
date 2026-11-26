@@ -67,9 +67,9 @@ function roleBadgeTone(role: string): string {
     case "VIDEO":
       return "bg-[#e8f1ff] text-[#0058c7]";
     case "LLM":
-      return "bg-[#eef0f2] text-[#1d1d1f]";
+      return "bg-[#eef0f2] text-[var(--ecom-ink)]";
     default:
-      return "bg-[#eef0f2] text-[#6e6e73]";
+      return "bg-[#eef0f2] text-[var(--ecom-muted)]";
   }
 }
 
@@ -125,14 +125,14 @@ export function EcomGatewayModelCard({
       className={cn(
         "group relative flex w-full min-h-[4.75rem] flex-row items-stretch gap-4 rounded-xl border px-4 py-3 text-left transition",
         selected
-          ? "border-[var(--ecom-outline-border)] bg-[#f0f6ff] shadow-sm"
-          : "border-[#e8e8ed] bg-white hover:border-[#c7c7cc] hover:bg-[#fafafa]",
-        disabled && "cursor-not-allowed opacity-50 hover:border-[#e8e8ed] hover:bg-white",
+          ? "border-[var(--ecom-outline-border)] bg-[var(--ecom-content-selected-bg)] shadow-sm"
+          : "border-[var(--ecom-divider)] bg-white hover:border-[#c7c7cc] hover:bg-[#fafafa]",
+        disabled && "cursor-not-allowed opacity-50 hover:border-[var(--ecom-divider)] hover:bg-white",
       )}
     >
       <div className="flex min-w-0 flex-1 flex-col justify-center gap-1 pr-6">
         <div className="flex flex-wrap items-center gap-2">
-          <p className="text-[13px] font-semibold text-[#1d1d1f]">
+          <p className="text-[13px] font-semibold text-[var(--ecom-ink)]">
             {model.displayName || model.modelKey}
           </p>
           <span
@@ -145,14 +145,14 @@ export function EcomGatewayModelCard({
             {typeLabel}
           </span>
           {model.sourceLabel ? (
-            <span className="shrink-0 rounded bg-[#eef0f2] px-1.5 py-0.5 text-[10px] text-[#6e6e73]">
+            <span className="shrink-0 rounded bg-[#eef0f2] px-1.5 py-0.5 text-[10px] text-[var(--ecom-muted)]">
               {model.sourceLabel}
             </span>
           ) : null}
         </div>
-        <p className="truncate font-mono text-[11px] text-[#86868b]">{model.modelKey}</p>
+        <p className="truncate font-mono text-[11px] text-[var(--ecom-subtle)]">{model.modelKey}</p>
         {model.description ? (
-          <p className="line-clamp-1 text-[11px] leading-relaxed text-[#6e6e73]">
+          <p className="line-clamp-1 text-[11px] leading-relaxed text-[var(--ecom-muted)]">
             {model.description}
           </p>
         ) : null}
@@ -190,7 +190,7 @@ export function EcomGatewayModelMediaFilterBar({
   const tabs = storyboardModelFilterTabsForMode(mode);
   return (
     <div className="flex flex-wrap items-center gap-2 border-b border-[#f0f0f2] pb-3">
-      <span className="text-[11px] font-medium text-[#86868b]">类型</span>
+      <span className="text-[11px] font-medium text-[var(--ecom-subtle)]">类型</span>
       {tabs.map((tab) => {
         const count = models.filter((m) =>
           storyboardModelMatchesMediaFilter(m, mode, tab.id),
@@ -205,8 +205,8 @@ export function EcomGatewayModelMediaFilterBar({
             className={cn(
               "rounded-full border px-3 py-1 text-[12px] font-medium transition",
               active
-                ? "border-[var(--ecom-outline-border)] bg-[#f0f6ff] text-[var(--ecom-primary)]"
-                : "border-[#e8e8ed] bg-white text-[#6e6e73] hover:border-[#c7c7cc] hover:bg-[#fafafa]",
+                ? "border-[var(--ecom-outline-border)] bg-[var(--ecom-content-selected-bg)] text-[var(--ecom-primary)]"
+                : "border-[var(--ecom-divider)] bg-white text-[var(--ecom-muted)] hover:border-[#c7c7cc] hover:bg-[#fafafa]",
               tab.id !== "all" && count === 0 && "cursor-not-allowed opacity-40 hover:bg-white",
             )}
           >
@@ -283,7 +283,7 @@ export function EcomGatewayModelGroupedList({
         />
       ) : null}
       {filterEmpty ? (
-        <p className="rounded-xl border border-dashed border-[#e8e8ed] px-4 py-10 text-center text-sm text-[#86868b]">
+        <p className="rounded-xl border border-dashed border-[var(--ecom-divider)] px-4 py-10 text-center text-sm text-[var(--ecom-subtle)]">
           当前筛选下暂无模型，请切换类型或选择「全部」。
         </p>
       ) : (
@@ -291,7 +291,7 @@ export function EcomGatewayModelGroupedList({
           <section key={g.kind}>
             {!models.some((m) => m.platformOffering) ? (
               <header className="mb-2 flex items-center gap-2">
-                <h3 className="text-[12px] font-semibold text-[#1d1d1f]">{g.kind}</h3>
+                <h3 className="text-[12px] font-semibold text-[var(--ecom-ink)]">{g.kind}</h3>
               </header>
             ) : null}
             <div className="flex flex-col gap-2">

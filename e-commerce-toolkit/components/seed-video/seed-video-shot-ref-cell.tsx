@@ -61,8 +61,8 @@ export function SeedVideoShotRefCell({
       className={cn(
         "relative min-w-[7.5rem] space-y-1.5 rounded-lg border border-dashed p-1.5 transition-colors",
         dragOver || pasteReady
-          ? "border-[var(--ecom-outline-border)] bg-[#f0f6ff]"
-          : "border-[#e8e8ed] bg-[#fafafa]",
+          ? "border-[var(--ecom-outline-border)] bg-[var(--ecom-content-selected-bg)]"
+          : "border-[var(--ecom-divider)] bg-[#fafafa]",
       )}
       {...dropZoneProps}
     >
@@ -94,7 +94,7 @@ export function SeedVideoShotRefCell({
           removeLabel="取消本镜参考"
         />
       ) : (
-        <div className="flex h-12 items-center justify-center rounded-md border border-[#e8e8ed] bg-white px-2 text-[10px] leading-snug text-[#86868b]">
+        <div className="flex h-12 items-center justify-center rounded-md border border-[var(--ecom-divider)] bg-white px-2 text-[10px] leading-snug text-[var(--ecom-subtle)]">
           上传 / 粘贴
         </div>
       )}
@@ -131,7 +131,7 @@ export function SeedVideoShotRefCell({
                   aria-label="关闭参考图选择"
                   onClick={() => setPickerOpen(false)}
                 />
-                <div className="absolute left-0 top-full z-[50] mt-1 max-h-48 w-52 overflow-y-auto rounded-lg border border-[#e8e8ed] bg-white py-1 shadow-lg">
+                <div className="absolute left-0 top-full z-[50] mt-1 max-h-48 w-52 overflow-y-auto rounded-lg border border-[var(--ecom-divider)] bg-white py-1 shadow-lg">
                   {materials.map((ref, i) => {
                     const label = mentionRefs[i]?.token ?? `@图片${i + 1}`;
                     return (
@@ -139,8 +139,8 @@ export function SeedVideoShotRefCell({
                         key={ref.id}
                         type="button"
                         className={cn(
-                          "flex w-full items-center gap-2 px-2 py-1.5 text-left text-[11px] hover:bg-[#f5f5f7]",
-                          ref.id === refImageId && "bg-[#f0f6ff]",
+                          "flex w-full items-center gap-2 px-2 py-1.5 text-left text-[11px] hover:bg-[var(--ecom-parchment)]",
+                          ref.id === refImageId && "bg-[var(--ecom-content-selected-bg)]",
                         )}
                         onClick={() => {
                           onAssign(ref.id, label);
@@ -151,9 +151,9 @@ export function SeedVideoShotRefCell({
                         <img
                           src={ref.ossUrl}
                           alt=""
-                          className="h-8 w-8 shrink-0 rounded border border-[#e8e8ed] object-cover"
+                          className="h-8 w-8 shrink-0 rounded border border-[var(--ecom-divider)] object-cover"
                         />
-                        <span className="min-w-0 truncate text-[#1d1d1f]">{label}</span>
+                        <span className="min-w-0 truncate text-[var(--ecom-ink)]">{label}</span>
                       </button>
                     );
                   })}

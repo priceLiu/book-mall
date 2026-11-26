@@ -587,7 +587,7 @@ export function AiDetailPageStudio() {
           />
 
           <div className="ecom-scrollbar-overlay min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-y-contain">
-          <div className="border-b border-[#e8e8ed] bg-[#fafafa] px-5 py-3">
+          <div className="border-b border-[var(--ecom-divider)] bg-[#fafafa] px-5 py-3">
             <EcomRefUploadCard
               title="产品参考图"
               items={project.references

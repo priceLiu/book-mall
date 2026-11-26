@@ -52,7 +52,7 @@ export function StoryboardPanelCard({
     <article
       className={cn(
         "group relative flex shrink-0 flex-col overflow-hidden rounded-xl border bg-white shadow-sm transition",
-        selected ? "border-[var(--ecom-outline-border)] ring-2 ring-[#1d1d1f]/15" : "border-[#e8e8ed]",
+        selected ? "border-[var(--ecom-outline-border)] ring-2 ring-[var(--ecom-ink)]/15" : "border-[var(--ecom-divider)]",
       )}
       style={{ width: cardWidth }}
       onClick={
@@ -81,7 +81,7 @@ export function StoryboardPanelCard({
       ) : null}
       <div
         className={cn(
-          "relative w-full bg-[#f5f5f7]",
+          "relative w-full bg-[var(--ecom-parchment)]",
           storyboardPreviewAspectClass(aspectRatio),
           imageUrl && !busy && "group/image",
         )}
@@ -93,7 +93,7 @@ export function StoryboardPanelCard({
             type="button"
             title={generateImageTitle}
             disabled={!onRegenerateImage || busy}
-            className="flex h-full w-full flex-col items-center justify-center gap-2 text-[#86868b] transition hover:bg-[#ebebed] disabled:cursor-default disabled:hover:bg-transparent"
+            className="flex h-full w-full flex-col items-center justify-center gap-2 text-[var(--ecom-subtle)] transition hover:bg-[#ebebed] disabled:cursor-default disabled:hover:bg-transparent"
             onClick={(e) => {
               e.stopPropagation();
               onRegenerateImage?.();
@@ -123,10 +123,10 @@ export function StoryboardPanelCard({
       </div>
 
       <div className="flex items-center justify-between px-3 py-2">
-        <p className="text-xs font-semibold text-[#1d1d1f]">
+        <p className="text-xs font-semibold text-[var(--ecom-ink)]">
           {indexLabel} {panel.index}
           {panel.timeline ? (
-            <span className="ml-1 font-normal text-[#86868b]">{panel.timeline}</span>
+            <span className="ml-1 font-normal text-[var(--ecom-subtle)]">{panel.timeline}</span>
           ) : null}
         </p>
         {hasPanelVideo && onPreviewPanelVideo ? (

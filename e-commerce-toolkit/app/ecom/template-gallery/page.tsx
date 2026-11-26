@@ -349,10 +349,10 @@ function TemplateGalleryPageInner() {
         className={cn(
           "shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition",
           category === cat.id && available
-            ? "border-[#1d1d1f] bg-[#1d1d1f] text-white"
+            ? "border-[var(--ecom-ink)] bg-[var(--ecom-ink)] text-white"
             : available
-              ? "border-[#e8e8ed] bg-white text-[#1d1d1f] hover:bg-[#f5f5f7]"
-              : "cursor-not-allowed border-[#e8e8ed] bg-[#f5f5f7] text-[#86868b]",
+              ? "border-[var(--ecom-divider)] bg-white text-[var(--ecom-ink)] hover:bg-[var(--ecom-parchment)]"
+              : "cursor-not-allowed border-[var(--ecom-divider)] bg-[var(--ecom-parchment)] text-[var(--ecom-subtle)]",
         )}
       >
         {cat.label}
@@ -367,15 +367,15 @@ function TemplateGalleryPageInner() {
     <>
       <EcomWorkspaceLayout fullWidth>
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          <div className="shrink-0 border-b border-[#e8e8ed] px-4 py-4 sm:px-6">
+          <div className="shrink-0 border-b border-[var(--ecom-divider)] px-4 py-4 sm:px-6">
             <div className="space-y-3">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <EcomWorkspaceTitleHeading
                   heading="h1"
-                  titleClassName="text-lg font-semibold text-[#1d1d1f]"
+                  titleClassName="text-lg font-semibold text-[var(--ecom-ink)]"
                   title="模板区"
                 >
-                  <p className="mt-1 text-xs text-[#6e6e73]">
+                  <p className="mt-1 text-xs text-[var(--ecom-muted)]">
                     案例库模板参考，按品类浏览；更多品类数据持续补充中。
                   </p>
                 </EcomWorkspaceTitleHeading>
@@ -391,7 +391,7 @@ function TemplateGalleryPageInner() {
                     </EcomIconToolbarGroup>
                   </EcomIconToolbar>
                 ) : importAccessLoading ? (
-                  <span className="text-xs text-[#86868b]">…</span>
+                  <span className="text-xs text-[var(--ecom-subtle)]">…</span>
                 ) : null}
               </div>
 
@@ -415,8 +415,8 @@ function TemplateGalleryPageInner() {
                     className={cn(
                       "flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-medium transition",
                       moreOpen
-                        ? "border-[#1d1d1f] bg-[#f5f5f7] text-[#1d1d1f]"
-                        : "border-[#e8e8ed] bg-white text-[#1d1d1f] hover:bg-[#f5f5f7]",
+                        ? "border-[var(--ecom-ink)] bg-[var(--ecom-parchment)] text-[var(--ecom-ink)]"
+                        : "border-[var(--ecom-divider)] bg-white text-[var(--ecom-ink)] hover:bg-[var(--ecom-parchment)]",
                     )}
                   >
                     更多
@@ -430,7 +430,7 @@ function TemplateGalleryPageInner() {
 
                   {moreOpen ? (
                     // 贴分类行左缘展开而非贴按钮：按钮位置随换行漂移，贴它会在窄屏溢出右边界
-                    <div className="absolute left-0 top-full z-30 mt-2 max-h-[50vh] w-[min(92vw,520px)] overflow-y-auto rounded-xl border border-[#e8e8ed] bg-white p-3 shadow-lg">
+                    <div className="absolute left-0 top-full z-30 mt-2 max-h-[50vh] w-[min(92vw,520px)] overflow-y-auto rounded-xl border border-[var(--ecom-divider)] bg-white p-3 shadow-lg">
                       <div className="flex flex-wrap gap-2">
                         {ECOM_TEMPLATE_MORE_CATEGORIES.map(renderCategoryChip)}
                       </div>
@@ -456,10 +456,10 @@ function TemplateGalleryPageInner() {
                       className={cn(
                         "inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs transition",
                         media === opt.value && opt.enabled
-                          ? "border-[var(--ecom-outline-border)] bg-[#f0f6ff] text-[#0071e3]"
+                          ? "border-[var(--ecom-outline-border)] bg-[var(--ecom-content-selected-bg)] text-[var(--ecom-primary)]"
                           : opt.enabled
-                            ? "border-[#e8e8ed] bg-white text-[#1d1d1f] hover:bg-[#f5f5f7]"
-                            : "cursor-not-allowed border-[#e8e8ed] bg-[#f5f5f7] text-[#86868b]",
+                            ? "border-[var(--ecom-divider)] bg-white text-[var(--ecom-ink)] hover:bg-[var(--ecom-parchment)]"
+                            : "cursor-not-allowed border-[var(--ecom-divider)] bg-[var(--ecom-parchment)] text-[var(--ecom-subtle)]",
                       )}
                     >
                       <opt.icon className="h-3.5 w-3.5" />
@@ -469,7 +469,7 @@ function TemplateGalleryPageInner() {
                 </div>
               </div>
 
-              <p className="text-xs text-[#6e6e73]">
+              <p className="text-xs text-[var(--ecom-muted)]">
                 {!categoryAvailable
                   ? `${categoryMeta?.label ?? ""} 案例筹备中，敬请期待。`
                   : templates.length === 0
@@ -490,7 +490,7 @@ function TemplateGalleryPageInner() {
             className="ecom-scrollbar-thin min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-6"
           >
             {!categoryAvailable ? (
-              <p className="text-sm text-[#6e6e73]">
+              <p className="text-sm text-[var(--ecom-muted)]">
                 「{categoryMeta?.label}」模板筹备中，后续会在此展示。
               </p>
             ) : templates.length === 0 ? (
@@ -502,7 +502,7 @@ function TemplateGalleryPageInner() {
                   aspect="3/4"
                 />
               ) : (
-                <p className="text-sm text-[#6e6e73]">
+                <p className="text-sm text-[var(--ecom-muted)]">
                   暂无案例。
                   {canImport
                     ? " 点击右上角「导入 HTML」从页面源码批量上传。"

@@ -312,10 +312,10 @@ export function FilmPullWorkspace({
 
   const mainScroll = (
     <>
-      <header className="sticky top-0 z-20 border-b border-[#e8e8ed] bg-white px-5 py-3 shadow-[0_1px_0_0_rgba(0,0,0,0.04)]">
+      <header className="sticky top-0 z-20 border-b border-[var(--ecom-divider)] bg-white px-5 py-3 shadow-[0_1px_0_0_rgba(0,0,0,0.04)]">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <EcomWorkspaceTitleHeading guideModuleId="film-pull" title="专业拉片">
-            <p className="text-[11px] text-[#6e6e73]">上传视频 → 拉片 → 一键复刻 → 制作成片</p>
+            <p className="text-[11px] text-[var(--ecom-muted)]">上传视频 → 拉片 → 一键复刻 → 制作成片</p>
           </EcomWorkspaceTitleHeading>
           <EcomIconToolbar>
             <EcomIconToolbarGroup label="项目">
@@ -382,7 +382,7 @@ export function FilmPullWorkspace({
           onClear={onClearMedia}
         />
 
-        <div className="space-y-2 rounded-xl border border-[#e8e8ed] bg-white p-4">
+        <div className="space-y-2 rounded-xl border border-[var(--ecom-divider)] bg-white p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <button
               type="button"
@@ -390,8 +390,8 @@ export function FilmPullWorkspace({
               aria-expanded={promptExpanded}
               onClick={() => setPromptExpanded((v) => !v)}
             >
-              <span className="text-sm font-semibold text-[#1d1d1f]">拉片指令</span>
-              <ChevronDown className={cn("h-4 w-4 shrink-0 text-[#6e6e73] transition-transform", promptExpanded && "rotate-180")} />
+              <span className="text-sm font-semibold text-[var(--ecom-ink)]">拉片指令</span>
+              <ChevronDown className={cn("h-4 w-4 shrink-0 text-[var(--ecom-muted)] transition-transform", promptExpanded && "rotate-180")} />
             </button>
             <div className="flex flex-wrap items-center gap-2">
               <EcomButtonSecondary
@@ -446,7 +446,7 @@ export function FilmPullWorkspace({
               value={prompt}
               disabled={analyzing}
               rows={10}
-              className="w-full resize-y rounded-lg border border-[#d2d2d7] px-3 py-2 text-sm leading-relaxed outline-none focus:border-[var(--ecom-outline-border)] focus:ring-2 focus:ring-[#1d1d1f]/15"
+              className="w-full resize-y rounded-lg border border-[var(--ecom-border-soft)] px-3 py-2 text-sm leading-relaxed outline-none focus:border-[var(--ecom-outline-border)] focus:ring-2 focus:ring-[var(--ecom-ink)]/15"
               onChange={(e) => setPrompt(e.target.value)}
             />
           ) : null}
@@ -455,9 +455,9 @@ export function FilmPullWorkspace({
         <StoryboardTaskStatus active={Boolean(analyzing)} title="AI 拉片中" detail="正在调用视觉理解模型，请稍候…" surface="content" />
 
         {(displaySource || structured) && (
-          <div className="space-y-4 rounded-xl border border-[#e8e8ed] bg-white p-4">
+          <div className="space-y-4 rounded-xl border border-[var(--ecom-divider)] bg-white p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <h2 className="text-sm font-semibold text-[#1d1d1f]">拉片结果</h2>
+              <h2 className="text-sm font-semibold text-[var(--ecom-ink)]">拉片结果</h2>
               {canStartReplica && phase === "replica_idle" ? (
                 <EcomIconButton
                   label={replicaBusy ? "复刻中…" : "一键复刻"}

@@ -6,20 +6,20 @@ import { cn } from "@/lib/utils";
 
 /** 模式 A · 数据表外壳（见 design/TABLE.md） */
 export const ecomDataTableWrapClass =
-  "min-w-0 max-w-full w-full overflow-x-auto rounded-lg border border-[#e8e8ed]";
+  "min-w-0 max-w-full w-full overflow-x-auto rounded-lg border border-[var(--ecom-divider)]";
 
 /** 模式 A · 表格本体 */
 export const ecomDataTableClass = "w-full border-collapse text-left text-xs";
 
 /** 模式 A · 墨黑表头行 */
-export const ecomDataTableHeadRowClass = "bg-[#1d1d1f] text-white";
+export const ecomDataTableHeadRowClass = "bg-[var(--ecom-ink)] text-white";
 
 /** 模式 A · 表体行 */
-export const ecomDataTableBodyRowClass = "border-t border-[#e8e8ed] align-top";
+export const ecomDataTableBodyRowClass = "border-t border-[var(--ecom-divider)] align-top";
 
 export const ecomDataTableThClass = "px-3 py-2 font-medium";
 
-export const ecomDataTableTdClass = "px-3 py-2 align-top text-[#1d1d1f]";
+export const ecomDataTableTdClass = "px-3 py-2 align-top text-[var(--ecom-ink)]";
 
 export type EcomDataTableProps = {
   headers: ReactNode[];

@@ -76,7 +76,7 @@ function patchHasChanges(
 }
 
 const MENTION_FIELD_CLASS =
-  "min-w-[10rem] rounded border border-[#d2d2d7] bg-white px-1.5 py-1 text-xs leading-relaxed";
+  "min-w-[10rem] rounded border border-[var(--ecom-border-soft)] bg-white px-1.5 py-1 text-xs leading-relaxed";
 
 function ScriptMentionField({
   value,
@@ -124,7 +124,7 @@ function ScriptTextField({
   if (multiline) {
     return (
       <textarea
-        className={`w-full ${minHeightClass} rounded border border-[#d2d2d7] px-1.5 py-1 text-xs outline-none focus:border-[var(--ecom-outline-border)]`}
+        className={`w-full ${minHeightClass} rounded border border-[var(--ecom-border-soft)] px-1.5 py-1 text-xs outline-none focus:border-[var(--ecom-outline-border)]`}
         rows={2}
         value={value}
         disabled={disabled}
@@ -134,7 +134,7 @@ function ScriptTextField({
   }
   return (
     <input
-      className="w-full rounded border border-[#d2d2d7] px-1.5 py-1 text-xs outline-none focus:border-[var(--ecom-outline-border)]"
+      className="w-full rounded border border-[var(--ecom-border-soft)] px-1.5 py-1 text-xs outline-none focus:border-[var(--ecom-outline-border)]"
       value={value}
       disabled={disabled}
       onChange={(e) => onChange(e.target.value)}
@@ -342,7 +342,7 @@ export function FilmPullProductionScriptTable({
                 <td className={ecomDataTableTdClass}>
                   <button
                     type="button"
-                    className="flex size-8 items-center justify-center rounded-lg text-[#86868b] transition hover:bg-[#fff5f5] hover:text-[#ff3b30] disabled:cursor-not-allowed disabled:opacity-30"
+                    className="flex size-8 items-center justify-center rounded-lg text-[var(--ecom-subtle)] transition hover:bg-[#fff5f5] hover:text-[#ff3b30] disabled:cursor-not-allowed disabled:opacity-30"
                     disabled={disabled || shots.length <= 1}
                     title={shots.length <= 1 ? "至少保留一镜" : "删除本镜"}
                     aria-label={`删除镜 ${shot.shotNo}`}
@@ -361,7 +361,7 @@ export function FilmPullProductionScriptTable({
         </tbody>
         {showRowActions && isEdit ? (
           <tfoot>
-            <tr className="border-t border-[#e8e8ed] bg-[#fafafa]">
+            <tr className="border-t border-[var(--ecom-divider)] bg-[#fafafa]">
               <td colSpan={columnCount} className="px-3 py-2.5">
                 <EcomButtonSecondary
                   type="button"

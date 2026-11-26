@@ -33,7 +33,7 @@ export function StoryboardSheetThumbnail({
   const panels = sheet?.panels.filter((p) => Boolean(p.imageUrl?.trim())) ?? [];
   if (panels.length === 0) {
     return (
-      <div className="flex h-full min-h-[120px] items-center justify-center text-xs text-[#86868b]">
+      <div className="flex h-full min-h-[120px] items-center justify-center text-xs text-[var(--ecom-subtle)]">
         待生成分镜图
       </div>
     );
@@ -47,7 +47,7 @@ export function StoryboardSheetThumbnail({
           key={p.index}
           src={p.imageUrl!}
           alt={`镜头 ${p.index}`}
-          className="h-full max-w-none shrink-0 rounded border border-[#e8e8ed] object-cover"
+          className="h-full max-w-none shrink-0 rounded border border-[var(--ecom-divider)] object-cover"
           style={{ aspectRatio: panelAr, height: "100%" }}
         />
       ))}

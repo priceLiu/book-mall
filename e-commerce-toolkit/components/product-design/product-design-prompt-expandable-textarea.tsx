@@ -38,7 +38,7 @@ export function ProductDesignPromptExpandableTextarea({
     <>
       <textarea
         className={cn(
-          "min-h-[5.5rem] w-full flex-1 rounded-lg border border-[#e8e8ed] px-2 py-1.5 font-mono text-[10px] leading-relaxed",
+          "min-h-[5.5rem] w-full flex-1 rounded-lg border border-[var(--ecom-divider)] px-2 py-1.5 font-mono text-[10px] leading-relaxed",
           !disabled && "cursor-text",
           className,
         )}

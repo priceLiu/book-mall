@@ -43,17 +43,17 @@ export function VtonFourViewGenerateDialog({ open, onClose, busy, onConfirm }: P
       onMouseDown={ecomModalBackdropMouseDown(onClose, { disabled: busy })}
     >
       <div
-        className="flex max-h-[min(88vh,720px)] w-full max-w-lg flex-col rounded-2xl border border-[#e8e8ed] bg-white shadow-xl"
+        className="flex max-h-[min(88vh,720px)] w-full max-w-lg flex-col rounded-2xl border border-[var(--ecom-divider)] bg-white shadow-xl"
         role="dialog"
         aria-modal
         aria-labelledby="vton-four-view-gen-title"
       >
-        <div className="flex items-start justify-between gap-3 border-b border-[#e8e8ed] px-5 py-4">
+        <div className="flex items-start justify-between gap-3 border-b border-[var(--ecom-divider)] px-5 py-4">
           <div>
-            <h3 id="vton-four-view-gen-title" className="text-sm font-semibold text-[#1d1d1f]">
+            <h3 id="vton-four-view-gen-title" className="text-sm font-semibold text-[var(--ecom-ink)]">
               AI 生全身模特
             </h3>
-            <p className="mt-1 text-xs text-[#6e6e73]">
+            <p className="mt-1 text-xs text-[var(--ecom-muted)]">
               编辑 Prompt 后点击生成；系统使用万相 2.7 Pro，一次输出白底正面全身图。
             </p>
           </div>
@@ -61,16 +61,16 @@ export function VtonFourViewGenerateDialog({ open, onClose, busy, onConfirm }: P
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-          <label className="mb-2 block text-xs font-medium text-[#6e6e73]">生图 Prompt</label>
+          <label className="mb-2 block text-xs font-medium text-[var(--ecom-muted)]">生图 Prompt</label>
           <textarea
-            className="ecom-scrollbar-thin min-h-[220px] w-full rounded-lg border border-[#e8e8ed] px-3 py-2 text-xs leading-relaxed text-[#1d1d1f] outline-none focus:border-[var(--ecom-outline-border)]"
+            className="ecom-scrollbar-thin min-h-[220px] w-full rounded-lg border border-[var(--ecom-divider)] px-3 py-2 text-xs leading-relaxed text-[var(--ecom-ink)] outline-none focus:border-[var(--ecom-outline-border)]"
             value={draft}
             disabled={busy}
             onChange={(e) => setDraft(e.target.value)}
           />
         </div>
 
-        <div className="flex items-center justify-end gap-2 border-t border-[#e8e8ed] px-5 py-4">
+        <div className="flex items-center justify-end gap-2 border-t border-[var(--ecom-divider)] px-5 py-4">
           <EcomGenerateCreditsBeside
             modelKey={VTON_FOUR_VIEW_MODEL_KEY}
             imageCount={1}

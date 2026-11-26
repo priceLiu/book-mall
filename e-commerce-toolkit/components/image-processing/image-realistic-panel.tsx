@@ -152,7 +152,7 @@ export function ImageRealisticPanel({
         </span>
       </div>
 
-      <div className="rounded-xl border border-sky-100 bg-sky-50/80 px-3 py-3 text-sm leading-relaxed text-[#1d1d1f] sm:px-4">
+      <div className="rounded-xl border border-sky-100 bg-sky-50/80 px-3 py-3 text-sm leading-relaxed text-[var(--ecom-ink)] sm:px-4">
         <div className="flex gap-2">
           <Camera className="mt-0.5 h-4 w-4 shrink-0 text-sky-600" />
           <p>
@@ -164,8 +164,8 @@ export function ImageRealisticPanel({
 
       <div className="rounded-2xl border border-[#e5e5ea] bg-white p-4 shadow-sm sm:p-6">
         <div className="flex items-center justify-between gap-2">
-          <p className="text-sm font-semibold text-[#1d1d1f]">相机和镜头</p>
-          <span className="text-xs text-[#0071e3]">设置焦距和景深</span>
+          <p className="text-sm font-semibold text-[var(--ecom-ink)]">相机和镜头</p>
+          <span className="text-xs text-[var(--ecom-primary)]">设置焦距和景深</span>
         </div>
         <div className="mt-2 flex flex-wrap gap-2">
           {REALISTIC_CAMERA_OPTIONS.map((o) => (
@@ -183,7 +183,7 @@ export function ImageRealisticPanel({
           ))}
         </div>
 
-        <label className="mt-4 block text-sm font-medium text-[#1d1d1f]">
+        <label className="mt-4 block text-sm font-medium text-[var(--ecom-ink)]">
           <span className="inline-flex items-center gap-1.5">
             <Pencil className="h-4 w-4" />
             描述场景或主题
@@ -193,7 +193,7 @@ export function ImageRealisticPanel({
             onChange={(e) => setSceneDescription(e.target.value.slice(0, 500))}
             rows={4}
             placeholder="一位三十多岁的女子在巴黎一家路边咖啡馆里啜饮咖啡，温暖的秋日阳光洒在她脸上，神情放松。"
-            className="mt-1 w-full resize-y rounded-xl border border-[#d2d2d7] px-4 py-3 text-sm font-normal"
+            className="mt-1 w-full resize-y rounded-xl border border-[var(--ecom-border-soft)] px-4 py-3 text-sm font-normal"
           />
           <span className="mt-1 block text-xs text-[#7a7a7a]">
             {sceneDescription.length} / 500 个字符
@@ -201,7 +201,7 @@ export function ImageRealisticPanel({
         </label>
 
         <div className="mt-4">
-          <p className="inline-flex items-center gap-1.5 text-sm font-medium text-[#1d1d1f]">
+          <p className="inline-flex items-center gap-1.5 text-sm font-medium text-[var(--ecom-ink)]">
             <Sun className="h-4 w-4" />
             灯光氛围
           </p>
@@ -262,7 +262,7 @@ export function ImageRealisticPanel({
       </div>
 
       <section className="rounded-2xl border border-[#e5e5ea] bg-white p-4 sm:p-6">
-        <h3 className="text-lg font-semibold text-[#1d1d1f]">你可以创造什么</h3>
+        <h3 className="text-lg font-semibold text-[var(--ecom-ink)]">你可以创造什么</h3>
         <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {USE_CASES.map((c) => (
             <div
@@ -270,7 +270,7 @@ export function ImageRealisticPanel({
               className="rounded-xl border border-[#e5e5ea] bg-[#fafafa] p-4"
             >
               <c.icon className={cn("mb-2 h-5 w-5", c.color)} />
-              <p className="text-sm font-semibold text-[#1d1d1f]">{c.title}</p>
+              <p className="text-sm font-semibold text-[var(--ecom-ink)]">{c.title}</p>
               <p className="mt-1 text-xs leading-relaxed text-[#7a7a7a]">{c.desc}</p>
             </div>
           ))}

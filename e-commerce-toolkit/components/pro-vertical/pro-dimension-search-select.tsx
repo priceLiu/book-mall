@@ -39,24 +39,24 @@ export function ProDimensionSearchSelect({
   return (
     <div className={cn("space-y-3", className)}>
       <div className="relative">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#86868b]" />
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--ecom-subtle)]" />
         <input
           type="search"
           value={query}
           disabled={disabled}
           placeholder={`搜索${label}…`}
           onChange={(e) => setQuery(e.target.value)}
-          className="w-full rounded-xl border border-[#d2d2d7] bg-white py-2.5 pl-9 pr-3 text-sm text-[#1d1d1f] outline-none ring-[#0071e3] placeholder:text-[#86868b] focus:border-[var(--ecom-outline-border)] focus:ring-2"
+          className="w-full rounded-xl border border-[var(--ecom-border-soft)] bg-white py-2.5 pl-9 pr-3 text-sm text-[var(--ecom-ink)] outline-none ring-[var(--ecom-primary)] placeholder:text-[var(--ecom-subtle)] focus:border-[var(--ecom-outline-border)] focus:ring-2"
         />
       </div>
       {showMoreHint ? (
-        <p className="text-[11px] text-[#86868b]">
+        <p className="text-[11px] text-[var(--ecom-subtle)]">
           默认展示 {DIMENSION_SEARCH_DEFAULT_VISIBLE} 项，输入关键词可搜索全部 {options.length} 项
         </p>
       ) : null}
-      <div className="max-h-52 space-y-1 overflow-y-auto rounded-xl border border-[#e8e8ed] bg-white p-1">
+      <div className="max-h-52 space-y-1 overflow-y-auto rounded-xl border border-[var(--ecom-divider)] bg-white p-1">
         {filtered.length === 0 ? (
-          <p className="px-3 py-4 text-center text-xs text-[#86868b]">无匹配项，可尝试其他关键词或选「自定义」</p>
+          <p className="px-3 py-4 text-center text-xs text-[var(--ecom-subtle)]">无匹配项，可尝试其他关键词或选「自定义」</p>
         ) : (
           filtered.map((opt) => (
             <button
@@ -64,7 +64,7 @@ export function ProDimensionSearchSelect({
               type="button"
               disabled={disabled}
               onClick={() => onSelect(opt)}
-              className="flex w-full rounded-lg px-3 py-2 text-left text-sm text-[#1d1d1f] transition hover:bg-[#f0f6ff] disabled:opacity-50"
+              className="flex w-full rounded-lg px-3 py-2 text-left text-sm text-[var(--ecom-ink)] transition hover:bg-[var(--ecom-content-selected-bg)] disabled:opacity-50"
             >
               {opt}
             </button>

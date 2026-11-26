@@ -73,25 +73,25 @@ export function DetailPageSuiteSizeChartEditDialog({
         <DialogHeader className="pr-10">
           <DialogTitle className="leading-snug">{title}</DialogTitle>
         </DialogHeader>
-        <p className="text-xs leading-relaxed text-[#86868b]">
+        <p className="text-xs leading-relaxed text-[var(--ecom-subtle)]">
           {isSpec
             ? "系统将按下方数据直接生成参数表图片（不经大模型）。演示数据仅作预览，上架前请替换为本款真实规格参数。"
             : "系统将按下方数据直接生成尺码表图片（不经大模型）。演示数据仅作预览，上架前请替换为本款真实尺码。"}
         </p>
-        <label className="block text-sm text-[#6e6e73]">
+        <label className="block text-sm text-[var(--ecom-muted)]">
           表标题
           <input
-            className="mt-1 w-full rounded-lg border border-[#d2d2d7] px-3 py-2 text-sm"
+            className="mt-1 w-full rounded-lg border border-[var(--ecom-border-soft)] px-3 py-2 text-sm"
             value={draft.title ?? ""}
             onChange={(e) =>
               setDraft((p) => ({ ...p, title: e.target.value, isDemo: false }))
             }
           />
         </label>
-        <div className="max-h-[50vh] overflow-auto rounded-lg border border-[#e8e8ed]">
+        <div className="max-h-[50vh] overflow-auto rounded-lg border border-[var(--ecom-divider)]">
           <table className="w-full min-w-[640px] border-collapse text-xs">
             <thead>
-              <tr className="bg-[#1d1d1f] text-white">
+              <tr className="bg-[var(--ecom-ink)] text-white">
                 {draft.headers.map((h) => (
                   <th key={h} className="px-2 py-2 font-medium">
                     {h}
@@ -102,9 +102,9 @@ export function DetailPageSuiteSizeChartEditDialog({
             </thead>
             <tbody>
               {draft.rows.map((row, ri) => (
-                <tr key={ri} className={ri % 2 === 0 ? "bg-white" : "bg-[#f5f5f7]"}>
+                <tr key={ri} className={ri % 2 === 0 ? "bg-white" : "bg-[var(--ecom-parchment)]"}>
                   {draft.headers.map((_, ci) => (
-                    <td key={ci} className="border-t border-[#e8e8ed] p-0">
+                    <td key={ci} className="border-t border-[var(--ecom-divider)] p-0">
                       <input
                         className="w-full bg-transparent px-2 py-1.5 outline-none"
                         value={row[ci] ?? ""}
@@ -112,10 +112,10 @@ export function DetailPageSuiteSizeChartEditDialog({
                       />
                     </td>
                   ))}
-                  <td className="border-t border-[#e8e8ed] text-center">
+                  <td className="border-t border-[var(--ecom-divider)] text-center">
                     <button
                       type="button"
-                      className="text-[#86868b] hover:text-[#ff3b30]"
+                      className="text-[var(--ecom-subtle)] hover:text-[#ff3b30]"
                       onClick={() => removeRow(ri)}
                       aria-label="删除行"
                     >

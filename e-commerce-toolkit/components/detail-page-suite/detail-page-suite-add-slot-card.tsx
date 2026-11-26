@@ -35,17 +35,17 @@ export function DetailPageSuiteAddSlotCard({
       className={cn(
         "group flex shrink-0 flex-col overflow-hidden rounded-xl border border-dashed bg-white text-left shadow-sm transition",
         disabled
-          ? "cursor-not-allowed border-[#e8e8ed] opacity-50"
-          : "border-[#d2d2d7] hover:border-[var(--ecom-outline-border)] hover:bg-[#fafafa]",
+          ? "cursor-not-allowed border-[var(--ecom-divider)] opacity-50"
+          : "border-[var(--ecom-border-soft)] hover:border-[var(--ecom-outline-border)] hover:bg-[#fafafa]",
       )}
       style={{ width: cardWidth }}
       onClick={onClick}
     >
       <div
         className={cn(
-          "flex w-full flex-col items-center justify-center gap-2 bg-[#f5f5f7] text-[#86868b] transition group-hover:bg-[#f0f6ff] group-hover:text-[#0071e3]",
+          "flex w-full flex-col items-center justify-center gap-2 bg-[var(--ecom-parchment)] text-[var(--ecom-subtle)] transition group-hover:bg-[var(--ecom-content-selected-bg)] group-hover:text-[var(--ecom-primary)]",
           detailPageAspectClass(displayRatio),
-          disabled && "group-hover:bg-[#f5f5f7] group-hover:text-[#86868b]",
+          disabled && "group-hover:bg-[var(--ecom-parchment)] group-hover:text-[var(--ecom-subtle)]",
         )}
       >
         <span className="flex size-10 items-center justify-center rounded-full border border-current bg-white/80">
@@ -53,7 +53,7 @@ export function DetailPageSuiteAddSlotCard({
         </span>
         <span className="text-xs font-medium">新增点位</span>
       </div>
-      <p className="px-3 py-2 text-center text-[10px] leading-relaxed text-[#86868b]">
+      <p className="px-3 py-2 text-center text-[10px] leading-relaxed text-[var(--ecom-subtle)]">
         {hint}
       </p>
     </button>

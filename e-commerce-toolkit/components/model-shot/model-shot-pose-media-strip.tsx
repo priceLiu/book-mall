@@ -84,12 +84,12 @@ export function ModelShotPoseMediaStrip({
   return (
     <section
       id="model-shot-pose-media-strip"
-      className="rounded-xl border border-[#e8e8ed] bg-white p-5"
+      className="rounded-xl border border-[var(--ecom-divider)] bg-white p-5"
     >
       <div className="mb-3 flex shrink-0 flex-wrap items-center justify-between gap-2">
         <div>
-          <h3 className="text-sm font-semibold text-[#1d1d1f]">模特图</h3>
-          <p className="mt-0.5 text-[11px] text-[#86868b]">
+          <h3 className="text-sm font-semibold text-[var(--ecom-ink)]">模特图</h3>
+          <p className="mt-0.5 text-[11px] text-[var(--ecom-subtle)]">
             已生成 {readyCount} / {items.length} 张 · 重生成保留历史，悬停可切换版本
           </p>
         </div>
@@ -115,7 +115,7 @@ export function ModelShotPoseMediaStrip({
               : "生成全部模特图"}
         </EcomButtonSecondary>
       </div>
-      <p className="mb-4 shrink-0 text-[11px] leading-relaxed text-[#86868b]">
+      <p className="mb-4 shrink-0 text-[11px] leading-relaxed text-[var(--ecom-subtle)]">
         参考顺序：服装 → 模特 → 场景。同格多次生成会叠层保留；右侧栏可浏览全部成图。
       </p>
 

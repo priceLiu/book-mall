@@ -64,7 +64,7 @@ type Props = {
 };
 
 const promptTextareaClass =
-  "mt-1 w-full min-h-[7rem] max-h-[min(16rem,28vh)] resize-y rounded-lg border border-[#d2d2d7] bg-white px-3 py-2 text-sm leading-relaxed text-[#1d1d1f] outline-none focus:border-[#424245] focus:ring-0";
+  "mt-1 w-full min-h-[7rem] max-h-[min(16rem,28vh)] resize-y rounded-lg border border-[var(--ecom-border-soft)] bg-white px-3 py-2 text-sm leading-relaxed text-[var(--ecom-ink)] outline-none focus:border-[#424245] focus:ring-0";
 
 /** 详情页套图 · 单点位编辑（排版模式走 EcomCopyLayoutStudioDialog 壳层） */
 export function DetailPageSuiteSlotPromptEditDialog({
@@ -212,12 +212,12 @@ export function DetailPageSuiteSlotPromptEditDialog({
           </DialogHeader>
           <div className="mt-4 space-y-4 pb-2">
             {!isAdd && shootingRequirement?.trim() ? (
-              <div className="rounded-lg border border-[#e8e8ed] bg-[#f5f5f7] px-3 py-2 text-sm leading-relaxed text-[#1d1d1f]">
-                <span className="font-medium text-[#6e6e73]">拍摄要求：</span>
+              <div className="rounded-lg border border-[var(--ecom-divider)] bg-[var(--ecom-parchment)] px-3 py-2 text-sm leading-relaxed text-[var(--ecom-ink)]">
+                <span className="font-medium text-[var(--ecom-muted)]">拍摄要求：</span>
                 {shootingRequirement.trim()}
               </div>
             ) : null}
-            <label className="block text-sm text-[#6e6e73]">
+            <label className="block text-sm text-[var(--ecom-muted)]">
               {isAdd
                 ? "填写出图提示词，保存后新增 1 个点位格"
                 : "下方为完整出图提示词（含全片约束与本张拍摄要求），修改后保存将同步至中栏点位卡"}
@@ -231,7 +231,7 @@ export function DetailPageSuiteSlotPromptEditDialog({
             </label>
           </div>
         </div>
-        <DialogFooter className="shrink-0 flex-wrap gap-2 border-t border-[#e8e8ed] px-6 py-4 sm:justify-end">
+        <DialogFooter className="shrink-0 flex-wrap gap-2 border-t border-[var(--ecom-divider)] px-6 py-4 sm:justify-end">
           {!isAdd && onRewrite ? (
             <EcomButtonSecondary
               type="button"

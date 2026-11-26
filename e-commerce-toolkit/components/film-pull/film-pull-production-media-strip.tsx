@@ -191,7 +191,7 @@ export function FilmPullProductionMediaStrip({
     <div className="space-y-8">
       <section>
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <p className="text-xs font-medium text-[#1d1d1f]">各镜头分镜图</p>
+          <p className="text-xs font-medium text-[var(--ecom-ink)]">各镜头分镜图</p>
           <div className="flex flex-wrap items-center gap-2">
             <EcomButtonSecondary
               size="sm"
@@ -222,7 +222,7 @@ export function FilmPullProductionMediaStrip({
             </EcomButtonSecondary>
           </div>
         </div>
-        <p className="mb-3 text-[11px] leading-relaxed text-[#86868b]">
+        <p className="mb-3 text-[11px] leading-relaxed text-[var(--ecom-subtle)]">
           勾选镜头后可批量生图；逐镜点卡片内「生成」可单独重试。
         </p>
         <div className="flex flex-wrap gap-4">
@@ -251,11 +251,11 @@ export function FilmPullProductionMediaStrip({
         </div>
       </section>
 
-      <section className="rounded-xl border border-[#e8e8ed] bg-[#fafafa] p-4">
+      <section className="rounded-xl border border-[var(--ecom-divider)] bg-[#fafafa] p-4">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <div>
-            <p className="text-xs font-medium text-[#1d1d1f]">各镜头单镜视频</p>
-            <p className="mt-0.5 text-[11px] text-[#86868b]">
+            <p className="text-xs font-medium text-[var(--ecom-ink)]">各镜头单镜视频</p>
+            <p className="mt-0.5 text-[11px] text-[var(--ecom-subtle)]">
               已生成 {panelVideoCount} / {shots.length} 镜
             </p>
           </div>
@@ -283,11 +283,11 @@ export function FilmPullProductionMediaStrip({
         </div>
       </section>
 
-      <section className="rounded-xl border border-[#e8e8ed] bg-white p-4">
+      <section className="rounded-xl border border-[var(--ecom-divider)] bg-white p-4">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <div>
-            <p className="text-xs font-medium text-[#1d1d1f]">合成成片</p>
-            <p className="mt-0.5 text-[11px] text-[#86868b]">
+            <p className="text-xs font-medium text-[var(--ecom-ink)]">合成成片</p>
+            <p className="mt-0.5 text-[11px] text-[var(--ecom-subtle)]">
               {finalUrl
                 ? "各镜头已云端合成"
                 : composeBusy

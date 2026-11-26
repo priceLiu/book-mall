@@ -233,8 +233,8 @@ export function MainImageHitReplicaStudio() {
     return (
       <EcomWorkspaceLayout fullWidth>
         <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4 px-6 py-16 text-center">
-          <h2 className="text-xl font-semibold text-[#1d1d1f]">爆款图复刻</h2>
-          <p className="max-w-md text-sm text-[#6e6e73]">
+          <h2 className="text-xl font-semibold text-[var(--ecom-ink)]">爆款图复刻</h2>
+          <p className="max-w-md text-sm text-[var(--ecom-muted)]">
             上传爆款参考图，替换自家产品，一键生成同款结构主图/海报。
           </p>
           {loadError ? (

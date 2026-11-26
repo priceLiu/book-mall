@@ -42,16 +42,16 @@ export function EcomComposeClipAudioPickDialog({
       aria-modal
       aria-labelledby="ecom-compose-audio-pick-title"
     >
-      <div className="relative flex max-h-[min(560px,85dvh)] w-full max-w-md flex-col rounded-2xl border border-[#e8e8ed] bg-white shadow-xl">
+      <div className="relative flex max-h-[min(560px,85dvh)] w-full max-w-md flex-col rounded-2xl border border-[var(--ecom-divider)] bg-white shadow-xl">
         <EcomDialogCloseButton disabled={busy} onClick={onClose} />
-        <div className="border-b border-[#e8e8ed] px-5 py-4 pr-12">
+        <div className="border-b border-[var(--ecom-divider)] px-5 py-4 pr-12">
           <h2
             id="ecom-compose-audio-pick-title"
-            className="text-base font-semibold text-[#1d1d1f]"
+            className="text-base font-semibold text-[var(--ecom-ink)]"
           >
             {title}
           </h2>
-          <p className="mt-1 text-[12px] leading-relaxed text-[#6e6e73]">
+          <p className="mt-1 text-[12px] leading-relaxed text-[var(--ecom-muted)]">
             上传本地音频，或从本页已生成的口播 TTS 中选择（按套装/分镜）。
           </p>
         </div>
@@ -60,7 +60,7 @@ export function EcomComposeClipAudioPickDialog({
           <button
             type="button"
             disabled={busy}
-            className="mb-3 flex w-full items-center justify-center rounded-xl border border-dashed border-[var(--ecom-outline-border)] bg-[#f0f6ff] px-3 py-2.5 text-[13px] font-medium text-[#0071e3] hover:bg-[#e8f2ff] disabled:opacity-50"
+            className="mb-3 flex w-full items-center justify-center rounded-xl border border-dashed border-[var(--ecom-outline-border)] bg-[var(--ecom-content-selected-bg)] px-3 py-2.5 text-[13px] font-medium text-[var(--ecom-primary)] hover:bg-[#e8f2ff] disabled:opacity-50"
             onClick={() => {
               if (busy) return;
               onUploadLocal();
@@ -69,12 +69,12 @@ export function EcomComposeClipAudioPickDialog({
             本地上传音频
           </button>
 
-          <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-[#86868b]">
+          <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-[var(--ecom-subtle)]">
             页面已生成 TTS
           </p>
 
           {options.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-[#e8e8ed] bg-[#fafafa] px-3 py-6 text-center text-[12px] text-[#86868b]">
+            <div className="rounded-xl border border-dashed border-[var(--ecom-divider)] bg-[#fafafa] px-3 py-6 text-center text-[12px] text-[var(--ecom-subtle)]">
               暂无已生成口播。请先在上方工作区为各镜/套装生成 TTS，或选择本地上传。
             </div>
           ) : (
@@ -91,25 +91,25 @@ export function EcomComposeClipAudioPickDialog({
                         "flex w-full items-start gap-2 rounded-xl border px-3 py-2.5 text-left transition hover:border-[var(--ecom-outline-border)]/50 hover:bg-[#fafafa] disabled:opacity-50",
                         suggested
                           ? "border-[var(--ecom-outline-border)] bg-[var(--ecom-outline-hover-bg)]/60"
-                          : "border-[#e8e8ed] bg-white",
+                          : "border-[var(--ecom-divider)] bg-white",
                       )}
                       onClick={() => onPickTts(opt)}
                     >
                       <Volume2
-                        className="mt-0.5 size-4 shrink-0 text-[#0071e3]"
+                        className="mt-0.5 size-4 shrink-0 text-[var(--ecom-primary)]"
                         aria-hidden
                       />
                       <span className="min-w-0 flex-1">
-                        <span className="block text-[13px] font-medium text-[#1d1d1f]">
+                        <span className="block text-[13px] font-medium text-[var(--ecom-ink)]">
                           {opt.label}
                           {suggested ? (
-                            <span className="ml-1.5 text-[10px] font-normal text-[#0071e3]">
+                            <span className="ml-1.5 text-[10px] font-normal text-[var(--ecom-primary)]">
                               推荐
                             </span>
                           ) : null}
                         </span>
                         {opt.voiceover?.trim() ? (
-                          <span className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-[#6e6e73]">
+                          <span className="mt-0.5 line-clamp-2 text-[11px] leading-snug text-[var(--ecom-muted)]">
                             {opt.voiceover.trim()}
                           </span>
                         ) : null}
@@ -122,7 +122,7 @@ export function EcomComposeClipAudioPickDialog({
           )}
         </div>
 
-        <div className="flex justify-end border-t border-[#e8e8ed] px-5 py-3">
+        <div className="flex justify-end border-t border-[var(--ecom-divider)] px-5 py-3">
           <EcomButtonSecondary disabled={busy} onClick={onClose}>
             取消
           </EcomButtonSecondary>

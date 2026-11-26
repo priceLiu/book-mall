@@ -44,15 +44,15 @@ function ScriptPrepStepList({ activeStep }: { activeStep: number }) {
             {done ? (
               <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#34c759]" />
             ) : active ? (
-              <Loader2 className="mt-0.5 h-3.5 w-3.5 shrink-0 animate-spin text-[#0071e3]" />
+              <Loader2 className="mt-0.5 h-3.5 w-3.5 shrink-0 animate-spin text-[var(--ecom-primary)]" />
             ) : (
-              <span className="mt-0.5 h-3.5 w-3.5 shrink-0 rounded-full border border-[#d2d2d7]" />
+              <span className="mt-0.5 h-3.5 w-3.5 shrink-0 rounded-full border border-[var(--ecom-border-soft)]" />
             )}
             <span
               className={cn(
-                done && "text-[#6e6e73]",
-                active && "font-medium text-[#1d1d1f]",
-                !done && !active && "text-[#86868b]",
+                done && "text-[var(--ecom-muted)]",
+                active && "font-medium text-[var(--ecom-ink)]",
+                !done && !active && "text-[var(--ecom-subtle)]",
               )}
             >
               {label}
@@ -146,11 +146,11 @@ export function FilmPullProductionScriptPanel({
   const showEmpty = !plan?.shots.length;
 
   return (
-    <div className="space-y-3 rounded-xl border border-[#e8e8ed] bg-white p-4">
+    <div className="space-y-3 rounded-xl border border-[var(--ecom-divider)] bg-white p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h2 className="text-sm font-semibold text-[#1d1d1f]">制作脚本</h2>
-          <p className="text-[11px] text-[#6e6e73]">
+          <h2 className="text-sm font-semibold text-[var(--ecom-ink)]">制作脚本</h2>
+          <p className="text-[11px] text-[var(--ecom-muted)]">
             与拉片相同的 25 维分镜表；内容区只读预览，点「编辑」在全屏弹层中修改。
           </p>
         </div>
@@ -230,7 +230,7 @@ export function FilmPullProductionScriptPanel({
       ) : null}
 
       {showEmpty && !prepBusy && !prepError && !actionBusy ? (
-        <p className="text-sm text-[#6e6e73]">素材就绪后系统将自动生成制作脚本，请稍候…</p>
+        <p className="text-sm text-[var(--ecom-muted)]">素材就绪后系统将自动生成制作脚本，请稍候…</p>
       ) : null}
 
       {!showEmpty ? (

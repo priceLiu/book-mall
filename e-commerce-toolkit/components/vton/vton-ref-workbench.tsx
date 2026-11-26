@@ -179,8 +179,8 @@ function modeButtonClass(active: boolean): string {
   return cn(
     "rounded-lg border px-3 py-2 text-left text-xs transition-colors",
     active
-      ? "border-[var(--ecom-outline-border)] bg-[#f0f6ff] text-[#1d1d1f]"
-      : "border-[#e8e8ed] bg-white text-[#6e6e73] hover:border-[#d2d2d7]",
+      ? "border-[var(--ecom-outline-border)] bg-[var(--ecom-content-selected-bg)] text-[var(--ecom-ink)]"
+      : "border-[var(--ecom-divider)] bg-white text-[var(--ecom-muted)] hover:border-[var(--ecom-border-soft)]",
   );
 }
 
@@ -441,10 +441,10 @@ export function VtonRefWorkbench({
 
   return (
     <>
-    <section className="space-y-4 rounded-xl border border-[#e8e8ed] bg-white p-4">
+    <section className="space-y-4 rounded-xl border border-[var(--ecom-divider)] bg-white p-4">
       <div>
-        <h2 className="text-sm font-semibold text-[#1d1d1f]">{sectionTitle}</h2>
-        <p className="mt-1 text-xs text-[#6e6e73]">{sectionHint}</p>
+        <h2 className="text-sm font-semibold text-[var(--ecom-ink)]">{sectionTitle}</h2>
+        <p className="mt-1 text-xs text-[var(--ecom-muted)]">{sectionHint}</p>
       </div>
 
       <div className="grid gap-2 sm:grid-cols-3">
@@ -454,7 +454,7 @@ export function VtonRefWorkbench({
           disabled={busy || tryonBusy || refsLocked}
           onClick={() => onOutfitRefModeChange("already_dressed")}
         >
-          <span className="font-medium text-[#1d1d1f]">已穿搭</span>
+          <span className="font-medium text-[var(--ecom-ink)]">已穿搭</span>
           <span className="mt-0.5 block text-[11px] leading-relaxed">
             上传 1 张已穿好目标服装的全身照，无需试衣。
           </span>
@@ -465,7 +465,7 @@ export function VtonRefWorkbench({
           disabled={busy || tryonBusy || refsLocked}
           onClick={() => onOutfitRefModeChange("need_tryon")}
         >
-          <span className="font-medium text-[#1d1d1f]">需穿衣</span>
+          <span className="font-medium text-[var(--ecom-ink)]">需穿衣</span>
           <span className="mt-0.5 block text-[11px] leading-relaxed">
             上传模特全身照与服装，AI 试衣合成穿搭图。
           </span>
@@ -477,7 +477,7 @@ export function VtonRefWorkbench({
             disabled={busy || tryonBusy || refsLocked}
             onClick={() => onOutfitRefModeChange("text_to_tryon")}
           >
-            <span className="font-medium text-[#1d1d1f]">文生试衣</span>
+            <span className="font-medium text-[var(--ecom-ink)]">文生试衣</span>
             <span className="mt-0.5 block text-[11px] leading-relaxed">
               上传参考图 + Prompt 引用素材，图片编辑模型生成试衣大片。
             </span>
@@ -522,8 +522,8 @@ export function VtonRefWorkbench({
             className={cn(
               "rounded-full border px-3 py-1 text-[11px]",
               isTwoPiece
-                ? "border-[var(--ecom-outline-border)] bg-[#f0f6ff] text-[#0071e3]"
-                : "border-[#e8e8ed] text-[#6e6e73]",
+                ? "border-[var(--ecom-outline-border)] bg-[var(--ecom-content-selected-bg)] text-[var(--ecom-primary)]"
+                : "border-[var(--ecom-divider)] text-[var(--ecom-muted)]",
             )}
             disabled={busy || tryonBusy || refsLocked}
             onClick={() => onGarmentModeChange("two_piece")}
@@ -535,8 +535,8 @@ export function VtonRefWorkbench({
             className={cn(
               "rounded-full border px-3 py-1 text-[11px]",
               !isTwoPiece
-                ? "border-[var(--ecom-outline-border)] bg-[#f0f6ff] text-[#0071e3]"
-                : "border-[#e8e8ed] text-[#6e6e73]",
+                ? "border-[var(--ecom-outline-border)] bg-[var(--ecom-content-selected-bg)] text-[var(--ecom-primary)]"
+                : "border-[var(--ecom-divider)] text-[var(--ecom-muted)]",
             )}
             disabled={busy || tryonBusy || refsLocked}
             onClick={() => onGarmentModeChange("one_piece")}
@@ -560,7 +560,7 @@ export function VtonRefWorkbench({
       >
         {isAlreadyDressed ? (
           <div className="space-y-2">
-            <span className="text-xs font-medium text-[#6e6e73]">已穿搭全身照</span>
+            <span className="text-xs font-medium text-[var(--ecom-muted)]">已穿搭全身照</span>
             <EcomRefUploadCard
               title="已穿搭"
               items={modelItems}
@@ -607,7 +607,7 @@ export function VtonRefWorkbench({
           />
         ) : (
           <div className="space-y-2">
-            <span className="text-xs font-medium text-[#6e6e73]">模特全身照</span>
+            <span className="text-xs font-medium text-[var(--ecom-muted)]">模特全身照</span>
             <EcomRefUploadCard
               title="模特"
               items={modelItems}
@@ -768,8 +768,8 @@ export function VtonRefWorkbench({
 
       {!useBatch && hasTryonPreview ? (
         <div className="space-y-2">
-          <span className="text-xs font-medium text-[#6e6e73]">试衣效果预览</span>
-          <div className="overflow-hidden rounded-xl border border-[#e8e8ed] bg-[#fafafa]">
+          <span className="text-xs font-medium text-[var(--ecom-muted)]">试衣效果预览</span>
+          <div className="overflow-hidden rounded-xl border border-[var(--ecom-divider)] bg-[#fafafa]">
             <button
               type="button"
               className="mx-auto block max-h-[420px] w-full cursor-zoom-in"
@@ -956,7 +956,7 @@ function GarmentSlot({
 
   return (
     <div className="space-y-2">
-      <span className="text-xs font-medium text-[#6e6e73]">{label}</span>
+      <span className="text-xs font-medium text-[var(--ecom-muted)]">{label}</span>
       <EcomRefUploadCard
         title={title}
         items={items}
@@ -1003,15 +1003,15 @@ function VtonExpandFullBodyDialog({
       aria-labelledby="vton-expand-title"
       onMouseDown={ecomModalBackdropMouseDown(onClose, { disabled: busy })}
     >
-      <div className="w-full max-w-md rounded-2xl border border-[#e8e8ed] bg-white p-5 shadow-xl">
-        <h3 id="vton-expand-title" className="text-sm font-semibold text-[#1d1d1f]">
+      <div className="w-full max-w-md rounded-2xl border border-[var(--ecom-divider)] bg-white p-5 shadow-xl">
+        <h3 id="vton-expand-title" className="text-sm font-semibold text-[var(--ecom-ink)]">
           生成全身图
         </h3>
-        <p className="mt-1 text-xs text-[#6e6e73]">
+        <p className="mt-1 text-xs text-[var(--ecom-muted)]">
           将当前模特图扩展为全身照（{fusionDisplayName}）。可追加补充描述，留空则使用默认 Prompt。
         </p>
         <textarea
-          className="mt-3 min-h-[88px] w-full rounded-lg border border-[#e8e8ed] px-3 py-2 text-xs text-[#1d1d1f] outline-none focus:border-[var(--ecom-outline-border)]"
+          className="mt-3 min-h-[88px] w-full rounded-lg border border-[var(--ecom-divider)] px-3 py-2 text-xs text-[var(--ecom-ink)] outline-none focus:border-[var(--ecom-outline-border)]"
           placeholder="可选：补充姿态、背景等描述"
           value={prompt}
           onChange={(e) => onPromptChange(e.target.value)}

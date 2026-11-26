@@ -34,7 +34,7 @@ function LayoutPresetThumb({ preset }: { preset: EcomStylePreset }) {
   const thumb = failed ? undefined : ecomStylePresetDisplayThumbUrl(preset);
   if (!thumb) {
     return (
-      <div className="flex h-full items-center justify-center bg-gradient-to-br from-[#f0f6ff] to-[#e8e8ed] px-2 text-center text-[11px] text-[#86868b]">
+      <div className="flex h-full items-center justify-center bg-gradient-to-br from-[var(--ecom-content-selected-bg)] to-[var(--ecom-divider)] px-2 text-center text-[11px] text-[var(--ecom-subtle)]">
         {preset.title}
       </div>
     );
@@ -111,14 +111,14 @@ export function ProductImageSetLayoutPickerDialog({
   return (
     <Dialog open={open} onOpenChange={(o) => !o && void commitAndClose()}>
       <DialogContent className="flex max-h-[90vh] w-[min(1024px,calc(100vw-2rem))] max-w-[1024px] flex-col gap-0 p-0">
-        <DialogHeader className="border-b border-[#e8e8ed] px-5 py-3.5">
+        <DialogHeader className="border-b border-[var(--ecom-divider)] px-5 py-3.5">
           <DialogTitle className="text-base font-semibold">选择卖点图版式</DialogTitle>
           <EcomDialogCloseButton type="button" onClick={() => void commitAndClose()} />
         </DialogHeader>
         <div className="flex min-h-[420px] min-h-0 flex-1 flex-col md:flex-row">
           <div className="ecom-scrollbar-thin min-h-0 flex-1 overflow-y-auto p-4 md:max-h-[560px]">
             {loading ? (
-              <p className="text-sm text-[#86868b]">加载预置版式库…</p>
+              <p className="text-sm text-[var(--ecom-subtle)]">加载预置版式库…</p>
             ) : (
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
                 {presets.map((p) => {
@@ -135,7 +135,7 @@ export function ProductImageSetLayoutPickerDialog({
                       )}
                       onClick={() => toggle(p.id)}
                     >
-                      <div className="relative aspect-[4/5] w-full bg-[#f5f5f7]">
+                      <div className="relative aspect-[4/5] w-full bg-[var(--ecom-parchment)]">
                         <LayoutPresetThumb preset={p} />
                         <div
                           className={cn(
@@ -161,15 +161,15 @@ export function ProductImageSetLayoutPickerDialog({
             )}
             <ProductImageSetLayoutRefUpload projectId={projectId} disabled={loading} />
           </div>
-          <aside className="flex w-full shrink-0 flex-col border-t border-[#e8e8ed] bg-[#fafafa] md:w-[280px] md:border-l md:border-t-0">
-            <div className="border-b border-[#e8e8ed] px-4 py-3">
+          <aside className="flex w-full shrink-0 flex-col border-t border-[var(--ecom-divider)] bg-[#fafafa] md:w-[280px] md:border-l md:border-t-0">
+            <div className="border-b border-[var(--ecom-divider)] px-4 py-3">
               <div className="flex items-baseline justify-between gap-2">
-                <p className="text-sm font-semibold text-[#1d1d1f]">已选版式</p>
-                <span className="text-xs text-[#86868b]">
+                <p className="text-sm font-semibold text-[var(--ecom-ink)]">已选版式</p>
+                <span className="text-xs text-[var(--ecom-subtle)]">
                   {draft.length}/{maxSelect}
                 </span>
               </div>
-              <p className="mt-1 text-[11px] leading-relaxed text-[#86868b]">
+              <p className="mt-1 text-[11px] leading-relaxed text-[var(--ecom-subtle)]">
                 每种版式生成 1 张，剩余卖点图 AI 补齐。
               </p>
             </div>
@@ -177,18 +177,18 @@ export function ProductImageSetLayoutPickerDialog({
               {selectedPresets.map((p) => (
                   <div
                     key={p.id}
-                    className="flex items-center gap-2 rounded-lg border border-[#e8e8ed] bg-white p-2"
+                    className="flex items-center gap-2 rounded-lg border border-[var(--ecom-divider)] bg-white p-2"
                   >
-                    <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-md bg-[#f5f5f7]">
+                    <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-md bg-[var(--ecom-parchment)]">
                       <LayoutPresetThumb preset={p} />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-xs font-semibold text-[#1d1d1f]">{p.title}</p>
-                      <p className="text-[10px] text-[#86868b]">生成 1 张</p>
+                      <p className="truncate text-xs font-semibold text-[var(--ecom-ink)]">{p.title}</p>
+                      <p className="text-[10px] text-[var(--ecom-subtle)]">生成 1 张</p>
                     </div>
                     <button
                       type="button"
-                      className="shrink-0 text-[#939599] hover:text-[#1d1d1f]"
+                      className="shrink-0 text-[#939599] hover:text-[var(--ecom-ink)]"
                       onClick={() => toggle(p.id)}
                       aria-label={`移除${p.title}`}
                     >
@@ -197,7 +197,7 @@ export function ProductImageSetLayoutPickerDialog({
                   </div>
               ))}
             </div>
-            <div className="border-t border-[#e8e8ed] p-3">
+            <div className="border-t border-[var(--ecom-divider)] p-3">
               <EcomButtonPrimary
                 size="sm"
                 className="w-full"

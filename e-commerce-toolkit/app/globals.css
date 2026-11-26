@@ -3,27 +3,47 @@
 @tailwind utilities;
 
 :root {
-  --ecom-primary: #0066cc;
-  --ecom-primary-focus: #0071e3;
-  --ecom-primary-on-dark: #2997ff;
+  /* 工作台色板：与图片编辑同一套奶油 / 焦炭。左侧导航不使用这组。 */
+  --ecom-cream: #fffbf5;
+  --ecom-cream-deep: #f5efe6;
+  --ecom-cream-muted: #ebe3d8;
+  --ecom-canvas-well: #ede6dc;
+  --ecom-border-strong: #3a322c;
+  --ecom-border-soft: #cfc5b8;
+  --ecom-subtle: #8a8178;
+  --ecom-divider: #e5ddd2;
+  --ie-cream: var(--ecom-cream);
+  --ie-cream-deep: var(--ecom-cream-deep);
+  --ie-cream-muted: var(--ecom-cream-muted);
+  --ie-canvas-well: var(--ecom-canvas-well);
+  --ie-border: var(--ecom-border-strong);
+  --ie-border-soft: var(--ecom-border-soft);
+  --ie-ink: var(--ecom-ink);
+  --ie-muted: var(--ecom-muted);
+  --ie-subtle: var(--ecom-subtle);
+  --ie-divider: var(--ecom-divider);
+
+  --ecom-primary: var(--ecom-ink);
+  --ecom-primary-focus: var(--ecom-border-strong);
+  --ecom-primary-on-dark: var(--ecom-ink);
   /** 侧栏 Logo 同款 · 主按钮实心填充 */
   --ecom-brand-orange: #ff6b3d;
   --ecom-brand-orange-deep: #e85d2c;
-  /** 描边按钮 / Logo / 选中框：墨黑边 */
-  --ecom-outline-border: #1d1d1f;
-  --ecom-outline-text: #1d1d1f;
-  --ecom-outline-hover-bg: #f5f5f7;
+  /** 描边按钮 / Logo / 选中框：焦炭边 */
+  --ecom-outline-border: var(--ecom-border-strong);
+  --ecom-outline-text: var(--ecom-ink);
+  --ecom-outline-hover-bg: var(--ecom-cream-muted);
   /* 按钮规范：design/BUTTON.md */
   --ecom-btn-fill: var(--ecom-brand-orange);
   --ecom-btn-fill-hover: var(--ecom-brand-orange-deep);
   --ecom-btn-on-fill: #ffffff;
-  --ecom-btn-alt-fill: #f4f4f5;
-  --ecom-btn-alt-on-fill: #18181b;
-  --ecom-ink: #1d1d1f;
-  --ecom-parchment: #f5f5f7;
+  --ecom-btn-alt-fill: var(--ecom-cream-muted);
+  --ecom-btn-alt-on-fill: var(--ecom-ink);
+  --ecom-ink: #2a2420;
+  --ecom-parchment: var(--ecom-cream-deep);
   --ecom-tile: #272729;
-  --ecom-hairline: #e0e0e0;
-  --ecom-muted: #7a7a7a;
+  --ecom-hairline: var(--ecom-divider);
+  --ecom-muted: #5c544c;
 
   /** 已登录壳层 / 门户外底（App 网格与 body） */
   --ecom-shell-bg: #3c3c3c;
@@ -45,34 +65,34 @@
   --ecom-glass-highlight: rgba(255, 255, 255, 0.22);
   --ecom-glass-inset: rgba(255, 255, 255, 0.06);
 
-  /* 工作台主内容 / 助手 / 进度轨 — 白底 */
-  --ecom-workspace-bg: #ffffff;
-  --ecom-rail-bg: #ffffff;
-  --ecom-rail-border: #e8e8ed;
-  --ecom-rail-label: #1d1d1f;
-  --ecom-rail-label-muted: #86868b;
-  --ecom-rail-accent: #0071e3;
-  --ecom-rail-dot-active-bg: #e8e8ed;
-  --ecom-rail-dot-pending-border: #e8e8ed;
-  --ecom-rail-dot-skipped-bg: #ffffff;
+  /* 工作台主内容 / 助手 / 进度轨 — 奶油底 */
+  --ecom-workspace-bg: var(--ecom-cream-deep);
+  --ecom-rail-bg: var(--ecom-cream);
+  --ecom-rail-border: var(--ecom-border-soft);
+  --ecom-rail-label: var(--ecom-ink);
+  --ecom-rail-label-muted: var(--ecom-subtle);
+  --ecom-rail-accent: var(--ecom-ink);
+  --ecom-rail-dot-active-bg: var(--ecom-cream-muted);
+  --ecom-rail-dot-pending-border: var(--ecom-border-soft);
+  --ecom-rail-dot-skipped-bg: var(--ecom-cream);
 
-  --ecom-assistant-bg: #ffffff;
-  --ecom-assistant-surface: #ffffff;
-  --ecom-assistant-border: #e8e8ed;
-  --ecom-assistant-bubble-user-bg: #ffffff;
-  --ecom-assistant-bubble-user-border: #e8e8ed;
-  --ecom-assistant-bubble-bot-bg: #ffffff;
-  --ecom-assistant-bubble-bot-ring: #e8e8ed;
-  --ecom-assistant-bubble-bg: #ffffff;
-  --ecom-assistant-composer-bg: #ffffff;
-  --ecom-assistant-input-bg: #ffffff;
-  --ecom-assistant-input-border: #e8e8ed;
-  --ecom-assistant-choice-bg: #ffffff;
-  --ecom-assistant-choice-border: #d2d2d7;
-  --ecom-assistant-choice-hover-bg: #ffffff;
+  --ecom-assistant-bg: var(--ecom-cream);
+  --ecom-assistant-surface: var(--ecom-cream-deep);
+  --ecom-assistant-border: var(--ecom-border-soft);
+  --ecom-assistant-bubble-user-bg: var(--ecom-cream);
+  --ecom-assistant-bubble-user-border: var(--ecom-border-soft);
+  --ecom-assistant-bubble-bot-bg: var(--ecom-cream-deep);
+  --ecom-assistant-bubble-bot-ring: var(--ecom-divider);
+  --ecom-assistant-bubble-bg: var(--ecom-cream);
+  --ecom-assistant-composer-bg: var(--ecom-cream);
+  --ecom-assistant-input-bg: var(--ecom-cream);
+  --ecom-assistant-input-border: var(--ecom-border-soft);
+  --ecom-assistant-choice-bg: var(--ecom-cream);
+  --ecom-assistant-choice-border: var(--ecom-border-soft);
+  --ecom-assistant-choice-hover-bg: var(--ecom-cream-muted);
 
-  --ecom-content-highlight: #f0f6ff;
-  --ecom-content-selected-bg: #f0f6ff;
+  --ecom-content-highlight: var(--ecom-cream-muted);
+  --ecom-content-selected-bg: var(--ecom-cream-muted);
 }
 
 html,
@@ -161,8 +181,8 @@ body {
   position: relative;
   overflow: hidden;
   box-shadow:
-    0 0 0 1px rgba(0, 113, 227, 0.55),
-    0 0 16px rgba(0, 113, 227, 0.35);
+    0 0 0 1px rgba(58, 50, 44, 0.45),
+    0 0 16px rgba(58, 50, 44, 0.22);
 }
 
 .ecom-media-generating-sweep::after {
@@ -173,7 +193,7 @@ body {
   background: linear-gradient(
     105deg,
     transparent 35%,
-    rgba(0, 113, 227, 0.22) 50%,
+    rgba(58, 50, 44, 0.16) 50%,
     transparent 65%
   );
   animation: ecom-media-shimmer 2.2s linear infinite;
@@ -197,7 +217,7 @@ body {
 .ecom-upload-progress {
   height: 4px;
   border-radius: 999px;
-  background: #e8e8ed;
+  background: var(--ecom-divider);
   overflow: hidden;
 }
 
@@ -205,7 +225,7 @@ body {
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, #0071e3, #2997ff);
+  background: linear-gradient(90deg, var(--ecom-border-strong), var(--ecom-muted));
   transition: width 0.2s ease;
 }
 
@@ -225,7 +245,7 @@ body {
 
 /** 媒体缩略图 / 画廊懒加载占位（对齐 QuickReplica qr-skeleton · 浅色变体） */
 .ecom-skeleton {
-  background: linear-gradient(90deg, #ececee 0%, #f5f5f7 50%, #ececee 100%);
+  background: linear-gradient(90deg, var(--ecom-cream-muted) 0%, var(--ecom-cream) 50%, var(--ecom-cream-muted) 100%);
   background-size: 200% 100%;
   animation: ecom-skeleton-shimmer 1.2s ease-in-out infinite;
 }

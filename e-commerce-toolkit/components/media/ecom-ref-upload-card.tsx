@@ -68,7 +68,7 @@ const REF_THUMB_SIZE = 56;
 function EcomRefGeneratingThumb({ label }: { label: string }) {
   return (
     <div
-      className="relative shrink-0 overflow-hidden rounded-md border border-[#d2d2d7] bg-[#ececee]"
+      className="relative shrink-0 overflow-hidden rounded-md border border-[var(--ecom-border-soft)] bg-[#ececee]"
       style={{ width: REF_THUMB_SIZE, height: REF_THUMB_SIZE }}
       aria-busy
       aria-label={label}
@@ -101,7 +101,7 @@ function EcomRefVideoThumb({
       <button
         type="button"
         title={alt}
-        className="relative h-full w-full overflow-hidden rounded-md border border-[#d2d2d7] bg-black"
+        className="relative h-full w-full overflow-hidden rounded-md border border-[var(--ecom-border-soft)] bg-black"
         onClick={onPreview}
       >
         <EcomVideoThumb src={src} className="absolute inset-0 size-full" />
@@ -185,10 +185,10 @@ export function EcomRefUploadCard({
     <div
       {...dropZoneProps}
       className={cn(
-        "rounded-lg border px-2.5 py-2 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[#1d1d1f]/15",
-        highlight && "border-[var(--ecom-outline-border)] bg-white ring-1 ring-[#1d1d1f]/15",
-        !highlight && suggested && "border-[var(--ecom-outline-border)] bg-white ring-1 ring-[#1d1d1f]/12",
-        !highlight && !suggested && "border-[#e8e8ed] bg-white hover:border-[var(--ecom-outline-border)]",
+        "rounded-lg border px-2.5 py-2 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[var(--ecom-ink)]/15",
+        highlight && "border-[var(--ecom-outline-border)] bg-white ring-1 ring-[var(--ecom-ink)]/15",
+        !highlight && suggested && "border-[var(--ecom-outline-border)] bg-white ring-1 ring-[var(--ecom-ink)]/12",
+        !highlight && !suggested && "border-[var(--ecom-divider)] bg-white hover:border-[var(--ecom-outline-border)]",
       )}
       onMouseEnter={() => {
         dropZoneProps.onMouseEnter?.();
@@ -209,7 +209,7 @@ export function EcomRefUploadCard({
           {!hideTitle ? (
             <TitleTag
               type={onTitleClick ? "button" : undefined}
-              className="min-w-0 text-left text-xs font-semibold text-[#1d1d1f]"
+              className="min-w-0 text-left text-xs font-semibold text-[var(--ecom-ink)]"
               onClick={onTitleClick}
             >
               {title}
@@ -281,7 +281,7 @@ export function EcomRefUploadCard({
               }
             />
           </div>
-          <p className="text-[10px] text-[#0071e3]">
+          <p className="text-[10px] text-[var(--ecom-primary)]">
             {typeof uploadProgress === "number" && uploadProgress >= 100
               ? "完成"
               : (uploadProgressLabel?.trim() || "正在上传…")}
@@ -349,10 +349,10 @@ export function EcomRefUploadCard({
         ) : !generating ? (
           hideEmptyHint ? (
             highlight ? (
-              <p className="text-[10px] text-[#0071e3]">松开以上传</p>
+              <p className="text-[10px] text-[var(--ecom-primary)]">松开以上传</p>
             ) : null
           ) : (
-            <p className={cn("text-[10px]", highlight ? "text-[#0071e3]" : "text-[#86868b]")}>
+            <p className={cn("text-[10px]", highlight ? "text-[var(--ecom-primary)]" : "text-[var(--ecom-subtle)]")}>
               {highlight ? "松开以上传" : emptyHint}
             </p>
           )

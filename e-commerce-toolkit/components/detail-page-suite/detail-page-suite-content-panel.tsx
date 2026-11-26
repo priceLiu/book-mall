@@ -230,7 +230,7 @@ export function DetailPageSuiteWorkbenchChrome({
         : "detail-page-suite";
 
   return (
-    <header className="shrink-0 border-b border-[#e8e8ed] bg-white px-5 py-3 shadow-[0_1px_0_0_rgba(0,0,0,0.04)]">
+    <header className="shrink-0 border-b border-[var(--ecom-divider)] bg-white px-5 py-3 shadow-[0_1px_0_0_rgba(0,0,0,0.04)]">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <EcomWorkspaceTitleHeading
           guideModuleId={guideModuleId}
@@ -244,7 +244,7 @@ export function DetailPageSuiteWorkbenchChrome({
                   : project.title?.trim() || "服装详情套图（模板）"
           }
         >
-          <p className="text-[11px] text-[#6e6e73]">
+          <p className="text-[11px] text-[var(--ecom-muted)]">
             阶段：{isWorkbench ? "出图" : phaseLabel}
             {!isWorkbench && project.brief?.platform ? ` · ${project.brief.platform}` : ""}
             {" · 已开模块 "}
@@ -252,7 +252,7 @@ export function DetailPageSuiteWorkbenchChrome({
             {" · 展示比例 "}
             {onDisplayRatioChange ? (
               <select
-                className="ml-0.5 rounded border border-[#d2d2d7] bg-white px-1 py-0 text-[11px]"
+                className="ml-0.5 rounded border border-[var(--ecom-border-soft)] bg-white px-1 py-0 text-[11px]"
                 value={displayRatio}
                 onChange={(e) =>
                   onDisplayRatioChange(e.target.value as EcomDetailPageRatio)
@@ -581,7 +581,7 @@ export function DetailPageSuiteContentPanel({
           {!isWorkbench && (project.brief?.sellPoints?.length || project.brief?.sellpointFivePart) ? (
             <section className="mb-6">
               <h2 className="mb-2 text-sm font-semibold">卖点（五段式）</h2>
-              <pre className="whitespace-pre-wrap rounded-lg border border-[#e8e8ed] bg-[#f5f5f7] px-3 py-2 font-sans text-sm leading-relaxed text-[#424245]">
+              <pre className="whitespace-pre-wrap rounded-lg border border-[var(--ecom-divider)] bg-[var(--ecom-parchment)] px-3 py-2 font-sans text-sm leading-relaxed text-[#424245]">
                 {formatDetailPageSuiteSellpointDraft(project.brief)}
               </pre>
             </section>
@@ -592,7 +592,7 @@ export function DetailPageSuiteContentPanel({
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <h2 className="text-sm font-semibold">模块 · 提示词 · 出图</h2>
                 {promptWorkspacePhase && onToggleAllPromptSelection ? (
-                  <label className="flex items-center gap-1 text-xs text-[#6e6e73]">
+                  <label className="flex items-center gap-1 text-xs text-[var(--ecom-muted)]">
                     <input
                       type="checkbox"
                       checked={promptSelectionState === "all"}
@@ -608,7 +608,7 @@ export function DetailPageSuiteContentPanel({
                 ) : null}
               </div>
               {promptWorkspacePhase ? (
-                <p className="text-[11px] leading-relaxed text-[#86868b]">
+                <p className="text-[11px] leading-relaxed text-[var(--ecom-subtle)]">
                   勾选点位后，在模块右侧「生成提示词」或「生图」；格子内勾选、点击编辑「文案与出图」、已出图 hover
                   操作。多条可并行提交。提示词 {promptReadyCount}/{promptTargets.length}。
                 </p>
@@ -650,7 +650,7 @@ export function DetailPageSuiteContentPanel({
               ))}
             </section>
           ) : (
-            <p className="text-sm text-[#86868b]">右侧选择平台与模板后，这里会列出大模块。</p>
+            <p className="text-sm text-[var(--ecom-subtle)]">右侧选择平台与模板后，这里会列出大模块。</p>
           )}
         </div>
       </div>
@@ -746,7 +746,7 @@ function ModuleBlock({
   const canAddSlot = addSlotCheck.ok;
 
   return (
-    <div className="rounded-xl border border-[#e8e8ed] p-4">
+    <div className="rounded-xl border border-[var(--ecom-divider)] p-4">
       <div className="mb-2 flex flex-wrap items-center gap-2">
         <label className="flex items-center gap-1 text-sm font-medium">
           <input
@@ -761,7 +761,7 @@ function ModuleBlock({
         (replicaMode || mod.enable) &&
         gridSlots.length > 0 &&
         onToggleModulePromptSelection ? (
-          <label className="flex items-center gap-1 text-xs text-[#6e6e73]">
+          <label className="flex items-center gap-1 text-xs text-[var(--ecom-muted)]">
             <input
               type="checkbox"
               checked={modulePickState === "all"}
@@ -779,13 +779,13 @@ function ModuleBlock({
           </label>
         ) : null}
         {!replicaMode ? (
-        <label className="text-xs text-[#86868b]">
+        <label className="text-xs text-[var(--ecom-subtle)]">
           N
           <input
             type="number"
             min={0}
             max={mod.max_num}
-            className="ml-1 w-14 rounded border border-[#d2d2d7] px-1 py-0.5"
+            className="ml-1 w-14 rounded border border-[var(--ecom-border-soft)] px-1 py-0.5"
             value={mod.generate_count}
             onChange={(e) => onChangeCount(mod.module_id, Number(e.target.value) || 0)}
           />
@@ -813,7 +813,7 @@ function ModuleBlock({
       </div>
 
       {(replicaMode || mod.enable) && gridSlots.length > 0 ? (
-        <p className="mb-3 text-[11px] text-[#86868b]">
+        <p className="mb-3 text-[11px] text-[var(--ecom-subtle)]">
           已选 {selectedSlotCount}/{gridSlots.length} 个点位
           {isSizeChartModule ? (
             isSpecChartModule
@@ -918,12 +918,12 @@ function ModuleBlock({
           />
         </div>
       ) : mod.enable && !replicaMode ? (
-        <p className="mb-2 text-xs text-[#86868b]">请在下方配置子维度，或调整 N 张数。</p>
+        <p className="mb-2 text-xs text-[var(--ecom-subtle)]">请在下方配置子维度，或调整 N 张数。</p>
       ) : null}
 
       {mod.enable && !replicaMode ? (
         <details className="group/subdim mt-1 rounded-lg border border-[#f0f0f2] bg-[#fafafa] px-3 py-2">
-          <summary className="cursor-pointer select-none text-[11px] font-medium text-[#6e6e73] marker:content-none">
+          <summary className="cursor-pointer select-none text-[11px] font-medium text-[var(--ecom-muted)] marker:content-none">
             <span className="group-open/subdim:hidden">配置子维度（{mod.selected_item_list.length}/{mod.generate_count}）</span>
             <span className="hidden group-open/subdim:inline">收起子维度配置</span>
           </summary>
@@ -937,8 +937,8 @@ function ModuleBlock({
                   className={cn(
                     "rounded-full border px-2 py-0.5 text-[11px]",
                     on
-                      ? "border-[var(--ecom-outline-border)] bg-[#f0f6ff] text-[#0071e3]"
-                      : "border-[#d2d2d7] text-[#6e6e73]",
+                      ? "border-[var(--ecom-outline-border)] bg-[var(--ecom-content-selected-bg)] text-[var(--ecom-primary)]"
+                      : "border-[var(--ecom-border-soft)] text-[var(--ecom-muted)]",
                   )}
                   onClick={() => onToggleItem(mod.module_id, item)}
                 >
@@ -948,7 +948,7 @@ function ModuleBlock({
             })}
             <button
               type="button"
-              className="rounded-full border border-dashed border-[#d2d2d7] px-2 py-0.5 text-[11px]"
+              className="rounded-full border border-dashed border-[var(--ecom-border-soft)] px-2 py-0.5 text-[11px]"
               onClick={() => onRequestAddItem(mod.module_id)}
             >
               + 子维度

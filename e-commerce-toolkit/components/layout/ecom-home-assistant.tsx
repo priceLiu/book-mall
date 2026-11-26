@@ -24,7 +24,7 @@ export function EcomHomeAssistant({ variant }: { variant: "home" | "library" }) 
             <li key={m.id}>
               <Link
                 href={m.href}
-                className="block rounded-lg border border-[var(--ecom-chrome-border)] bg-[var(--ecom-chrome-surface)] px-3 py-2 text-[var(--ecom-primary-on-dark)] transition-colors hover:bg-[var(--ecom-chrome-surface-raised)]"
+                className="block rounded-lg border border-[var(--ecom-chrome-border)] bg-[var(--ecom-chrome-surface)] px-3 py-2 text-[var(--ecom-chrome-text)] transition-colors hover:bg-[var(--ecom-chrome-surface-raised)]"
               >
                 {m.title}
               </Link>
@@ -34,7 +34,7 @@ export function EcomHomeAssistant({ variant }: { variant: "home" | "library" }) 
       ) : (
         <Link
           href="/"
-          className="mt-4 inline-block text-[var(--ecom-primary-on-dark)] hover:underline"
+          className="mt-4 inline-block text-[var(--ecom-chrome-text)] hover:underline"
         >
           ← 返回工作台
         </Link>

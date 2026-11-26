@@ -30,7 +30,7 @@ const editorWideBtn =
 function EditorBrandMark() {
   return (
     <span
-      className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-[#0071e3] text-sm font-bold text-white"
+      className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-[var(--ecom-primary)] text-sm font-bold text-white"
       aria-hidden
     >
       商

@@ -50,12 +50,12 @@ export function StoryboardSchemePicker({
       />
 
       {selectedScheme ? (
-        <div className="rounded-xl border border-[#e8e8ed] bg-[#fafafa] p-4">
-          <p className="mb-3 text-sm font-semibold text-[#1d1d1f]">
+        <div className="rounded-xl border border-[var(--ecom-divider)] bg-[#fafafa] p-4">
+          <p className="mb-3 text-sm font-semibold text-[var(--ecom-ink)]">
             已选方案 · {selectedScheme.title}
           </p>
           {selectedScheme.summary ? (
-            <p className="mb-3 text-xs text-[#6e6e73]">{selectedScheme.summary}</p>
+            <p className="mb-3 text-xs text-[var(--ecom-muted)]">{selectedScheme.summary}</p>
           ) : null}
           <StoryboardSchemePanelsTable
             panels={selectedScheme.panels}

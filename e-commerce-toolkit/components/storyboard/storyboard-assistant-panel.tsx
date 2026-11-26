@@ -1248,9 +1248,9 @@ export function StoryboardAssistantPanel({
                         compact={m.id === "streaming"}
                       />
                     ) : briefBody ? (
-                      <p className="whitespace-pre-wrap text-sm text-[#1d1d1f]">{briefBody}</p>
+                      <p className="whitespace-pre-wrap text-sm text-[var(--ecom-ink)]">{briefBody}</p>
                     ) : m.id === "streaming" ? (
-                      <p className="text-sm text-[#86868b]">正在生成策划方案…</p>
+                      <p className="text-sm text-[var(--ecom-subtle)]">正在生成策划方案…</p>
                     ) : null
                   ) : (
                     <p className="whitespace-pre-wrap">{m.content}</p>

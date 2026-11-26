@@ -247,9 +247,9 @@ export function EcomTemplateGalleryImportDialog({
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
           <div className="space-y-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <label className="text-xs font-medium text-[#1d1d1f]">HTML 来源</label>
+              <label className="text-xs font-medium text-[var(--ecom-ink)]">HTML 来源</label>
               {fileName ? (
-                <span className="truncate text-[10px] text-[#6e6e73]">{fileName}</span>
+                <span className="truncate text-[10px] text-[var(--ecom-muted)]">{fileName}</span>
               ) : null}
             </div>
 
@@ -263,8 +263,8 @@ export function EcomTemplateGalleryImportDialog({
               className={cn(
                 "rounded-lg border border-dashed px-4 py-5 text-center transition",
                 dragOver
-                  ? "border-[var(--ecom-outline-border)] bg-[#f0f6ff]"
-                  : "border-[#e8e8ed] bg-[#fafafa]",
+                  ? "border-[var(--ecom-outline-border)] bg-[var(--ecom-content-selected-bg)]"
+                  : "border-[var(--ecom-divider)] bg-[#fafafa]",
               )}
             >
               <input
@@ -275,24 +275,24 @@ export function EcomTemplateGalleryImportDialog({
                 onChange={handleFileInputChange}
               />
               {fileLoading ? (
-                <p className="flex items-center justify-center gap-2 text-xs text-[#6e6e73]">
+                <p className="flex items-center justify-center gap-2 text-xs text-[var(--ecom-muted)]">
                   <Loader2 className="h-4 w-4 animate-spin" />
                   正在读取文件…
                 </p>
               ) : (
                 <>
-                  <FileUp className="mx-auto h-6 w-6 text-[#86868b]" />
-                  <p className="mt-2 text-xs text-[#1d1d1f]">
+                  <FileUp className="mx-auto h-6 w-6 text-[var(--ecom-subtle)]" />
+                  <p className="mt-2 text-xs text-[var(--ecom-ink)]">
                     拖拽 HTML 文件到此处，或
                   </p>
                   <button
                     type="button"
-                    className="mt-2 text-xs font-medium text-[#0071e3] hover:underline"
+                    className="mt-2 text-xs font-medium text-[var(--ecom-primary)] hover:underline"
                     onClick={() => fileInputRef.current?.click()}
                   >
                     选择本地文件
                   </button>
-                  <p className="mt-1 text-[10px] text-[#86868b]">
+                  <p className="mt-1 text-[10px] text-[var(--ecom-subtle)]">
                     支持 .html / .htm（如 女装 图片.html）
                   </p>
                 </>
@@ -302,7 +302,7 @@ export function EcomTemplateGalleryImportDialog({
               ) : null}
             </div>
 
-            <p className="text-[10px] text-[#86868b]">或直接粘贴 HTML 源码</p>
+            <p className="text-[10px] text-[var(--ecom-subtle)]">或直接粘贴 HTML 源码</p>
             <textarea
               value={html}
               onChange={(e) => {
@@ -310,10 +310,10 @@ export function EcomTemplateGalleryImportDialog({
                 if (e.target.value.trim()) setFileName(null);
               }}
               placeholder="粘贴页面 HTML…"
-              className="h-32 w-full resize-y rounded-lg border border-[#e8e8ed] p-2 font-mono text-xs"
+              className="h-32 w-full resize-y rounded-lg border border-[var(--ecom-divider)] p-2 font-mono text-xs"
             />
             {htmlReady ? (
-              <p className="text-[10px] text-[#6e6e73]">
+              <p className="text-[10px] text-[var(--ecom-muted)]">
                 已载入约 {(html.length / 1024).toFixed(0)} KB 文本
                 {fileCategoryHint ? (
                   <>
@@ -326,7 +326,7 @@ export function EcomTemplateGalleryImportDialog({
           </div>
 
           {categoryMismatch ? (
-            <p className="rounded-lg border border-[#ff9500] bg-[#fff8eb] px-3 py-2 text-xs text-[#1d1d1f]">
+            <p className="rounded-lg border border-[#ff9500] bg-[#fff8eb] px-3 py-2 text-xs text-[var(--ecom-ink)]">
               文件名对应「{templateCategoryLabel(fileCategoryHint!)}」，当前选中「
               {templateCategoryLabel(category)}」。请切换到正确分类后再解析，否则 ID
               与页面品类会不一致。
@@ -334,7 +334,7 @@ export function EcomTemplateGalleryImportDialog({
           ) : null}
 
           <div className="space-y-2">
-            <p className="text-xs font-medium text-[#1d1d1f]">分类</p>
+            <p className="text-xs font-medium text-[var(--ecom-ink)]">分类</p>
             <div className="flex flex-wrap gap-2">
               {ECOM_TEMPLATE_CATEGORY_META.map((cat) => (
                 <button
@@ -344,8 +344,8 @@ export function EcomTemplateGalleryImportDialog({
                   className={cn(
                     "rounded-full border px-3 py-1.5 text-xs font-medium",
                     category === cat.id
-                      ? "border-[#1d1d1f] bg-[#1d1d1f] text-white"
-                      : "border-[#e8e8ed] bg-white text-[#1d1d1f]",
+                      ? "border-[var(--ecom-ink)] bg-[var(--ecom-ink)] text-white"
+                      : "border-[var(--ecom-divider)] bg-white text-[var(--ecom-ink)]",
                   )}
                 >
                   {cat.label}
@@ -360,7 +360,7 @@ export function EcomTemplateGalleryImportDialog({
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs text-[#6e6e73]">解析媒体：</span>
+            <span className="text-xs text-[var(--ecom-muted)]">解析媒体：</span>
             {(["all", "image", "video"] as const).map((m) => (
               <button
                 key={m}
@@ -369,27 +369,27 @@ export function EcomTemplateGalleryImportDialog({
                 className={cn(
                   "rounded-lg border px-2.5 py-1 text-xs",
                   mediaFilter === m
-                    ? "border-[var(--ecom-outline-border)] bg-[#f0f6ff] text-[#0071e3]"
-                    : "border-[#e8e8ed]",
+                    ? "border-[var(--ecom-outline-border)] bg-[var(--ecom-content-selected-bg)] text-[var(--ecom-primary)]"
+                    : "border-[var(--ecom-divider)]",
                 )}
               >
                 {m === "all" ? "全部" : m === "image" ? "图片" : "视频"}
               </button>
             ))}
             {mediaFilter === "video" ? (
-              <span className="text-[10px] text-[#6e6e73]">
+              <span className="text-[10px] text-[var(--ecom-muted)]">
                 视频站 HTML 内 <code>&lt;video src&gt;</code> 为空，按封面同名推导 .mp4
               </span>
             ) : null}
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs text-[#6e6e73]">预设：</span>
+            <span className="text-xs text-[var(--ecom-muted)]">预设：</span>
             <button
               type="button"
               className={cn(
                 "rounded-lg border px-2.5 py-1 text-xs",
-                preset === "yibaiaigc-demo-card" && "border-[var(--ecom-outline-border)] bg-[#f0f6ff]",
+                preset === "yibaiaigc-demo-card" && "border-[var(--ecom-outline-border)] bg-[var(--ecom-content-selected-bg)]",
               )}
               onClick={() => setPreset("yibaiaigc-demo-card")}
             >
@@ -399,7 +399,7 @@ export function EcomTemplateGalleryImportDialog({
               type="button"
               className={cn(
                 "rounded-lg border px-2.5 py-1 text-xs",
-                preset === "custom" && "border-[var(--ecom-outline-border)] bg-[#f0f6ff]",
+                preset === "custom" && "border-[var(--ecom-outline-border)] bg-[var(--ecom-content-selected-bg)]",
               )}
               onClick={() => setPreset("custom")}
             >
@@ -407,7 +407,7 @@ export function EcomTemplateGalleryImportDialog({
             </button>
             <button
               type="button"
-              className="text-xs text-[#0071e3]"
+              className="text-xs text-[var(--ecom-primary)]"
               onClick={() => setShowAdvanced((v) => !v)}
             >
               {showAdvanced ? "收起高级" : "高级规则"}
@@ -415,7 +415,7 @@ export function EcomTemplateGalleryImportDialog({
           </div>
 
           {showAdvanced && preset === "custom" ? (
-            <div className="space-y-2 rounded-lg border border-[#e8e8ed] p-3">
+            <div className="space-y-2 rounded-lg border border-[var(--ecom-divider)] p-3">
               {(
                 [
                   ["blockMarker", "块分割标记"],
@@ -426,9 +426,9 @@ export function EcomTemplateGalleryImportDialog({
                 ] as const
               ).map(([key, label]) => (
                 <div key={key}>
-                  <label className="text-[10px] text-[#6e6e73]">{label}</label>
+                  <label className="text-[10px] text-[var(--ecom-muted)]">{label}</label>
                   <input
-                    className="mt-0.5 w-full rounded border border-[#e8e8ed] px-2 py-1 font-mono text-xs"
+                    className="mt-0.5 w-full rounded border border-[var(--ecom-divider)] px-2 py-1 font-mono text-xs"
                     value={customConfig[key]}
                     onChange={(e) =>
                       setCustomConfig((c) => ({ ...c, [key]: e.target.value }))
@@ -458,19 +458,19 @@ export function EcomTemplateGalleryImportDialog({
               <>
                 <button
                   type="button"
-                  className="text-xs text-[#0071e3]"
+                  className="text-xs text-[var(--ecom-primary)]"
                   onClick={selectAll}
                 >
                   全选
                 </button>
                 <button
                   type="button"
-                  className="text-xs text-[#6e6e73]"
+                  className="text-xs text-[var(--ecom-muted)]"
                   onClick={selectNone}
                 >
                   取消全选
                 </button>
-                <span className="text-xs text-[#6e6e73]">
+                <span className="text-xs text-[var(--ecom-muted)]">
                   已选 {selected.size} / {parsed.length} · 视频 {videoCount} ·
                   图片 {parsed.length - videoCount}
                   {importedCount > 0 ? (
@@ -489,12 +489,12 @@ export function EcomTemplateGalleryImportDialog({
               {parsed.map((row) => (
                 <li key={row.tempKey} className="relative">
                   {row.alreadyImported ? (
-                    <span className="absolute left-1 top-1 z-10 rounded bg-[#86868b] px-1 py-0.5 text-[9px] font-medium text-white">
+                    <span className="absolute left-1 top-1 z-10 rounded bg-[var(--ecom-subtle)] px-1 py-0.5 text-[9px] font-medium text-white">
                       已导入
                     </span>
                   ) : null}
                   {row.mediaKind === "video" ? (
-                    <span className="absolute right-1 top-1 z-10 rounded bg-[#0071e3] px-1 py-0.5 text-[9px] font-medium text-white">
+                    <span className="absolute right-1 top-1 z-10 rounded bg-[var(--ecom-primary)] px-1 py-0.5 text-[9px] font-medium text-white">
                       {row.videoUrlDerived ? "视频·推导" : "视频"}
                     </span>
                   ) : null}
@@ -509,7 +509,7 @@ export function EcomTemplateGalleryImportDialog({
                     onPreview={() => {}}
                     disableLazy={false}
                   />
-                  <p className="mt-1 truncate text-[10px] text-[#6e6e73]">
+                  <p className="mt-1 truncate text-[10px] text-[var(--ecom-muted)]">
                     {row.title}
                   </p>
                   <ParsedRowUrl
@@ -557,7 +557,7 @@ function ExistingCheckHint({
 }) {
   if (loading) {
     return (
-      <p className="text-[10px] text-[#6e6e73]">正在核对库中已导入的条目…</p>
+      <p className="text-[10px] text-[var(--ecom-muted)]">正在核对库中已导入的条目…</p>
     );
   }
   if (!load) {
@@ -575,7 +575,7 @@ function ExistingCheckHint({
     );
   }
   return (
-    <p className="text-[10px] text-[#6e6e73]">
+    <p className="text-[10px] text-[var(--ecom-muted)]">
       库中「{templateCategoryLabel(category)}」已有 {load.ids.size} 条，解析时自动标记重复
     </p>
   );
@@ -598,7 +598,7 @@ function ParsedRowUrl({
 }) {
   return (
     <p className="flex items-center gap-1 text-[10px] leading-4">
-      <span className="shrink-0 text-[#86868b]">{label}</span>
+      <span className="shrink-0 text-[var(--ecom-subtle)]">{label}</span>
       <a
         href={url}
         target="_blank"
@@ -607,7 +607,7 @@ function ParsedRowUrl({
         onClick={(e) => e.stopPropagation()}
         className={cn(
           "truncate hover:underline",
-          accent ? "text-[#0071e3]" : "text-[#6e6e73]",
+          accent ? "text-[var(--ecom-primary)]" : "text-[var(--ecom-muted)]",
         )}
       >
         {urlFileName(url)}

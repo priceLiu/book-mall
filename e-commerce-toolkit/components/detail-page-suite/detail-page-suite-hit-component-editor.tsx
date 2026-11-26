@@ -86,13 +86,13 @@ export function DetailPageSuiteHitComponentEditor({
   }
 
   return (
-    <div className="border-b border-[#e8e8ed] bg-white px-5 py-3">
+    <div className="border-b border-[var(--ecom-divider)] bg-white px-5 py-3">
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h2 className="text-sm font-semibold text-[#1d1d1f]">
+          <h2 className="text-sm font-semibold text-[var(--ecom-ink)]">
             爆款结构（{template.component_list.length} 个卡位）
           </h2>
-          <p className="mt-0.5 text-[11px] text-[#86868b]">
+          <p className="mt-0.5 text-[11px] text-[var(--ecom-subtle)]">
             {template.template_name}
             {template.category_tag?.length ? ` · ${template.category_tag.join(" / ")}` : ""}
             {" · 画布 "}
@@ -142,12 +142,12 @@ export function DetailPageSuiteHitComponentEditor({
           return (
             <li
               key={comp.id}
-              className="rounded-lg border border-[#e8e8ed] bg-[#fafafa] p-2 text-xs"
+              className="rounded-lg border border-[var(--ecom-divider)] bg-[#fafafa] p-2 text-xs"
             >
               <div className="flex flex-wrap items-center gap-2">
-                <span className="w-6 text-[#86868b]">{index + 1}</span>
+                <span className="w-6 text-[var(--ecom-subtle)]">{index + 1}</span>
                 <select
-                  className="rounded-md border border-[#d2d2d7] bg-white px-2 py-1"
+                  className="rounded-md border border-[var(--ecom-border-soft)] bg-white px-2 py-1"
                   disabled={busy}
                   value={comp.type}
                   onChange={(e) => {
@@ -166,7 +166,7 @@ export function DetailPageSuiteHitComponentEditor({
                   ))}
                 </select>
                 <select
-                  className="rounded-md border border-[#d2d2d7] bg-white px-2 py-1"
+                  className="rounded-md border border-[var(--ecom-border-soft)] bg-white px-2 py-1"
                   disabled={busy}
                   value={comp.layout}
                   onChange={(e) =>
@@ -179,13 +179,13 @@ export function DetailPageSuiteHitComponentEditor({
                     </option>
                   ))}
                 </select>
-                <label className="flex items-center gap-1 text-[#6e6e73]">
+                <label className="flex items-center gap-1 text-[var(--ecom-muted)]">
                   数量
                   <input
                     type="number"
                     min={1}
                     max={max}
-                    className="w-14 rounded-md border border-[#d2d2d7] bg-white px-1 py-1"
+                    className="w-14 rounded-md border border-[var(--ecom-border-soft)] bg-white px-1 py-1"
                     disabled={busy || !editableCount}
                     value={comp.repeat_count}
                     onChange={(e) => {
@@ -200,7 +200,7 @@ export function DetailPageSuiteHitComponentEditor({
                 <div className="ml-auto flex items-center gap-1">
                   <button
                     type="button"
-                    className="rounded-md border border-[#d2d2d7] p-1 disabled:opacity-40"
+                    className="rounded-md border border-[var(--ecom-border-soft)] p-1 disabled:opacity-40"
                     disabled={busy || index === 0}
                     onClick={() => patchList(moveItem(template.component_list, index, -1))}
                     aria-label="上移"
@@ -209,7 +209,7 @@ export function DetailPageSuiteHitComponentEditor({
                   </button>
                   <button
                     type="button"
-                    className="rounded-md border border-[#d2d2d7] p-1 disabled:opacity-40"
+                    className="rounded-md border border-[var(--ecom-border-soft)] p-1 disabled:opacity-40"
                     disabled={busy || index === template.component_list.length - 1}
                     onClick={() => patchList(moveItem(template.component_list, index, 1))}
                     aria-label="下移"
@@ -218,7 +218,7 @@ export function DetailPageSuiteHitComponentEditor({
                   </button>
                   <button
                     type="button"
-                    className="rounded-md border border-[#d2d2d7] p-1 text-red-600 disabled:opacity-40"
+                    className="rounded-md border border-[var(--ecom-border-soft)] p-1 text-red-600 disabled:opacity-40"
                     disabled={busy || template.component_list.length <= 1}
                     onClick={() =>
                       patchList(template.component_list.filter((_, i) => i !== index))
@@ -229,8 +229,8 @@ export function DetailPageSuiteHitComponentEditor({
                   </button>
                 </div>
               </div>
-              {comp.note ? <p className="mt-1 text-[#6e6e73]">{comp.note}</p> : null}
-              <p className="mt-1 text-[#86868b]">
+              {comp.note ? <p className="mt-1 text-[var(--ecom-muted)]">{comp.note}</p> : null}
+              <p className="mt-1 text-[var(--ecom-subtle)]">
                 {comp.text_slot?.text_type ? `文案：${comp.text_slot.text_type}` : "文案插槽"}
                 {comp.text_slot?.max_char ? ` ≤${comp.text_slot.max_char}字` : ""}
                 {comp.image_slot?.composition ? ` · 构图 ${comp.image_slot.composition}` : ""}

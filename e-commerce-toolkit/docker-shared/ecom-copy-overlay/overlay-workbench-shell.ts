@@ -13,7 +13,7 @@ export function overlayWorkbenchShellProps(opts: {
   const useNaturalAspect = imageNatural != null && imageNatural.w > 0 && imageNatural.h > 0;
   return {
     className: [
-      "relative mx-auto overflow-visible rounded-xl border border-[#d2d2d7] bg-[#1d1d1f]/90",
+      "relative mx-auto overflow-visible rounded-xl border border-[var(--ecom-border-soft)] bg-[var(--ecom-ink)]/90",
       useNaturalAspect ? "" : aspectClassName,
       fillWorkbench ? "h-auto max-h-full w-full max-w-full shrink-0" : "w-full",
       frameClassName,

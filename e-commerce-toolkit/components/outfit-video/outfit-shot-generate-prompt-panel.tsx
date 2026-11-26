@@ -50,16 +50,16 @@ export function OutfitShotGeneratePromptPanel({
 
   if (!scene) {
     return (
-      <div className="rounded-lg border border-dashed border-[#e8e8ed] bg-[#fafafa] px-3 py-4 text-xs text-[#86868b]">
+      <div className="rounded-lg border border-dashed border-[var(--ecom-divider)] bg-[#fafafa] px-3 py-4 text-xs text-[var(--ecom-subtle)]">
         勾选或点击镜号后，可在此编辑该镜生成 Prompt（系统已预填光影/场景；运镜/动作仅表格展示）。
       </div>
     );
   }
 
   return (
-    <div className="space-y-3 rounded-lg border border-[#e8e8ed] bg-[#fafafa] p-3">
+    <div className="space-y-3 rounded-lg border border-[var(--ecom-divider)] bg-[#fafafa] p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-xs font-semibold text-[#1d1d1f]">
+        <h3 className="text-xs font-semibold text-[var(--ecom-ink)]">
           片段生成 · 镜 {scene.index}
           {scene.parseIncomplete ? (
             <span className="ml-2 font-normal text-[#ff9500]">识别不足</span>
@@ -68,7 +68,7 @@ export function OutfitShotGeneratePromptPanel({
         {onResetPrefill ? (
           <button
             type="button"
-            className="text-[11px] text-[#0071e3] hover:underline disabled:opacity-40"
+            className="text-[11px] text-[var(--ecom-primary)] hover:underline disabled:opacity-40"
             disabled={disabled}
             onClick={() => {
               const prefilled = buildOutfitShotPrefilledGeneratePrompt(scene);
@@ -82,7 +82,7 @@ export function OutfitShotGeneratePromptPanel({
       </div>
 
       <div className="space-y-1">
-        <label className="text-[11px] font-medium text-[#6e6e73]">
+        <label className="text-[11px] font-medium text-[var(--ecom-muted)]">
           正向 Prompt（可 @ 引用参考图，提交生成时使用）
         </label>
         {mentionRefs.length > 0 ? (
@@ -94,7 +94,7 @@ export function OutfitShotGeneratePromptPanel({
             mentionBadgeVariant="thumbnail"
             refBarHint="参考资产 · Prompt 中已 @ 引用的素材"
             minHeightClass="min-h-[6rem]"
-            className="rounded-lg border border-[#d2d2d7] bg-white px-3 py-2 text-xs leading-relaxed"
+            className="rounded-lg border border-[var(--ecom-border-soft)] bg-white px-3 py-2 text-xs leading-relaxed"
             onChange={(value) => {
               setDraft(value);
               onPromptChange(scene.sceneId, value);
@@ -105,7 +105,7 @@ export function OutfitShotGeneratePromptPanel({
             rows={4}
             disabled={disabled}
             value={draft}
-            className="ecom-scrollbar-thin w-full resize-y rounded-lg border border-[#d2d2d7] bg-white px-3 py-2 text-xs leading-relaxed text-[#1d1d1f] outline-none focus:border-[var(--ecom-outline-border)] focus:ring-2 focus:ring-[#1d1d1f]/15 disabled:opacity-60"
+            className="ecom-scrollbar-thin w-full resize-y rounded-lg border border-[var(--ecom-border-soft)] bg-white px-3 py-2 text-xs leading-relaxed text-[var(--ecom-ink)] outline-none focus:border-[var(--ecom-outline-border)] focus:ring-2 focus:ring-[var(--ecom-ink)]/15 disabled:opacity-60"
             placeholder="可留空（Kling 动作控制将仅依赖参考片段 + 模特图）"
             onChange={(e) => {
               const value = e.target.value;
@@ -114,14 +114,14 @@ export function OutfitShotGeneratePromptPanel({
             }}
           />
         )}
-        <p className="text-[10px] leading-relaxed text-[#86868b]">
+        <p className="text-[10px] leading-relaxed text-[var(--ecom-subtle)]">
           输入 @ 插入穿搭/场景参考代号；与表格「动作/场景」列一致。生成前/后/再生成均可修改。
         </p>
       </div>
 
       <div className="space-y-1">
-        <span className="text-[11px] font-medium text-[#6e6e73]">负面 Prompt（只读）</span>
-        <pre className="whitespace-pre-wrap rounded-lg border border-[#e8e8ed] bg-white px-3 py-2 text-xs leading-relaxed text-[#6e6e73]">
+        <span className="text-[11px] font-medium text-[var(--ecom-muted)]">负面 Prompt（只读）</span>
+        <pre className="whitespace-pre-wrap rounded-lg border border-[var(--ecom-divider)] bg-white px-3 py-2 text-xs leading-relaxed text-[var(--ecom-muted)]">
           {scene ? resolveOutfitShotNegativePrompt(scene) : ""}
         </pre>
       </div>

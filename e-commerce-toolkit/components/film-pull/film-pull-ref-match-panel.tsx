@@ -31,8 +31,8 @@ function RefThumb({ url, label }: { url: string; label?: string }) {
   return (
     <div className="flex flex-col items-center gap-0.5">
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={url} alt={label ?? ""} className="h-10 w-10 rounded object-cover ring-1 ring-[#e8e8ed]" />
-      {label ? <span className="max-w-[3rem] truncate text-[9px] text-[#6e6e73]">{label}</span> : null}
+      <img src={url} alt={label ?? ""} className="h-10 w-10 rounded object-cover ring-1 ring-[var(--ecom-divider)]" />
+      {label ? <span className="max-w-[3rem] truncate text-[9px] text-[var(--ecom-muted)]">{label}</span> : null}
     </div>
   );
 }
@@ -57,7 +57,7 @@ function RefToggleGroup({
             key={ref.id}
             type="button"
             disabled={disabled}
-            className={`rounded-lg p-0.5 ring-2 transition ${active ? "ring-[#0071e3]" : "ring-transparent opacity-60 hover:opacity-100"}`}
+            className={`rounded-lg p-0.5 ring-2 transition ${active ? "ring-[var(--ecom-primary)]" : "ring-transparent opacity-60 hover:opacity-100"}`}
             onClick={() => {
               const next = active
                 ? selectedIds.filter((id) => id !== ref.id)
@@ -123,11 +123,11 @@ export function FilmPullRefMatchPanel({ project, busy, onProjectUpdated, onAlert
   if (!refMatch?.shots.length) return null;
 
   return (
-    <div className="space-y-3 rounded-xl border border-[#e8e8ed] bg-white p-4">
+    <div className="space-y-3 rounded-xl border border-[var(--ecom-divider)] bg-white p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h2 className="text-sm font-semibold text-[#1d1d1f]">参考图匹配</h2>
-          <p className="text-[11px] text-[#6e6e73]">
+          <h2 className="text-sm font-semibold text-[var(--ecom-ink)]">参考图匹配</h2>
+          <p className="text-[11px] text-[var(--ecom-muted)]">
             系统已按分镜自动分配模特/产品 ref，可直接改选；与下方制作脚本一并确认即可。
           </p>
         </div>
@@ -154,7 +154,7 @@ export function FilmPullRefMatchPanel({ project, busy, onProjectUpdated, onAlert
               ) : null}
             </>
           ) : (
-            <span className="text-xs text-[#6e6e73]">脚本已确认，参考图已锁定</span>
+            <span className="text-xs text-[var(--ecom-muted)]">脚本已确认，参考图已锁定</span>
           )}
         </div>
       </div>
@@ -162,7 +162,7 @@ export function FilmPullRefMatchPanel({ project, busy, onProjectUpdated, onAlert
       <div className="overflow-x-auto">
         <table className="w-full min-w-[640px] border-collapse text-xs">
           <thead>
-            <tr className="border-b border-[#e8e8ed] text-left text-[#6e6e73]">
+            <tr className="border-b border-[var(--ecom-divider)] text-left text-[var(--ecom-muted)]">
               <th className="px-2 py-2 font-medium">镜号</th>
               <th className="px-2 py-2 font-medium">时间</th>
               <th className="px-2 py-2 font-medium">模特 ref</th>
@@ -175,8 +175,8 @@ export function FilmPullRefMatchPanel({ project, busy, onProjectUpdated, onAlert
               if (!match) return null;
               return (
                 <tr key={analyzeShot.shotNo} className="border-b border-[#f0f0f2] align-top">
-                  <td className="px-2 py-2 font-medium text-[#1d1d1f]">{analyzeShot.shotNo}</td>
-                  <td className="whitespace-nowrap px-2 py-2 text-[#6e6e73]">
+                  <td className="px-2 py-2 font-medium text-[var(--ecom-ink)]">{analyzeShot.shotNo}</td>
+                  <td className="whitespace-nowrap px-2 py-2 text-[var(--ecom-muted)]">
                     {analyzeShot.startTimeSec.toFixed(1)}–{analyzeShot.endTimeSec.toFixed(1)}s
                   </td>
                   <td className="px-2 py-2">

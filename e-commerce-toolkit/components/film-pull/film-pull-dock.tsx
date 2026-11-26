@@ -73,13 +73,13 @@ export function FilmPullDock({
   const videoCount = media?.ossUrl ? 1 : 0;
 
   return (
-    <div className="flex shrink-0 flex-col gap-3 border-t border-[#e8e8ed] bg-[#fafafa] px-5 py-4">
+    <div className="flex shrink-0 flex-col gap-3 border-t border-[var(--ecom-divider)] bg-[#fafafa] px-5 py-4">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-xs font-medium uppercase tracking-wide text-[#6e6e73]">
+        <span className="text-xs font-medium uppercase tracking-wide text-[var(--ecom-muted)]">
           源视频
           <span className="ml-1 font-normal normal-case text-[#ff3b30]">（{filmPullMaxVideoSecLabel()} · 必传）</span>
         </span>
-        <span className="shrink-0 text-[10px] text-[#86868b]">{videoCount}/1</span>
+        <span className="shrink-0 text-[10px] text-[var(--ecom-subtle)]">{videoCount}/1</span>
       </div>
 
       <div className="flex min-w-0 items-center gap-3">
@@ -144,12 +144,12 @@ export function FilmPullDock({
       </div>
 
       {(phase === "replace" || phase === "output") && (
-        <div className="space-y-2 border-t border-[#e8e8ed] pt-3">
+        <div className="space-y-2 border-t border-[var(--ecom-divider)] pt-3">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-xs font-medium uppercase tracking-wide text-[#6e6e73]">
+            <span className="text-xs font-medium uppercase tracking-wide text-[var(--ecom-muted)]">
               角色参考
             </span>
-            <span className="text-[10px] text-[#86868b]">{characterItems.length} 张</span>
+            <span className="text-[10px] text-[var(--ecom-subtle)]">{characterItems.length} 张</span>
           </div>
           <EcomRefUploadCard
             title="角色图"
@@ -166,7 +166,7 @@ export function FilmPullDock({
             }}
           />
           <textarea
-            className="w-full rounded-lg border border-[#d2d2d7] px-2 py-1.5 text-xs outline-none focus:border-[var(--ecom-outline-border)] focus:ring-2 focus:ring-[#1d1d1f]/15"
+            className="w-full rounded-lg border border-[var(--ecom-border-soft)] px-2 py-1.5 text-xs outline-none focus:border-[var(--ecom-outline-border)] focus:ring-2 focus:ring-[var(--ecom-ink)]/15"
             rows={2}
             placeholder="角色文字描述（可选）"
             value={characterDescription}

@@ -8,7 +8,7 @@ import {
 import { cn } from "@/lib/utils";
 
 const selectClass =
-  "w-full rounded-lg border border-[#e8e8ed] bg-[#fafafa] px-2 py-1.5 text-[11px] text-[#1d1d1f]";
+  "w-full rounded-lg border border-[var(--ecom-divider)] bg-[#fafafa] px-2 py-1.5 text-[11px] text-[var(--ecom-ink)]";
 
 type Props = {
   platform: string;

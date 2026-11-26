@@ -66,11 +66,11 @@ export function HandCraftRefUploader({
   return (
     <div className={className ?? "space-y-2"}>
       <div className="flex items-center justify-between gap-2">
-        <span className="text-xs font-medium uppercase tracking-wide text-[#6e6e73]">
+        <span className="text-xs font-medium uppercase tracking-wide text-[var(--ecom-muted)]">
           手绘线稿
           <span className="ml-1 font-normal normal-case text-[#ff3b30]">（必传）</span>
         </span>
-        <span className="text-[10px] text-[#86868b]">
+        <span className="text-[10px] text-[var(--ecom-subtle)]">
           {references.length}/{HAND_CRAFT_SKETCH_MAX} · {IMAGE_UPLOAD_DROP_HINT}
         </span>
       </div>

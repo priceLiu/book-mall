@@ -35,7 +35,7 @@ function HistoryThumb({
 }) {
   return (
     <span className="flex w-[88px] shrink-0 flex-col gap-1">
-      <span className="relative block aspect-square overflow-hidden rounded-lg bg-[#f5f5f7]">
+      <span className="relative block aspect-square overflow-hidden rounded-lg bg-[var(--ecom-parchment)]">
         {url ? (
           <Image src={url} alt={label} fill className="object-cover" unoptimized />
         ) : (
@@ -44,7 +44,7 @@ function HistoryThumb({
           </span>
         )}
       </span>
-      <span className="truncate text-center text-[10px] text-[#86868b]">{label}</span>
+      <span className="truncate text-center text-[10px] text-[var(--ecom-subtle)]">{label}</span>
     </span>
   );
 }
@@ -62,7 +62,7 @@ export function ImageLayerHistoryDialog({
       <DialogContent className="flex max-h-[85vh] max-w-3xl flex-col gap-0 overflow-hidden p-0">
         <DialogHeader className="border-b border-[#f0f0f2] px-5 py-4">
           <DialogTitle className="text-[15px]">处理历史</DialogTitle>
-          <p className="text-[12px] text-[#86868b]">
+          <p className="text-[12px] text-[var(--ecom-subtle)]">
             每条记录含左边原图、右边生成结果，以及当时的提示词与参考图。点一条即可回到当时继续编辑。
           </p>
         </DialogHeader>
@@ -70,7 +70,7 @@ export function ImageLayerHistoryDialog({
           {items.length === 0 ? (
             <div className="flex flex-col items-center gap-2 py-14 text-center">
               <History className="h-8 w-8 text-[#c7c7cc]" />
-              <p className="text-sm text-[#86868b]">还没有处理历史</p>
+              <p className="text-sm text-[var(--ecom-subtle)]">还没有处理历史</p>
               <p className="max-w-xs text-[12px] text-[#9ca3af]">
                 先上传或生成一张图，记录会出现在这里。
               </p>
@@ -90,18 +90,18 @@ export function ImageLayerHistoryDialog({
                     className={cn(
                       "flex items-start gap-3 rounded-xl border-2 p-2.5 text-left transition-colors",
                       active
-                        ? "border-[var(--ecom-outline-border)] bg-[#f0f6ff]"
-                        : "border-[#e8e8ed] bg-white hover:border-[#d2d2d7]",
+                        ? "border-[var(--ecom-outline-border)] bg-[var(--ecom-content-selected-bg)]"
+                        : "border-[var(--ecom-divider)] bg-white hover:border-[var(--ecom-border-soft)]",
                       restoringId && !restoring ? "opacity-60" : "",
                     )}
                   >
                     <HistoryThumb url={preview.beforeUrl} label="原图" />
                     <HistoryThumb url={preview.afterUrl} label="生成" />
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[13px] font-medium text-[#1d1d1f]">
+                      <span className="block truncate text-[13px] font-medium text-[var(--ecom-ink)]">
                         {item.title}
                       </span>
-                      <span className="mt-0.5 block text-[11px] text-[#86868b]">
+                      <span className="mt-0.5 block text-[11px] text-[var(--ecom-subtle)]">
                         {imageLayerGenerationKindLabel(item.kind)}
                         {item.modelKey ? ` · ${item.modelKey}` : ""}
                         {item.at ? ` · ${formatImageLayerGenerationAt(item.at)}` : ""}
@@ -120,7 +120,7 @@ export function ImageLayerHistoryDialog({
                           {preview.refs.map((ref) => (
                             <span
                               key={`${item.id}-${ref.url}`}
-                              className="inline-flex items-center gap-1 rounded-md bg-[#f5f5f7] px-1.5 py-1"
+                              className="inline-flex items-center gap-1 rounded-md bg-[var(--ecom-parchment)] px-1.5 py-1"
                             >
                               <span className="relative h-8 w-8 overflow-hidden rounded">
                                 <Image
@@ -139,13 +139,13 @@ export function ImageLayerHistoryDialog({
                         </span>
                       ) : null}
                       {active ? (
-                        <span className="mt-1 block text-[11px] text-[#0071e3]">
+                        <span className="mt-1 block text-[11px] text-[var(--ecom-primary)]">
                           当前工作图
                         </span>
                       ) : null}
                     </span>
                     {restoring ? (
-                      <Loader2 className="h-4 w-4 shrink-0 animate-spin text-[#0071e3]" />
+                      <Loader2 className="h-4 w-4 shrink-0 animate-spin text-[var(--ecom-primary)]" />
                     ) : null}
                   </button>
                 );

@@ -511,11 +511,11 @@ export function StoryboardModelPickerDialog({
 
   const header = (
     <div className="shrink-0 border-b border-[#f0f0f2] px-5 py-4">
-      <h2 className="flex items-center gap-2 text-[15px] font-semibold text-[#1d1d1f]">
+      <h2 className="flex items-center gap-2 text-[15px] font-semibold text-[var(--ecom-ink)]">
         <ModeIcon className="h-4 w-4 text-[var(--ecom-primary)]" />
         {resolvedTitle}
       </h2>
-      {subtitle ? <p className="text-[12px] text-[#86868b]">{subtitle}</p> : null}
+      {subtitle ? <p className="text-[12px] text-[var(--ecom-subtle)]">{subtitle}</p> : null}
     </div>
   );
 
@@ -523,9 +523,9 @@ export function StoryboardModelPickerDialog({
     <div className="flex min-h-[min(36dvh,280px)] flex-1 flex-col items-center justify-center gap-4 px-5 py-10">
       <Loader2 className="h-9 w-9 animate-spin text-[var(--ecom-primary)]" />
       <div className="max-w-md text-center">
-        <p className="text-sm font-medium text-[#1d1d1f]">{runningTitle ?? "处理中…"}</p>
+        <p className="text-sm font-medium text-[var(--ecom-ink)]">{runningTitle ?? "处理中…"}</p>
         {runningDetail ? (
-          <p className="mt-1.5 text-xs leading-relaxed text-[#86868b]">{runningDetail}</p>
+          <p className="mt-1.5 text-xs leading-relaxed text-[var(--ecom-subtle)]">{runningDetail}</p>
         ) : null}
       </div>
       <div className="ecom-upload-progress ecom-upload-progress-indeterminate w-full max-w-xs">
@@ -537,7 +537,7 @@ export function StoryboardModelPickerDialog({
       {modelsLoading && models.length === 0 ? (
         <div className="flex flex-col items-center justify-center gap-3 px-4 py-12 text-center">
           <Loader2 className="h-8 w-8 animate-spin text-[var(--ecom-primary)]" />
-          <p className="text-sm text-[#6e6e73]">
+          <p className="text-sm text-[var(--ecom-muted)]">
             {mode === "chat"
               ? "正在加载助手模型…"
               : mode === "video"
@@ -546,7 +546,7 @@ export function StoryboardModelPickerDialog({
           </p>
         </div>
       ) : !hasAnyModel ? (
-        <div className="grid place-items-center gap-3 px-4 py-10 text-center text-sm text-[#86868b]">
+        <div className="grid place-items-center gap-3 px-4 py-10 text-center text-sm text-[var(--ecom-subtle)]">
           <p>
             {modelsEmptyHint ??
               (mode === "chat"
@@ -585,11 +585,11 @@ export function StoryboardModelPickerDialog({
           />
 
           {!selectionOnly ? (
-          <section className="rounded-xl border border-[#e8e8ed] bg-[#fafafa] p-4 lg:sticky lg:top-0">
-            <p className="mb-3 flex flex-wrap items-center gap-2 text-[12px] font-semibold text-[#1d1d1f]">
-              <Cpu className="h-3.5 w-3.5 text-[#86868b]" />
+          <section className="rounded-xl border border-[var(--ecom-divider)] bg-[#fafafa] p-4 lg:sticky lg:top-0">
+            <p className="mb-3 flex flex-wrap items-center gap-2 text-[12px] font-semibold text-[var(--ecom-ink)]">
+              <Cpu className="h-3.5 w-3.5 text-[var(--ecom-subtle)]" />
               模型参数
-              <span className="font-normal text-[#86868b]">
+              <span className="font-normal text-[var(--ecom-subtle)]">
                 {selectedModel?.displayName ?? draftKey}
               </span>
               {mode === "video" && selectedModel ? (
@@ -607,11 +607,11 @@ export function StoryboardModelPickerDialog({
             <div className="space-y-4">
               {showImageSize && lockedImageSizeLabel ? (
                 <div className="space-y-1.5">
-                  <span className="text-xs font-medium text-[#6e6e73]">{lockedFieldLabel}</span>
-                  <p className="rounded-lg border border-[#e8e8ed] bg-white px-3 py-2 text-sm text-[#1d1d1f]">
+                  <span className="text-xs font-medium text-[var(--ecom-muted)]">{lockedFieldLabel}</span>
+                  <p className="rounded-lg border border-[var(--ecom-divider)] bg-white px-3 py-2 text-sm text-[var(--ecom-ink)]">
                     {lockedImageSizeLabel}
                   </p>
-                  <p className="text-[10px] text-[#86868b]">
+                  <p className="text-[10px] text-[var(--ecom-subtle)]">
                     比例由平台/步骤规则锁定；下方可选同比例下的 720P / 1080P / 2K 等具体像素尺寸。
                   </p>
                 </div>
@@ -619,9 +619,9 @@ export function StoryboardModelPickerDialog({
 
               {showImageSize && klingImageAspectOnly ? (
                 <label className="block space-y-1.5">
-                  <span className="text-xs font-medium text-[#6e6e73]">画面比例</span>
+                  <span className="text-xs font-medium text-[var(--ecom-muted)]">画面比例</span>
                   <select
-                    className="w-full rounded-lg border border-[#d2d2d7] bg-white px-3 py-2 text-sm"
+                    className="w-full rounded-lg border border-[var(--ecom-border-soft)] bg-white px-3 py-2 text-sm"
                     value={aspectRatio}
                     onChange={(e) =>
                       onAspectRatioChange?.(e.target.value as StoryboardVideoAspectRatio)
@@ -636,13 +636,13 @@ export function StoryboardModelPickerDialog({
 
               {showImageSize && !klingImageAspectOnly ? (
                 <label className="block space-y-1.5">
-                  <span className="text-xs font-medium text-[#6e6e73]">
+                  <span className="text-xs font-medium text-[var(--ecom-muted)]">
                     {isStoryboardKlingImageModel(draftKey) && hasLockedRatio
                       ? "输出分辨率"
                       : "输出分辨率（尺寸）"}
                   </span>
                   <select
-                    className="w-full rounded-lg border border-[#d2d2d7] bg-white px-3 py-2 text-sm"
+                    className="w-full rounded-lg border border-[var(--ecom-border-soft)] bg-white px-3 py-2 text-sm"
                     value={imageSize}
                     onChange={(e) => {
                       const next = e.target.value;
@@ -660,7 +660,7 @@ export function StoryboardModelPickerDialog({
                     ))}
                   </select>
                   {isStoryboardKlingImageModel(draftKey) && hasLockedRatio ? (
-                    <p className="text-[10px] leading-relaxed text-[#86868b]">
+                    <p className="text-[10px] leading-relaxed text-[var(--ecom-subtle)]">
                       可灵 API 不支持 3:4，服务端将映射为最接近比例出图；分辨率可选 1K / 2K。
                     </p>
                   ) : null}
@@ -669,9 +669,9 @@ export function StoryboardModelPickerDialog({
 
               {showAspect ? (
                 <label className="block space-y-1.5">
-                  <span className="text-xs font-medium text-[#6e6e73]">画面比例</span>
+                  <span className="text-xs font-medium text-[var(--ecom-muted)]">画面比例</span>
                   <select
-                    className="w-full rounded-lg border border-[#d2d2d7] bg-white px-3 py-2 text-sm"
+                    className="w-full rounded-lg border border-[var(--ecom-border-soft)] bg-white px-3 py-2 text-sm"
                     value={aspectRatio}
                     onChange={(e) =>
                       onAspectRatioChange?.(e.target.value as StoryboardVideoAspectRatio)
@@ -686,9 +686,9 @@ export function StoryboardModelPickerDialog({
 
               {showR2vRatio ? (
                 <label className="block space-y-1.5">
-                  <span className="text-xs font-medium text-[#6e6e73]">画布比例（百炼 R2V）</span>
+                  <span className="text-xs font-medium text-[var(--ecom-muted)]">画布比例（百炼 R2V）</span>
                   <select
-                    className="w-full rounded-lg border border-[#d2d2d7] bg-white px-3 py-2 text-sm"
+                    className="w-full rounded-lg border border-[var(--ecom-border-soft)] bg-white px-3 py-2 text-sm"
                     value={videoR2vRatio}
                     onChange={(e) => onVideoR2vRatioChange?.(e.target.value)}
                   >
@@ -703,9 +703,9 @@ export function StoryboardModelPickerDialog({
 
               {showResolution ? (
                 <label className="block space-y-1.5">
-                  <span className="text-xs font-medium text-[#6e6e73]">视频分辨率</span>
+                  <span className="text-xs font-medium text-[var(--ecom-muted)]">视频分辨率</span>
                   <select
-                    className="w-full rounded-lg border border-[#d2d2d7] bg-white px-3 py-2 text-sm"
+                    className="w-full rounded-lg border border-[var(--ecom-border-soft)] bg-white px-3 py-2 text-sm"
                     value={videoResolution}
                     onChange={(e) =>
                       onVideoResolutionChange?.(e.target.value as StoryboardVideoResolution)
@@ -722,7 +722,7 @@ export function StoryboardModelPickerDialog({
 
               {showFullDuration ? (
                 <label className="block space-y-1.5">
-                  <span className="text-xs font-medium text-[#6e6e73]">
+                  <span className="text-xs font-medium text-[var(--ecom-muted)]">
                     成片时长 {durationSec}s（{fullDurationRange.label}）
                   </span>
                   <input
@@ -734,7 +734,7 @@ export function StoryboardModelPickerDialog({
                     onChange={(e) => onDurationChange?.(Number(e.target.value))}
                     className="w-full accent-[var(--ecom-primary)]"
                   />
-                  <div className="flex justify-between text-[10px] text-[#86868b]">
+                  <div className="flex justify-between text-[10px] text-[var(--ecom-subtle)]">
                     <span>{fullDurationMin}s</span>
                     <span>{fullDurationMax}s</span>
                   </div>
@@ -754,7 +754,7 @@ export function StoryboardModelPickerDialog({
               ) : null}
 
               {showWanR2vExtras ? (
-                <label className="flex items-center gap-2 text-sm text-[#1d1d1f]">
+                <label className="flex items-center gap-2 text-sm text-[var(--ecom-ink)]">
                   <input
                     type="checkbox"
                     checked={videoPromptExtend}
@@ -767,12 +767,12 @@ export function StoryboardModelPickerDialog({
 
               {showR2vSeed ? (
                 <label className="block space-y-1.5">
-                  <span className="text-xs font-medium text-[#6e6e73]">随机种子（可选）</span>
+                  <span className="text-xs font-medium text-[var(--ecom-muted)]">随机种子（可选）</span>
                   <input
                     type="text"
                     inputMode="numeric"
                     placeholder="留空则随机"
-                    className="w-full rounded-lg border border-[#d2d2d7] bg-white px-3 py-2 text-sm"
+                    className="w-full rounded-lg border border-[var(--ecom-border-soft)] bg-white px-3 py-2 text-sm"
                     value={videoSeed}
                     onChange={(e) => onVideoSeedChange?.(e.target.value)}
                   />
@@ -780,14 +780,14 @@ export function StoryboardModelPickerDialog({
               ) : null}
 
               {showPanelVoiceoverAudio ? (
-                <div className="space-y-2 rounded-lg border border-[#e8e8ed] bg-[#fafafa] px-3 py-2.5">
-                  <p className="text-xs font-medium text-[#1d1d1f]">口播与音频</p>
-                  <p className="text-[11px] leading-relaxed text-[#6e6e73]">
+                <div className="space-y-2 rounded-lg border border-[var(--ecom-divider)] bg-[#fafafa] px-3 py-2.5">
+                  <p className="text-xs font-medium text-[var(--ecom-ink)]">口播与音频</p>
+                  <p className="text-[11px] leading-relaxed text-[var(--ecom-muted)]">
                     口播文案不会自动朗读进视频。推荐先生成无声视频，再在工作区点「批量
                     TTS」对口播单独配音，最后「合成成片」。
                   </p>
                   {showGenerateAudio ? (
-                    <label className="flex items-start gap-2 text-sm text-[#1d1d1f]">
+                    <label className="flex items-start gap-2 text-sm text-[var(--ecom-ink)]">
                       <input
                         type="checkbox"
                         checked={videoGenerateAudio}
@@ -799,13 +799,13 @@ export function StoryboardModelPickerDialog({
                       </span>
                     </label>
                   ) : (
-                    <p className="text-[11px] leading-relaxed text-[#86868b]">
+                    <p className="text-[11px] leading-relaxed text-[var(--ecom-subtle)]">
                       当前模型不生成视频内音效；口播请用「批量 TTS」。
                     </p>
                   )}
                 </div>
               ) : showGenerateAudio ? (
-                <label className="flex items-center gap-2 text-sm text-[#1d1d1f]">
+                <label className="flex items-center gap-2 text-sm text-[var(--ecom-ink)]">
                   <input
                     type="checkbox"
                     checked={videoGenerateAudio}
@@ -818,7 +818,7 @@ export function StoryboardModelPickerDialog({
 
               {showPanelDuration ? (
                 <label className="block space-y-1.5">
-                  <span className="text-xs font-medium text-[#6e6e73]">
+                  <span className="text-xs font-medium text-[var(--ecom-muted)]">
                     镜头时长 {panelDurationSec}s（{panelDurationRange.label}）
                   </span>
                   <input
@@ -833,7 +833,7 @@ export function StoryboardModelPickerDialog({
                     onChange={(e) => onPanelDurationChange?.(Number(e.target.value))}
                     className="w-full accent-[var(--ecom-primary)]"
                   />
-                  <div className="flex justify-between text-[10px] text-[#86868b]">
+                  <div className="flex justify-between text-[10px] text-[var(--ecom-subtle)]">
                     <span>{panelDurationMin}s</span>
                     <span>{panelDurationMax}s</span>
                   </div>
@@ -859,7 +859,7 @@ export function StoryboardModelPickerDialog({
 
   const footer = (
       <div className="flex shrink-0 items-center justify-between border-t border-[#f0f0f2] px-5 py-3">
-      <span className="text-[11px] text-[#86868b]">{footerLeftHint}</span>
+      <span className="text-[11px] text-[var(--ecom-subtle)]">{footerLeftHint}</span>
       <div className="flex items-center gap-2">
         {creditsBeside}
         {!running ? (
@@ -925,11 +925,11 @@ export function StoryboardModelPickerDialog({
             <ModeIcon className="h-4 w-4 text-[var(--ecom-primary)]" />
             {resolvedTitle}
           </DialogTitle>
-          {subtitle ? <p className="text-[12px] text-[#86868b]">{subtitle}</p> : null}
+          {subtitle ? <p className="text-[12px] text-[var(--ecom-subtle)]">{subtitle}</p> : null}
         </DialogHeader>
         {body}
         <DialogFooter className="shrink-0 items-center justify-between border-t border-[#f0f0f2] px-5 py-3 sm:justify-between">
-          <span className="text-[11px] text-[#86868b]">{footerLeftHint}</span>
+          <span className="text-[11px] text-[var(--ecom-subtle)]">{footerLeftHint}</span>
           <div className="flex items-center gap-2">
             {creditsBeside}
             {!running ? (

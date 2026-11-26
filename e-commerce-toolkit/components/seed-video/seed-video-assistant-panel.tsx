@@ -90,7 +90,7 @@ function renderChatMessageBody(
         <StoryboardMarkdownBlock markdown={markdown} />
         {display.actionLine ? (
           <div className="flex justify-end pt-1">
-            <span className="inline-block rounded-xl bg-[#0071e3] px-3 py-1.5 text-xs leading-relaxed text-white">
+            <span className="inline-block rounded-xl bg-[var(--ecom-primary)] px-3 py-1.5 text-xs leading-relaxed text-white">
               {display.actionLine}
             </span>
           </div>
@@ -648,7 +648,7 @@ export function SeedVideoAssistantPanel({
             key={r!.id}
             src={r!.ossUrl}
             alt={r!.label}
-            className="h-10 w-10 rounded-lg border border-[#e8e8ed] object-cover"
+            className="h-10 w-10 rounded-lg border border-[var(--ecom-divider)] object-cover"
           />
         ))}
       </div>
@@ -689,7 +689,7 @@ export function SeedVideoAssistantPanel({
     >
       <div className={ECOM_ASSISTANT_COMPOSER_ROW_CLASS}>
         <textarea
-          className="min-h-[2.5rem] flex-1 resize-y rounded-xl border border-[var(--ecom-assistant-input-border)] bg-[var(--ecom-assistant-input-bg)] px-3 py-2 text-sm leading-relaxed text-[#1d1d1f] outline-none placeholder:text-[#86868b] focus:border-[var(--ecom-chrome-accent)] disabled:opacity-50"
+          className="min-h-[2.5rem] flex-1 resize-y rounded-xl border border-[var(--ecom-assistant-input-border)] bg-[var(--ecom-assistant-input-bg)] px-3 py-2 text-sm leading-relaxed text-[var(--ecom-ink)] outline-none placeholder:text-[var(--ecom-subtle)] focus:border-[var(--ecom-chrome-accent)] disabled:opacity-50"
           rows={compact ? 1 : 3}
           placeholder={
             showChoices

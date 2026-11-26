@@ -287,12 +287,12 @@ export const ImageMaskCanvas = forwardRef<ImageMaskCanvasHandle, Props>(
           const y = n.y1;
           const w = n.x2 - n.x1;
           const h = n.y2 - n.y1;
-          ctx.strokeStyle = "rgba(0, 113, 227, 0.95)";
+          ctx.strokeStyle = "rgba(58, 50, 44, 0.95)";
           ctx.lineWidth = 2;
           ctx.strokeRect(x, y, w, h);
-          ctx.fillStyle = "rgba(0, 113, 227, 0.12)";
+          ctx.fillStyle = "rgba(58, 50, 44, 0.12)";
           ctx.fillRect(x, y, w, h);
-          ctx.fillStyle = "rgba(0, 113, 227, 0.95)";
+          ctx.fillStyle = "rgba(58, 50, 44, 0.95)";
           ctx.font = "bold 12px system-ui, sans-serif";
           ctx.fillText(String(idx + 1), x + 6, y + 16);
         });
@@ -303,11 +303,11 @@ export const ImageMaskCanvas = forwardRef<ImageMaskCanvasHandle, Props>(
           const w = n.x2 - n.x1;
           const h = n.y2 - n.y1;
           ctx.setLineDash([6, 4]);
-          ctx.strokeStyle = "rgba(0, 113, 227, 0.75)";
+          ctx.strokeStyle = "rgba(58, 50, 44, 0.75)";
           ctx.lineWidth = 2;
           ctx.strokeRect(x, y, w, h);
           ctx.setLineDash([]);
-          ctx.fillStyle = "rgba(0, 113, 227, 0.08)";
+          ctx.fillStyle = "rgba(58, 50, 44, 0.08)";
           ctx.fillRect(x, y, w, h);
         }
       },
@@ -687,7 +687,7 @@ export const ImageMaskCanvas = forwardRef<ImageMaskCanvasHandle, Props>(
         </div>
         {hideFooter ? null : (
           <>
-            <p className="mt-2 text-center text-xs text-[#6e6e73]">
+            <p className="mt-2 text-center text-xs text-[var(--ecom-muted)]">
               {mode === "bbox"
                 ? bboxSelection === "multi"
                   ? `拖动框选拆分区域（${committedBboxes.length}/${maxBboxes}）；撤销/清除见下方或顶栏。`
@@ -708,7 +708,7 @@ export const ImageMaskCanvas = forwardRef<ImageMaskCanvasHandle, Props>(
                     });
                   }}
                   disabled={committedBboxes.length === 0}
-                  className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-[#6e6e73] hover:bg-[#f0f0f5] disabled:opacity-40"
+                  className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-[var(--ecom-muted)] hover:bg-[#f0f0f5] disabled:opacity-40"
                 >
                   撤销上一框
                 </button>
@@ -716,7 +716,7 @@ export const ImageMaskCanvas = forwardRef<ImageMaskCanvasHandle, Props>(
               <button
                 type="button"
                 onClick={clearMask}
-                className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-[#6e6e73] hover:bg-[#f0f0f5]"
+                className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-[var(--ecom-muted)] hover:bg-[#f0f0f5]"
               >
                 <Eraser className="h-3.5 w-3.5" />
                 {mode === "bbox" ? "清除全部框" : "清除涂抹"}
@@ -745,16 +745,16 @@ export function MaskToolbar({
   return (
     <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-[#e5e5ea] bg-white px-3 py-3 text-sm sm:gap-4 sm:px-4">
       <label className="flex w-full min-w-0 items-center gap-3 sm:min-w-[180px] sm:flex-1">
-        <span className="shrink-0 text-[#1d1d1f]">画笔尺寸</span>
+        <span className="shrink-0 text-[var(--ecom-ink)]">画笔尺寸</span>
         <input
           type="range"
           min={8}
           max={80}
           value={brushSize}
           onChange={(e) => onBrushSizeChange(Number(e.target.value))}
-          className="h-1.5 flex-1 accent-[#0071e3]"
+          className="h-1.5 flex-1 accent-[var(--ecom-primary)]"
         />
-        <span className="w-8 text-right text-xs text-[#6e6e73]">{brushSize}</span>
+        <span className="w-8 text-right text-xs text-[var(--ecom-muted)]">{brushSize}</span>
       </label>
       <button
         type="button"
@@ -762,8 +762,8 @@ export function MaskToolbar({
         className={cn(
           "inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs",
           showTransparentMask
-            ? "border-[var(--ecom-outline-border)] bg-[#f0f6ff] text-[#0071e3]"
-            : "border-[#e5e5ea] text-[#1d1d1f]",
+            ? "border-[var(--ecom-outline-border)] bg-[var(--ecom-content-selected-bg)] text-[var(--ecom-primary)]"
+            : "border-[#e5e5ea] text-[var(--ecom-ink)]",
         )}
       >
         <Grid3x3 className="h-3.5 w-3.5" />

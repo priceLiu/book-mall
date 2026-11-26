@@ -53,7 +53,7 @@ export function PosterTemplatePicker({
 
   if (loading) {
     return (
-      <p className="flex items-center text-xs text-[#6e6e73]">
+      <p className="flex items-center text-xs text-[var(--ecom-muted)]">
         <Loader2 className="mr-1.5 size-3.5 animate-spin" />
         加载电商模板…
       </p>
@@ -65,7 +65,7 @@ export function PosterTemplatePicker({
   }
 
   if (entries.length === 0) {
-    return <p className="text-xs text-[#6e6e73]">暂无模板，请先在「电商模板库」导入。</p>;
+    return <p className="text-xs text-[var(--ecom-muted)]">暂无模板，请先在「电商模板库」导入。</p>;
   }
 
   return (
@@ -83,18 +83,18 @@ export function PosterTemplatePicker({
             type="button"
             className={cn(
               "overflow-hidden rounded-lg border text-left transition",
-              selected ? "border-[var(--ecom-outline-border)] ring-1 ring-[#1d1d1f]/15" : "border-[#e8e8ed] hover:border-[#d2d2d7]",
+              selected ? "border-[var(--ecom-outline-border)] ring-1 ring-[var(--ecom-ink)]/15" : "border-[var(--ecom-divider)] hover:border-[var(--ecom-border-soft)]",
             )}
             onClick={() => onSelect(entry)}
           >
             {thumb ? (
               <img src={thumb} alt="" className="aspect-[3/4] w-full object-cover" />
             ) : (
-              <div className="flex aspect-[3/4] items-center justify-center bg-[#f5f5f7] text-[10px] text-[#86868b]">
+              <div className="flex aspect-[3/4] items-center justify-center bg-[var(--ecom-parchment)] text-[10px] text-[var(--ecom-subtle)]">
                 无预览
               </div>
             )}
-            <p className="truncate px-1 py-1 text-[10px] text-[#6e6e73]">
+            <p className="truncate px-1 py-1 text-[10px] text-[var(--ecom-muted)]">
               {entry.title?.trim() || entry.id}
             </p>
           </button>

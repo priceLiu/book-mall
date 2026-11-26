@@ -18,8 +18,8 @@ const archetypeBtn = (active: boolean) =>
   cn(
     "rounded-lg border px-2 py-1.5 text-left text-[10px] transition",
     active
-      ? "border-[var(--ecom-outline-border)] bg-[#f0f6ff]"
-      : "border-[#e8e8ed] hover:bg-[#fafafa]",
+      ? "border-[var(--ecom-outline-border)] bg-[var(--ecom-content-selected-bg)]"
+      : "border-[var(--ecom-divider)] hover:bg-[#fafafa]",
   );
 
 /** 中栏 · 模特采集（虚拟人设 + 文字描述，无图参考） */
@@ -48,8 +48,8 @@ export function ModelShotModelCollectExtras({
   }, [draft, onSaveDescription]);
 
   return (
-    <div className="mt-2 space-y-2 rounded-lg border border-dashed border-[#e8e8ed] bg-[#fafafa] px-3 py-2.5">
-      <p className="text-[10px] font-medium text-[#6e6e73]">虚拟人设（文字参考，无需上传图）</p>
+    <div className="mt-2 space-y-2 rounded-lg border border-dashed border-[var(--ecom-divider)] bg-[#fafafa] px-3 py-2.5">
+      <p className="text-[10px] font-medium text-[var(--ecom-muted)]">虚拟人设（文字参考，无需上传图）</p>
       <div className="grid gap-1.5 sm:grid-cols-3">
         {MODEL_SHOT_MODEL_ARCHETYPES.map((a) => (
           <button
@@ -59,15 +59,15 @@ export function ModelShotModelCollectExtras({
             className={archetypeBtn(modelRef?.name === a.label && modelRef?.source === "text")}
             onClick={() => void onAttachArchetype(a)}
           >
-            <span className="font-medium text-[#1d1d1f]">{a.label}</span>
-            <span className="mt-0.5 line-clamp-2 text-[#86868b]">{a.description}</span>
+            <span className="font-medium text-[var(--ecom-ink)]">{a.label}</span>
+            <span className="mt-0.5 line-clamp-2 text-[var(--ecom-subtle)]">{a.description}</span>
           </button>
         ))}
       </div>
       <div>
-        <p className="mb-1 text-[10px] font-medium text-[#6e6e73]">或手写模特描述</p>
+        <p className="mb-1 text-[10px] font-medium text-[var(--ecom-muted)]">或手写模特描述</p>
         <textarea
-          className="min-h-[64px] w-full resize-y rounded-lg border border-[#e8e8ed] bg-white px-2 py-1.5 text-[11px]"
+          className="min-h-[64px] w-full resize-y rounded-lg border border-[var(--ecom-divider)] bg-white px-2 py-1.5 text-[11px]"
           placeholder="外貌、身形、气质…"
           value={draft}
           disabled={disabled || saving}

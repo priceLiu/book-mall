@@ -84,27 +84,27 @@ export function IpMasterSaveDialog({
       >
         <div className="mb-4 flex items-start justify-between gap-3">
           <div>
-            <h2 id="ip-master-save-title" className="text-lg font-semibold text-[#1d1d1f]">
+            <h2 id="ip-master-save-title" className="text-lg font-semibold text-[var(--ecom-ink)]">
               保存 IP 母版工作流
             </h2>
-            <p className="mt-1 text-sm text-[#6e6e73]">
+            <p className="mt-1 text-sm text-[var(--ecom-muted)]">
               镜像写入「我的资产」，含基准图、模板版本与会话快照。
             </p>
           </div>
           <EcomDialogCloseButton onClick={() => !busy && onOpenChange(false)} />
         </div>
-        <label className="block text-xs font-medium text-[#6e6e73]">IP 名称</label>
+        <label className="block text-xs font-medium text-[var(--ecom-muted)]">IP 名称</label>
         <input
-          className="mt-1 w-full rounded-lg border border-[#d2d2d7] px-3 py-2 text-sm"
+          className="mt-1 w-full rounded-lg border border-[var(--ecom-border-soft)] px-3 py-2 text-sm"
           value={name}
           onChange={(e) => setName(e.target.value)}
           disabled={busy}
         />
-        <p className="mt-2 text-[11px] text-[#86868b]">保存标题预览：{titlePreview}</p>
+        <p className="mt-2 text-[11px] text-[var(--ecom-subtle)]">保存标题预览：{titlePreview}</p>
         <div className="mt-6 flex justify-end gap-2">
           <button
             type="button"
-            className="rounded-lg px-4 py-2 text-sm text-[#0071e3]"
+            className="rounded-lg px-4 py-2 text-sm text-[var(--ecom-primary)]"
             disabled={busy}
             onClick={() => onOpenChange(false)}
           >

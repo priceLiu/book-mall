@@ -32,7 +32,7 @@ function EdgeCollapseButtonControl({
       onClick={onClick}
       disabled={disabled && !collapsed}
       className={cn(
-        "flex size-8 shrink-0 items-center justify-center rounded-full border border-[#d2d2d7] bg-white text-[#1d1d1f] shadow-[0_2px_12px_rgba(0,0,0,0.14)] transition hover:bg-[#f5f5f7]",
+        "flex size-8 shrink-0 items-center justify-center rounded-full border border-[var(--ecom-border-soft)] bg-white text-[var(--ecom-ink)] shadow-[0_2px_12px_rgba(0,0,0,0.14)] transition hover:bg-[var(--ecom-parchment)]",
         disabled && !collapsed && "cursor-not-allowed opacity-50",
         className,
       )}

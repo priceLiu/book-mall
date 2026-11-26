@@ -42,7 +42,7 @@ export function StoryboardAssistantDeliverableView({
 
   if (!deliverable && looksLikeRawDeliverableJson(content)) {
     return (
-      <p className="text-sm text-[#6e6e73]">
+      <p className="text-sm text-[var(--ecom-muted)]">
         策划 JSON 已收到，正在同步结构化结果…请稍候或刷新页面。
       </p>
     );
@@ -62,20 +62,20 @@ export function StoryboardAssistantDeliverableView({
   return (
     <div className="space-y-4">
       {brief ? (
-        <div className="text-sm text-[#1d1d1f]">
+        <div className="text-sm text-[var(--ecom-ink)]">
           <StoryboardMarkdownBlock markdown={brief} />
         </div>
       ) : null}
 
       {multiAwaitingPick ? (
-        <p className="rounded-lg border border-[#e8e8ed] bg-[#f0f6ff] px-3 py-2 text-xs text-[#0071e3]">
+        <p className="rounded-lg border border-[var(--ecom-divider)] bg-[var(--ecom-content-selected-bg)] px-3 py-2 text-xs text-[var(--ecom-primary)]">
           共 {schemes.length} 套方案已生成，请在下方卡片中单选一套后继续。
         </p>
       ) : null}
 
       {multiAwaitingPick ? null : (
-      <div className="rounded-lg border border-[#e8e8ed] bg-[#fafafa] p-3">
-        <p className="mb-3 text-xs font-semibold text-[#6e6e73]">
+      <div className="rounded-lg border border-[var(--ecom-divider)] bg-[#fafafa] p-3">
+        <p className="mb-3 text-xs font-semibold text-[var(--ecom-muted)]">
           策划交付 · {deliverable.productName?.trim() || "产品方案"}
           {schemes.length > 1 ? ` · 共 ${schemes.length} 套` : ""}
         </p>
@@ -104,9 +104,9 @@ export function StoryboardAssistantDeliverableView({
 
         {multiAwaitingPick ? null : scheme ? (
           <div className="mt-4 space-y-2">
-            <p className="text-sm font-medium text-[#1d1d1f]">{scheme.title}</p>
+            <p className="text-sm font-medium text-[var(--ecom-ink)]">{scheme.title}</p>
             {scheme.summary ? (
-              <p className="text-xs text-[#6e6e73]">{scheme.summary}</p>
+              <p className="text-xs text-[var(--ecom-muted)]">{scheme.summary}</p>
             ) : null}
             <StoryboardSchemePanelsTable
               panels={scheme.panels}
@@ -116,14 +116,14 @@ export function StoryboardAssistantDeliverableView({
         ) : null}
 
         {!compact && !multiAwaitingPick && schemes.length > 1 && scheme ? (
-          <div className="mt-4 space-y-4 border-t border-[#e8e8ed] pt-4">
-            <p className="text-xs font-semibold text-[#6e6e73]">其它方案</p>
+          <div className="mt-4 space-y-4 border-t border-[var(--ecom-divider)] pt-4">
+            <p className="text-xs font-semibold text-[var(--ecom-muted)]">其它方案</p>
             {schemes.map((s, i) =>
               i === selectedSchemeIndex ? null : (
                 <div key={s.id} className="space-y-2">
-                  <p className="text-sm font-medium text-[#1d1d1f]">{s.title}</p>
+                  <p className="text-sm font-medium text-[var(--ecom-ink)]">{s.title}</p>
                   {s.summary ? (
-                    <p className="text-xs text-[#6e6e73]">{s.summary}</p>
+                    <p className="text-xs text-[var(--ecom-muted)]">{s.summary}</p>
                   ) : null}
                   <StoryboardSchemePanelsTable
                     panels={s.panels}

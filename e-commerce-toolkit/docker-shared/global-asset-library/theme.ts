@@ -56,27 +56,27 @@ export type GlobalAssetTheme = {
 
 const LIGHT: GlobalAssetTheme = {
   overlay: "bg-black/80",
-  shell: "bg-white border-[#e8e8ed]",
+  shell: "bg-white border-[var(--ecom-divider)]",
   header: "border-[#f0f0f2]",
   sidebar: "bg-[#fafafa] border-[#f0f0f2]",
   filterBar: "bg-[#fafafa] border-[#f0f0f2]",
   footer: "bg-[#fafafa] border-[#f0f0f2]",
-  textPrimary: "text-[#1d1d1f]",
-  textSecondary: "text-[#86868b]",
-  border: "border-[#e8e8ed]",
-  borderStrong: "border-[#1d1d1f]",
-  cardHover: "hover:border-[#d2d2d7] hover:bg-[#f5f5f7]",
-  cardSelected: "border-2 border-[#1d1d1f] bg-[#fafafa]",
-  navActive: "bg-[#ebebed] font-medium text-[#1d1d1f]",
+  textPrimary: "text-[var(--ecom-ink)]",
+  textSecondary: "text-[var(--ecom-subtle)]",
+  border: "border-[var(--ecom-divider)]",
+  borderStrong: "border-[var(--ecom-ink)]",
+  cardHover: "hover:border-[var(--ecom-border-soft)] hover:bg-[var(--ecom-parchment)]",
+  cardSelected: "border-2 border-[var(--ecom-ink)] bg-[#fafafa]",
+  navActive: "bg-[#ebebed] font-medium text-[var(--ecom-ink)]",
   navIdle:
-    "text-[#86868b] hover:bg-[#f0f0f2] hover:text-[#1d1d1f] active:bg-[#e8e8ed]",
-  pill: "bg-[#f0f0f2] text-[#6e6e73]",
+    "text-[var(--ecom-subtle)] hover:bg-[#f0f0f2] hover:text-[var(--ecom-ink)] active:bg-[var(--ecom-divider)]",
+  pill: "bg-[#f0f0f2] text-[var(--ecom-muted)]",
   segmentedTrack: "bg-[#f0f0f2]",
-  segmentedActive: "bg-white text-[#1d1d1f] shadow-sm",
+  segmentedActive: "bg-white text-[var(--ecom-ink)] shadow-sm",
   segmentedIdle:
-    "text-[#86868b] hover:bg-white/60 hover:text-[#424245] active:text-[#1d1d1f]",
-  btnSecondary: "border border-[#d2d2d7] bg-white text-[#1d1d1f] hover:bg-[#f5f5f7]",
-  btnPrimary: "bg-[#1d1d1f] text-white hover:bg-[#333]",
+    "text-[var(--ecom-subtle)] hover:bg-white/60 hover:text-[#424245] active:text-[var(--ecom-ink)]",
+  btnSecondary: "border border-[var(--ecom-border-soft)] bg-white text-[var(--ecom-ink)] hover:bg-[var(--ecom-parchment)]",
+  btnPrimary: "bg-[var(--ecom-ink)] text-white hover:bg-[#333]",
 };
 
 const DARK: GlobalAssetTheme = {
@@ -86,22 +86,22 @@ const DARK: GlobalAssetTheme = {
   sidebar: "bg-[#2c2c2e] border-white/10",
   filterBar: "bg-[#2c2c2e] border-white/10",
   footer: "bg-[#2c2c2e] border-white/10",
-  textPrimary: "text-[#f5f5f7]",
+  textPrimary: "text-[var(--ecom-parchment)]",
   textSecondary: "text-[#aeaeb2]",
   border: "border-white/10",
-  borderStrong: "border-[#f5f5f7]",
+  borderStrong: "border-[var(--ecom-parchment)]",
   cardHover: "hover:border-white/20 hover:bg-[#2c2c2e]",
-  cardSelected: "border-2 border-[#f5f5f7] bg-[#2c2c2e]",
+  cardSelected: "border-2 border-[var(--ecom-parchment)] bg-[#2c2c2e]",
   navActive: "bg-white/[0.12] font-medium text-white",
   navIdle:
     "text-[#c5c5ca] hover:bg-white/[0.08] hover:text-[#fafafa] active:bg-white/[0.12] active:text-white",
   pill: "bg-[#3a3a3c] text-[#aeaeb2]",
   segmentedTrack: "bg-[#3a3a3c]",
-  segmentedActive: "bg-[#1c1c1e] text-[#f5f5f7] shadow-sm",
+  segmentedActive: "bg-[#1c1c1e] text-[var(--ecom-parchment)] shadow-sm",
   segmentedIdle:
-    "text-[#c5c5ca] hover:bg-white/[0.06] hover:text-[#f5f5f7] active:text-white",
-  btnSecondary: "border border-white/15 bg-[#1c1c1e] text-[#f5f5f7] hover:bg-[#2c2c2e]",
-  btnPrimary: "bg-[#f5f5f7] text-[#1d1d1f] hover:bg-white",
+    "text-[#c5c5ca] hover:bg-white/[0.06] hover:text-[var(--ecom-parchment)] active:text-white",
+  btnSecondary: "border border-white/15 bg-[#1c1c1e] text-[var(--ecom-parchment)] hover:bg-[#2c2c2e]",
+  btnPrimary: "bg-[var(--ecom-parchment)] text-[var(--ecom-ink)] hover:bg-white",
 };
 
 export function globalAssetTheme(variant: GlobalAssetLibraryVariant): GlobalAssetTheme {

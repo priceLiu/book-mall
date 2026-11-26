@@ -41,7 +41,7 @@ export function StoryboardSheetPreviewDialog({
       zIndexClass="z-[350]"
       panelClassName="h-[92vh] max-h-[92vh] w-[min(98vw,1400px)]"
     >
-      <div className="ecom-scrollbar-thin min-h-0 flex-1 overflow-auto rounded-lg border border-[#e8e8ed] bg-white p-2">
+      <div className="ecom-scrollbar-thin min-h-0 flex-1 overflow-auto rounded-lg border border-[var(--ecom-divider)] bg-white p-2">
         <StoryboardProSheetView
           sheet={sheet}
           references={references}

@@ -246,17 +246,17 @@ export function VtonTextTryonPanel({
 
   return (
     <>
-      <div className="overflow-hidden rounded-xl border border-[#e8e8ed] bg-white">
-        <section className="border-b border-[#e8e8ed] px-4 py-4 sm:px-5">
+      <div className="overflow-hidden rounded-xl border border-[var(--ecom-divider)] bg-white">
+        <section className="border-b border-[var(--ecom-divider)] px-4 py-4 sm:px-5">
           <div className="mb-2 flex items-center justify-between gap-2">
-            <span className="text-xs font-medium uppercase tracking-wide text-[#6e6e73]">
+            <span className="text-xs font-medium uppercase tracking-wide text-[var(--ecom-muted)]">
               试衣参考图
             </span>
-            <span className="text-[10px] text-[#86868b]">
+            <span className="text-[10px] text-[var(--ecom-subtle)]">
               {refs.length} 张 · {IMAGE_UPLOAD_DROP_HINT}
             </span>
           </div>
-          <p className="mb-3 text-[11px] leading-relaxed text-[#6e6e73]">
+          <p className="mb-3 text-[11px] leading-relaxed text-[var(--ecom-muted)]">
             上传参考图并在 Prompt 中 @ 引用；场景库可追加 @场景N（文字场景）或场景参考图。默认：服装 → @图片1，眼镜 → @图片2，模特可从模特库追加。
           </p>
           <EcomRefUploadCard
@@ -338,18 +338,18 @@ export function VtonTextTryonPanel({
               {sceneTextRefs.map((r, i) => (
                 <li
                   key={r.id}
-                  className="flex items-start gap-2 rounded-lg border border-[#e8e8ed] bg-[#fafafa] px-2.5 py-2 text-[10px] text-[#424245]"
+                  className="flex items-start gap-2 rounded-lg border border-[var(--ecom-divider)] bg-[#fafafa] px-2.5 py-2 text-[10px] text-[#424245]"
                 >
-                  <BookOpen className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#0071e3]" />
+                  <BookOpen className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--ecom-primary)]" />
                   <div className="min-w-0 flex-1">
-                    <p className="font-medium text-[#1d1d1f]">
+                    <p className="font-medium text-[var(--ecom-ink)]">
                       @场景{i + 1} · {r.label ?? "场景库"}
                     </p>
-                    <p className="mt-0.5 line-clamp-2 text-[#6e6e73]">{r.scenePrompt}</p>
+                    <p className="mt-0.5 line-clamp-2 text-[var(--ecom-muted)]">{r.scenePrompt}</p>
                   </div>
                   <button
                     type="button"
-                    className="shrink-0 text-[#0071e3] hover:underline disabled:opacity-50"
+                    className="shrink-0 text-[var(--ecom-primary)] hover:underline disabled:opacity-50"
                     disabled={uploadDisabled}
                     onClick={() => void onRemoveRef(r.id)}
                   >
@@ -361,14 +361,14 @@ export function VtonTextTryonPanel({
           ) : null}
         </section>
 
-        <section className="border-b border-[#e8e8ed] px-4 py-4 sm:px-5">
-          <p className="mb-1 text-xs font-medium uppercase tracking-wide text-[#6e6e73]">
+        <section className="border-b border-[var(--ecom-divider)] px-4 py-4 sm:px-5">
+          <p className="mb-1 text-xs font-medium uppercase tracking-wide text-[var(--ecom-muted)]">
             参考图 + Prompt
           </p>
-          <p className="mb-4 text-[11px] leading-relaxed text-[#6e6e73]">
+          <p className="mb-4 text-[11px] leading-relaxed text-[var(--ecom-muted)]">
             用 @图片N 引用参考图、@场景N 引用场景库文案；删除 Prompt 中的 @ 后，下方参考资产条会同步移除（上方缩略图区仅展示图片参考）。
           </p>
-          <p className="mb-2 text-[11px] font-semibold text-[#1d1d1f]">Prompt（可 @ 图片）</p>
+          <p className="mb-2 text-[11px] font-semibold text-[var(--ecom-ink)]">Prompt（可 @ 图片）</p>
           <ProductDesignPromptMentionTextarea
             key={mentionRefsKey}
             value={prompt}
@@ -383,13 +383,13 @@ export function VtonTextTryonPanel({
           <div className="mt-4 flex flex-wrap items-center gap-2">
             <button
               type="button"
-              className="inline-flex items-center gap-1.5 rounded-lg border border-[#e8e8ed] bg-white px-3 py-1.5 text-[11px] text-[#1d1d1f] hover:border-[#d2d2d7] disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--ecom-divider)] bg-white px-3 py-1.5 text-[11px] text-[var(--ecom-ink)] hover:border-[var(--ecom-border-soft)] disabled:opacity-50"
               disabled={Boolean(busy) || Boolean(generating) || modelsLoading}
               onClick={() => setModelPickerOpen(true)}
             >
-              <Cpu className="h-3.5 w-3.5 shrink-0 text-[#6e6e73]" />
+              <Cpu className="h-3.5 w-3.5 shrink-0 text-[var(--ecom-muted)]" />
               <span className="max-w-[140px] truncate">{modelDisplay}</span>
-              <span className="text-[10px] text-[#86868b]">{modelTypeLabel}</span>
+              <span className="text-[10px] text-[var(--ecom-subtle)]">{modelTypeLabel}</span>
             </button>
             <EcomGenerateCreditsBeside modelKey={modelKey} imageCount={1} />
             <EcomButtonPrimary
@@ -410,7 +410,7 @@ export function VtonTextTryonPanel({
             {!prompt.trim() ? (
               <button
                 type="button"
-                className="text-[11px] text-[#0071e3] hover:underline disabled:opacity-50"
+                className="text-[11px] text-[var(--ecom-primary)] hover:underline disabled:opacity-50"
                 disabled={Boolean(busy) || Boolean(generating)}
                 onClick={() =>
                   onPromptChange(normalizeVtonTextTryonPrompt(VTON_TEXT_TRYON_DEFAULT_PROMPT))
@@ -433,9 +433,9 @@ export function VtonTextTryonPanel({
 
         <section className="px-4 py-4 sm:px-5">
           <div className="mb-3 flex items-center justify-between gap-2">
-            <h3 className="text-sm font-semibold text-[#1d1d1f]">生成结果</h3>
+            <h3 className="text-sm font-semibold text-[var(--ecom-ink)]">生成结果</h3>
             {showResultsGrid ? (
-              <span className="text-[10px] text-[#86868b]">
+              <span className="text-[10px] text-[var(--ecom-subtle)]">
                 {generating && results.length === 0
                   ? "生成中…"
                   : `${results.length + (generating ? 1 : 0)} 张`}
@@ -443,8 +443,8 @@ export function VtonTextTryonPanel({
             ) : null}
           </div>
           {!showResultsGrid ? (
-            <div className="flex min-h-[28vh] flex-col items-center justify-center rounded-lg border border-dashed border-[#e8e8ed] bg-[#fafafa] px-6 py-10 text-center">
-              <p className="max-w-md text-sm text-[#6e6e73]">
+            <div className="flex min-h-[28vh] flex-col items-center justify-center rounded-lg border border-dashed border-[var(--ecom-divider)] bg-[#fafafa] px-6 py-10 text-center">
+              <p className="max-w-md text-sm text-[var(--ecom-muted)]">
                 上传参考图、填写 Prompt 并点击「生成试衣图」后，成片将显示在此。生成完成后可继续在上方的编辑区调整素材与 Prompt。
               </p>
             </div>

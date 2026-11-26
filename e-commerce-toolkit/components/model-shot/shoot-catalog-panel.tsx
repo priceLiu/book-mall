@@ -78,7 +78,7 @@ function CatalogSection({
 }) {
   return (
     <section className="space-y-2">
-      <h4 className="text-xs font-semibold text-[#86868b]">{title}</h4>
+      <h4 className="text-xs font-semibold text-[var(--ecom-subtle)]">{title}</h4>
       {children}
     </section>
   );
@@ -106,7 +106,7 @@ function SceneCatalogCard({
     )?.label ?? "—";
   return (
     <li className="flex flex-col overflow-hidden rounded-xl border border-[#e5e5ea] bg-white">
-      <div className="relative aspect-[4/3] w-full bg-[#f5f5f7]">
+      <div className="relative aspect-[4/3] w-full bg-[var(--ecom-parchment)]">
         <EcomMediaLibraryTile
           kind="image"
           src={imageUrl}
@@ -121,11 +121,11 @@ function SceneCatalogCard({
         </span>
       </div>
       <div className="flex flex-1 flex-col gap-1 p-2">
-        <p className="line-clamp-1 text-xs font-medium text-[#1d1d1f]">
+        <p className="line-clamp-1 text-xs font-medium text-[var(--ecom-ink)]">
           {entry.name}
           {!readonly ? <LockedBadge lockedAt={entry.lockedAt} /> : null}
         </p>
-        <p className="line-clamp-2 text-[10px] leading-relaxed text-[#6e6e73]">
+        <p className="line-clamp-2 text-[10px] leading-relaxed text-[var(--ecom-muted)]">
           {entry.visualPrompt?.trim() || "—"}
         </p>
         {!readonly && (onEdit || onRemove) ? (
@@ -133,7 +133,7 @@ function SceneCatalogCard({
             {onEdit ? (
               <button
                 type="button"
-                className="text-[10px] text-[#0071e3] disabled:opacity-40"
+                className="text-[10px] text-[var(--ecom-primary)] disabled:opacity-40"
                 disabled={!!entry.lockedAt}
                 onClick={onEdit}
               >
@@ -173,7 +173,7 @@ function PoseCatalogCard({
   const imageUrl = entry.thumbUrl || entry.ossUrl || undefined;
   return (
     <li className="flex flex-col overflow-hidden rounded-xl border border-[#e5e5ea] bg-white">
-      <div className="relative aspect-[3/4] w-full bg-[#f5f5f7]">
+      <div className="relative aspect-[3/4] w-full bg-[var(--ecom-parchment)]">
         {imageUrl ? (
           <EcomMediaLibraryTile
             kind="image"
@@ -184,7 +184,7 @@ function PoseCatalogCard({
             onPreview={() => onPreviewImage?.(imageUrl, entry.title)}
           />
         ) : (
-          <div className="flex h-full items-center justify-center px-2 text-center text-[10px] text-[#86868b]">
+          <div className="flex h-full items-center justify-center px-2 text-center text-[10px] text-[var(--ecom-subtle)]">
             暂无参考图
           </div>
         )}
@@ -197,7 +197,7 @@ function PoseCatalogCard({
           {resolvePoseGenders(entry).map((g) => (
             <span
               key={g}
-              className="rounded bg-[#f0f6ff] px-1 py-0.5 text-[9px] text-[#0071e3]"
+              className="rounded bg-[var(--ecom-content-selected-bg)] px-1 py-0.5 text-[9px] text-[var(--ecom-primary)]"
             >
               {poseGenderLabel(g)}
             </span>
@@ -205,18 +205,18 @@ function PoseCatalogCard({
           {resolvePoseSceneTags(entry).slice(0, 3).map((tag) => (
             <span
               key={tag}
-              className="rounded bg-[#f5f5f7] px-1 py-0.5 text-[9px] text-[#6e6e73]"
+              className="rounded bg-[var(--ecom-parchment)] px-1 py-0.5 text-[9px] text-[var(--ecom-muted)]"
             >
               {tag}
             </span>
           ))}
         </div>
-        <p className="line-clamp-1 text-xs font-medium text-[#1d1d1f]">
+        <p className="line-clamp-1 text-xs font-medium text-[var(--ecom-ink)]">
           {entry.title}
           {!readonly ? <LockedBadge lockedAt={entry.lockedAt} /> : null}
         </p>
         {entry.baseDescription?.trim() ? (
-          <p className="line-clamp-2 text-[10px] leading-relaxed text-[#6e6e73]">
+          <p className="line-clamp-2 text-[10px] leading-relaxed text-[var(--ecom-muted)]">
             {entry.baseDescription}
           </p>
         ) : (
@@ -227,7 +227,7 @@ function PoseCatalogCard({
             {onEdit ? (
               <button
                 type="button"
-                className="text-[10px] text-[#0071e3] disabled:opacity-40"
+                className="text-[10px] text-[var(--ecom-primary)] disabled:opacity-40"
                 disabled={!!entry.lockedAt}
                 onClick={onEdit}
               >
@@ -562,14 +562,14 @@ export function ShootCatalogPanel() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap gap-2 border-b border-[#e8e8ed] pb-3">
+      <div className="flex flex-wrap gap-2 border-b border-[var(--ecom-divider)] pb-3">
         {(["scene", "prop", "pose"] as Tab[]).map((t) => (
           <button
             key={t}
             type="button"
             className={cn(
               "rounded-full px-4 py-1.5 text-sm transition",
-              tab === t ? "bg-[#1d1d1f] text-white" : "bg-[#f5f5f7] text-[#424245] hover:bg-[#e8e8ed]",
+              tab === t ? "bg-[var(--ecom-ink)] text-white" : "bg-[var(--ecom-parchment)] text-[#424245] hover:bg-[var(--ecom-divider)]",
             )}
             onClick={() => setTab(t)}
           >
@@ -578,16 +578,16 @@ export function ShootCatalogPanel() {
         ))}
       </div>
 
-      {loading ? <p className="text-sm text-[#86868b]">加载中…</p> : null}
+      {loading ? <p className="text-sm text-[var(--ecom-subtle)]">加载中…</p> : null}
 
       {tab === "scene" ? (
         <div className="space-y-6">
-          <p className="text-xs text-[#86868b]">
+          <p className="text-xs text-[var(--ecom-subtle)]">
             无自定义参考图时展示平台默认场景图；编辑「我的场景」可上传替换参考图。
           </p>
           <CatalogSection title="系统推荐（只读）">
             {scenes.platform.length === 0 ? (
-              <p className="text-xs text-[#86868b]">暂无系统场景。</p>
+              <p className="text-xs text-[var(--ecom-subtle)]">暂无系统场景。</p>
             ) : (
               <ul className={ECOM_LIBRARY_MEDIA_GRID_CLASS}>
                 {scenes.platform.map((s) => (
@@ -614,7 +614,7 @@ export function ShootCatalogPanel() {
               </EcomButtonSecondary>
             </div>
             {scenes.user.length === 0 ? (
-              <p className="text-xs text-[#86868b]">暂无自建场景。新建后可在姿势表与助手中点选。</p>
+              <p className="text-xs text-[var(--ecom-subtle)]">暂无自建场景。新建后可在姿势表与助手中点选。</p>
             ) : (
               <ul className={ECOM_LIBRARY_MEDIA_GRID_CLASS}>
                 {scenes.user.map((s) => (
@@ -646,7 +646,7 @@ export function ShootCatalogPanel() {
             <div className="overflow-x-auto rounded-xl border border-[#e5e5ea]">
               <table className="min-w-[640px] w-full text-left text-xs">
                 <thead>
-                  <tr className="bg-[#1d1d1f] text-white">
+                  <tr className="bg-[var(--ecom-ink)] text-white">
                     <th className="px-3 py-2">名称</th>
                     <th className="px-3 py-2">描述</th>
                     <th className="px-3 py-2">冲突标签</th>
@@ -656,8 +656,8 @@ export function ShootCatalogPanel() {
                   {props.platform.map((p) => (
                     <tr key={p.id} className="border-t border-[#e5e5ea]">
                       <td className="px-3 py-2">{p.name}</td>
-                      <td className="max-w-md px-3 py-2 text-[#6e6e73]">{p.visualDescription}</td>
-                      <td className="px-3 py-2 text-[#86868b]">
+                      <td className="max-w-md px-3 py-2 text-[var(--ecom-muted)]">{p.visualDescription}</td>
+                      <td className="px-3 py-2 text-[var(--ecom-subtle)]">
                         {p.conflictTags?.length ? p.conflictTags.join(", ") : "—"}
                       </td>
                     </tr>
@@ -677,12 +677,12 @@ export function ShootCatalogPanel() {
               </EcomButtonSecondary>
             </div>
             {props.user.length === 0 ? (
-              <p className="text-xs text-[#86868b]">暂无自建道具。可在姿势计划表中点选填写。</p>
+              <p className="text-xs text-[var(--ecom-subtle)]">暂无自建道具。可在姿势计划表中点选填写。</p>
             ) : (
               <div className="overflow-x-auto rounded-xl border border-[#e5e5ea]">
                 <table className="min-w-[640px] w-full text-left text-xs">
                   <thead>
-                    <tr className="bg-[#1d1d1f] text-white">
+                    <tr className="bg-[var(--ecom-ink)] text-white">
                       <th className="px-3 py-2">名称</th>
                       <th className="px-3 py-2">描述</th>
                       <th className="px-3 py-2">操作</th>
@@ -695,11 +695,11 @@ export function ShootCatalogPanel() {
                           {p.name}
                           <LockedBadge lockedAt={p.lockedAt} />
                         </td>
-                        <td className="max-w-md px-3 py-2 text-[#6e6e73]">{p.visualDescription}</td>
+                        <td className="max-w-md px-3 py-2 text-[var(--ecom-muted)]">{p.visualDescription}</td>
                         <td className="px-3 py-2">
                           <button
                             type="button"
-                            className="mr-2 text-[#0071e3] disabled:opacity-40"
+                            className="mr-2 text-[var(--ecom-primary)] disabled:opacity-40"
                             disabled={!!p.lockedAt}
                             onClick={() =>
                               setPropForm({
@@ -732,7 +732,7 @@ export function ShootCatalogPanel() {
 
       {tab === "pose" ? (
         <div className="space-y-6">
-          <p className="text-xs text-[#86868b]">
+          <p className="text-xs text-[var(--ecom-subtle)]">
             系统姿势参与助手自动编排；自建姿势仅供姿势表内手动替换，不会进入自动抽取池。
           </p>
           <CatalogSection title="系统推荐（只读）">
@@ -743,13 +743,13 @@ export function ShootCatalogPanel() {
               onSceneTagsChange={setPoseSceneTagFilter}
               className="mb-2"
             />
-            <p className="text-[11px] text-[#86868b]">
+            <p className="text-[11px] text-[var(--ecom-subtle)]">
               共 {poses.platform.length} 条 · 筛选后 {filteredPlatformPoses.length} 条
             </p>
             {poses.platform.length === 0 ? (
-              <p className="text-xs text-[#86868b]">暂无系统姿势。</p>
+              <p className="text-xs text-[var(--ecom-subtle)]">暂无系统姿势。</p>
             ) : filteredPlatformPoses.length === 0 ? (
-              <p className="text-xs text-[#86868b]">无匹配姿势，请调整筛选条件。</p>
+              <p className="text-xs text-[var(--ecom-subtle)]">无匹配姿势，请调整筛选条件。</p>
             ) : (
               <ul className={ECOM_LIBRARY_MEDIA_GRID_CLASS}>
                 {filteredPlatformPoses.map((p) => (
@@ -782,7 +782,7 @@ export function ShootCatalogPanel() {
               </EcomButtonSecondary>
             </div>
             {poses.user.length === 0 ? (
-              <p className="text-xs text-[#86868b]">暂无自建姿势。</p>
+              <p className="text-xs text-[var(--ecom-subtle)]">暂无自建姿势。</p>
             ) : (
               <ul className={ECOM_LIBRARY_MEDIA_GRID_CLASS}>
                 {poses.user.map((p) => (
@@ -812,17 +812,17 @@ export function ShootCatalogPanel() {
       {sceneForm ? (
         <FormModal title={sceneForm.id ? "编辑场景" : "新建场景"} onClose={() => setSceneForm(null)}>
           <label className="block space-y-1 text-xs">
-            <span className="text-[#86868b]">名称</span>
+            <span className="text-[var(--ecom-subtle)]">名称</span>
             <input
-              className="w-full rounded-lg border border-[#d2d2d7] px-3 py-2"
+              className="w-full rounded-lg border border-[var(--ecom-border-soft)] px-3 py-2"
               value={sceneForm.name}
               onChange={(e) => setSceneForm({ ...sceneForm, name: e.target.value })}
             />
           </label>
           <label className="block space-y-1 text-xs">
-            <span className="text-[#86868b]">场景类型（用于姿势匹配）</span>
+            <span className="text-[var(--ecom-subtle)]">场景类型（用于姿势匹配）</span>
             <select
-              className="w-full rounded-lg border border-[#d2d2d7] px-3 py-2"
+              className="w-full rounded-lg border border-[var(--ecom-border-soft)] px-3 py-2"
               value={sceneForm.archetype}
               onChange={(e) => setSceneForm({ ...sceneForm, archetype: e.target.value })}
             >
@@ -834,15 +834,15 @@ export function ShootCatalogPanel() {
             </select>
           </label>
           <label className="block space-y-1 text-xs">
-            <span className="text-[#86868b]">visualPrompt</span>
+            <span className="text-[var(--ecom-subtle)]">visualPrompt</span>
             <textarea
-              className="min-h-[100px] w-full rounded-lg border border-[#d2d2d7] px-3 py-2"
+              className="min-h-[100px] w-full rounded-lg border border-[var(--ecom-border-soft)] px-3 py-2"
               value={sceneForm.visualPrompt}
               onChange={(e) => setSceneForm({ ...sceneForm, visualPrompt: e.target.value })}
             />
           </label>
           <div className="space-y-2 text-xs">
-            <span className="text-[#86868b]">参考图（可选，保存后上传）</span>
+            <span className="text-[var(--ecom-subtle)]">参考图（可选，保存后上传）</span>
             <div className="flex items-start gap-3">
               {sceneForm.previewUrl || sceneForm.pendingPreviewFile ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -856,12 +856,12 @@ export function ShootCatalogPanel() {
                   className="size-20 rounded-lg object-cover"
                 />
               ) : (
-                <div className="flex size-20 items-center justify-center rounded-lg bg-[#f5f5f7] text-[10px] text-[#86868b]">
+                <div className="flex size-20 items-center justify-center rounded-lg bg-[var(--ecom-parchment)] text-[10px] text-[var(--ecom-subtle)]">
                   默认图
                 </div>
               )}
               <div className="flex flex-col gap-2">
-                <label className="cursor-pointer text-[#0071e3]">
+                <label className="cursor-pointer text-[var(--ecom-primary)]">
                   选择图片
                   <input
                     type="file"
@@ -911,17 +911,17 @@ export function ShootCatalogPanel() {
       {propForm ? (
         <FormModal title={propForm.id ? "编辑道具" : "新建道具"} onClose={() => setPropForm(null)}>
           <label className="block space-y-1 text-xs">
-            <span className="text-[#86868b]">名称</span>
+            <span className="text-[var(--ecom-subtle)]">名称</span>
             <input
-              className="w-full rounded-lg border border-[#d2d2d7] px-3 py-2"
+              className="w-full rounded-lg border border-[var(--ecom-border-soft)] px-3 py-2"
               value={propForm.name}
               onChange={(e) => setPropForm({ ...propForm, name: e.target.value })}
             />
           </label>
           <label className="block space-y-1 text-xs">
-            <span className="text-[#86868b]">visualDescription</span>
+            <span className="text-[var(--ecom-subtle)]">visualDescription</span>
             <textarea
-              className="min-h-[100px] w-full rounded-lg border border-[#d2d2d7] px-3 py-2"
+              className="min-h-[100px] w-full rounded-lg border border-[var(--ecom-border-soft)] px-3 py-2"
               value={propForm.visualDescription}
               onChange={(e) => setPropForm({ ...propForm, visualDescription: e.target.value })}
             />
@@ -940,9 +940,9 @@ export function ShootCatalogPanel() {
       {poseForm ? (
         <FormModal title={poseForm.id ? "编辑姿势" : "新建姿势"} onClose={() => setPoseForm(null)}>
           <label className="block space-y-1 text-xs">
-            <span className="text-[#86868b]">分类</span>
+            <span className="text-[var(--ecom-subtle)]">分类</span>
             <select
-              className="w-full rounded-lg border border-[#d2d2d7] px-3 py-2"
+              className="w-full rounded-lg border border-[var(--ecom-border-soft)] px-3 py-2"
               value={poseForm.category}
               onChange={(e) => setPoseForm({ ...poseForm, category: e.target.value })}
             >
@@ -954,23 +954,23 @@ export function ShootCatalogPanel() {
             </select>
           </label>
           <label className="block space-y-1 text-xs">
-            <span className="text-[#86868b]">标题</span>
+            <span className="text-[var(--ecom-subtle)]">标题</span>
             <input
-              className="w-full rounded-lg border border-[#d2d2d7] px-3 py-2"
+              className="w-full rounded-lg border border-[var(--ecom-border-soft)] px-3 py-2"
               value={poseForm.title}
               onChange={(e) => setPoseForm({ ...poseForm, title: e.target.value })}
             />
           </label>
           <label className="block space-y-1 text-xs">
-            <span className="text-[#86868b]">baseDescription</span>
+            <span className="text-[var(--ecom-subtle)]">baseDescription</span>
             <textarea
-              className="min-h-[100px] w-full rounded-lg border border-[#d2d2d7] px-3 py-2"
+              className="min-h-[100px] w-full rounded-lg border border-[var(--ecom-border-soft)] px-3 py-2"
               value={poseForm.baseDescription}
               onChange={(e) => setPoseForm({ ...poseForm, baseDescription: e.target.value })}
             />
           </label>
           <div className="space-y-2 text-xs">
-            <span className="text-[#86868b]">性别（可多选）</span>
+            <span className="text-[var(--ecom-subtle)]">性别（可多选）</span>
             <div className="flex flex-wrap gap-2">
               {ECOM_POSE_GENDER_OPTIONS.map((opt) => {
                 const active = poseForm.genders.includes(opt.value);
@@ -996,7 +996,7 @@ export function ShootCatalogPanel() {
             </div>
           </div>
           <div className="space-y-2 text-xs">
-            <span className="text-[#86868b]">场景标签（可多选）</span>
+            <span className="text-[var(--ecom-subtle)]">场景标签（可多选）</span>
             <div className="flex flex-wrap gap-2">
               {ECOM_POSE_SCENE_TAG_OPTIONS.map((opt) => {
                 const active = poseForm.sceneTags.includes(opt.value);
@@ -1050,7 +1050,7 @@ function FormModal({
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4">
       <div className="w-full max-w-md space-y-3 rounded-2xl bg-white p-5 shadow-xl">
-        <h3 className="text-sm font-semibold text-[#1d1d1f]">{title}</h3>
+        <h3 className="text-sm font-semibold text-[var(--ecom-ink)]">{title}</h3>
         {children}
         <button type="button" className="sr-only" onClick={onClose}>
           close

@@ -26,23 +26,23 @@ export const ECOM_HOVER_PREVIEW_BTN_SIZE_CLASS =
 
 /** 缩略图悬停 · 预览 Eye（全站统一，见 design/MEDIA.md） */
 export const ECOM_MEDIA_TILE_PREVIEW_BTN_CLASS =
-  "inline-flex aspect-square w-[clamp(1.75rem,16%,2.5rem)] max-w-10 shrink-0 items-center justify-center rounded-full bg-white/95 text-[#1d1d1f] shadow-md transition hover:bg-white";
+  "inline-flex aspect-square w-[clamp(1.75rem,16%,2.5rem)] max-w-10 shrink-0 items-center justify-center rounded-full bg-white/95 text-[var(--ecom-ink)] shadow-md transition hover:bg-white";
 
 export const ECOM_MEDIA_TILE_PREVIEW_EYE_CLASS = "h-5 w-5";
 
 /** 缩略图悬停 · 下载 / 删除等次要操作 */
 export const ECOM_MEDIA_TILE_ACTION_BTN_CLASS =
-  "inline-flex aspect-square w-[clamp(1.75rem,14%,2.25rem)] max-w-9 shrink-0 items-center justify-center rounded-full bg-white/95 text-[#1d1d1f] shadow-md transition hover:bg-white";
+  "inline-flex aspect-square w-[clamp(1.75rem,14%,2.25rem)] max-w-9 shrink-0 items-center justify-center rounded-full bg-white/95 text-[var(--ecom-ink)] shadow-md transition hover:bg-white";
 
 export const ECOM_MEDIA_TILE_ACTION_ICON_CLASS = "h-4 w-4";
 
 /** 成图槽位悬停 · 主图 / 手伴等（ring 样式） */
 export const ECOM_SLOT_HOVER_ACTION_BTN_CLASS =
-  "inline-flex aspect-square w-[clamp(1.75rem,14%,2.25rem)] max-w-9 shrink-0 items-center justify-center rounded-full bg-white/95 text-[#1d1d1f] ring-1 ring-black/10 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-50";
+  "inline-flex aspect-square w-[clamp(1.75rem,14%,2.25rem)] max-w-9 shrink-0 items-center justify-center rounded-full bg-white/95 text-[var(--ecom-ink)] ring-1 ring-black/10 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-50";
 
 /** 成图槽位悬停 · 分镜等（shadow 样式） */
 export const ECOM_STORYBOARD_HOVER_ACTION_BTN_CLASS =
-  "inline-flex aspect-square w-[clamp(1.75rem,14%,2.25rem)] max-w-9 shrink-0 items-center justify-center rounded-full bg-white/95 text-[#1d1d1f] shadow transition hover:bg-white";
+  "inline-flex aspect-square w-[clamp(1.75rem,14%,2.25rem)] max-w-9 shrink-0 items-center justify-center rounded-full bg-white/95 text-[var(--ecom-ink)] shadow transition hover:bg-white";
 
 export const ECOM_SLOT_HOVER_OVERLAY_CLASS =
   "pointer-events-none absolute inset-0 z-10 bg-black/45 opacity-0 transition-opacity duration-150 [@media(hover:hover)]:group-hover/image:opacity-100 [@media(hover:hover)]:group-focus-within/image:opacity-100 [@media(hover:none)]:opacity-100";
@@ -190,10 +190,10 @@ export function EcomMediaLibraryTile({
     <div
       ref={ref}
       className={cn(
-        "group relative overflow-hidden rounded-lg border border-[#e8e8ed] bg-[#f5f5f7]",
+        "group relative overflow-hidden rounded-lg border border-[var(--ecom-divider)] bg-[var(--ecom-parchment)]",
         aspectClass,
         selectable && "cursor-pointer",
-        selected && "ring-2 ring-[#0071e3] ring-offset-1",
+        selected && "ring-2 ring-[var(--ecom-primary)] ring-offset-1",
         className,
       )}
       onMouseEnter={videoPosterSrc ? () => setHovered(true) : undefined}
@@ -218,7 +218,7 @@ export function EcomMediaLibraryTile({
       {body}
 
       {selected ? (
-        <span className="absolute right-1 top-1 z-10 grid h-5 w-5 place-items-center rounded-full bg-[#0071e3] text-white">
+        <span className="absolute right-1 top-1 z-10 grid h-5 w-5 place-items-center rounded-full bg-[var(--ecom-primary)] text-white">
           <Check className="h-3 w-3" strokeWidth={3} />
         </span>
       ) : null}
@@ -271,7 +271,7 @@ export function EcomMediaLibraryTile({
             type="button"
             className={cn(
               ECOM_MEDIA_TILE_ACTION_BTN_CLASS,
-              pinnedToAiSpace && "text-[#0071e3]",
+              pinnedToAiSpace && "text-[var(--ecom-primary)]",
             )}
             aria-label={pinnedToAiSpace ? "已展示到 AI 空间" : "展示到 AI 空间"}
             title={pinnedToAiSpace ? "已展示到 AI 空间" : "展示到 AI 空间"}

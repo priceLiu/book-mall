@@ -52,7 +52,7 @@ function ScenePreviewThumb({
   return (
     <div
       className={cn(
-        "group/image relative h-[4.5rem] w-10 shrink-0 overflow-hidden rounded border border-[#e8e8ed] bg-[#f5f5f7]",
+        "group/image relative h-[4.5rem] w-10 shrink-0 overflow-hidden rounded border border-[var(--ecom-divider)] bg-[var(--ecom-parchment)]",
         disabled && "opacity-60",
       )}
     >
@@ -145,7 +145,7 @@ export function OutfitSceneTable({ scenes, disabled, onChange, onDelete }: Props
                       }}
                     />
                   ) : (
-                    <span className="text-[#86868b]">待抽帧</span>
+                    <span className="text-[var(--ecom-subtle)]">待抽帧</span>
                   )}
                 </td>
                 <td className={ecomDataTableTdClass}>

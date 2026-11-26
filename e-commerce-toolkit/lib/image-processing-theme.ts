@@ -11,10 +11,10 @@ export const ipTagSelectedClass =
   "border-[var(--ecom-outline-border)] bg-[var(--ecom-btn-fill)] text-white";
 
 export const ipTagUnselectedClass =
-  "border-[#e5e5ea] bg-white text-[#1d1d1f]";
+  "border-[#e5e5ea] bg-white text-[var(--ecom-ink)]";
 
 export const ipAspectSelectedClass =
-  "border-[var(--ecom-outline-border)] bg-[#f0f6ff] text-[#0071e3]";
+  "border-[var(--ecom-outline-border)] bg-[var(--ecom-content-selected-bg)] text-[var(--ecom-primary)]";
 
 export const ipStepNumberClass =
   "flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-black text-sm font-semibold text-white";

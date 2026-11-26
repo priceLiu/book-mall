@@ -34,15 +34,15 @@ export function BackgroundReplaceResultDialog({
       onClick={onCancel}
     >
       <div
-        className="relative flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-[#e8e8ed] bg-white shadow-xl"
+        className="relative flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-[var(--ecom-divider)] bg-white shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <EcomDialogCloseButton onClick={onCancel} />
-        <div className="border-b border-[#e8e8ed] px-5 py-4 pr-12">
-          <h2 id="bg-replace-pick-title" className="text-base font-semibold text-[#1d1d1f]">
+        <div className="border-b border-[var(--ecom-divider)] px-5 py-4 pr-12">
+          <h2 id="bg-replace-pick-title" className="text-base font-semibold text-[var(--ecom-ink)]">
             选择生成结果
           </h2>
-          <p className="mt-1 text-[12px] leading-relaxed text-[#6e6e73]">
+          <p className="mt-1 text-[12px] leading-relaxed text-[var(--ecom-muted)]">
             本次生成了 {imageUrls.length} 张。点选一张应用到中栏；其余可在生成记录查看。
           </p>
         </div>
@@ -69,7 +69,7 @@ export function BackgroundReplaceResultDialog({
             </button>
           ))}
         </div>
-        <div className="flex justify-end border-t border-[#e8e8ed] px-5 py-3">
+        <div className="flex justify-end border-t border-[var(--ecom-divider)] px-5 py-3">
           <EcomButtonSecondary onClick={onCancel}>稍后再选</EcomButtonSecondary>
         </div>
       </div>

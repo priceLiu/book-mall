@@ -37,7 +37,7 @@ type Props = {
 
 /** 助手气泡内快捷按钮统一样式，见 .cursor/rules/ecom-storyboard-assistant-choices.mdc */
 export const STORYBOARD_ASSISTANT_CHOICE_CLASS =
-  "rounded-full border border-[var(--ecom-assistant-choice-border)] bg-[var(--ecom-assistant-choice-bg)] px-3 py-1.5 text-xs font-medium text-[#1d1d1f] transition-colors hover:border-[var(--ecom-chrome-text-muted)] hover:bg-[var(--ecom-assistant-choice-hover-bg)] disabled:opacity-50";
+  "rounded-full border border-[var(--ecom-assistant-choice-border)] bg-[var(--ecom-assistant-choice-bg)] px-3 py-1.5 text-xs font-medium text-[var(--ecom-ink)] transition-colors hover:border-[var(--ecom-chrome-text-muted)] hover:bg-[var(--ecom-assistant-choice-hover-bg)] disabled:opacity-50";
 
 export function StoryboardAssistantChoices({
   project,
@@ -87,9 +87,9 @@ export function StoryboardAssistantChoices({
   return (
     <div className={cn(compact ? "mt-3 border-t border-[var(--ecom-assistant-border)] pt-3" : "px-4 pb-2")}>
       {!compact ? (
-        <p className="mb-2 px-0 text-xs text-[#6e6e73]">{stepLabel}</p>
+        <p className="mb-2 px-0 text-xs text-[var(--ecom-muted)]">{stepLabel}</p>
       ) : (
-        <p className="mb-2 text-[11px] text-[#6e6e73]">{stepLabel}</p>
+        <p className="mb-2 text-[11px] text-[var(--ecom-muted)]">{stepLabel}</p>
       )}
       <div className="flex flex-wrap gap-2">
         {choices.map((c) => (

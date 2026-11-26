@@ -40,7 +40,7 @@ const COMPOSE_ICON_BTN = cn(
   "inline-flex items-center justify-center",
 );
 const COMPOSE_PREVIEW_BTN = cn(
-  "inline-flex items-center justify-center rounded-full bg-white/95 text-[#1d1d1f] ring-1 ring-black/10 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-50",
+  "inline-flex items-center justify-center rounded-full bg-white/95 text-[var(--ecom-ink)] ring-1 ring-black/10 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-50",
   ECOM_HOVER_PREVIEW_BTN_SIZE_CLASS,
 );
 
@@ -245,14 +245,14 @@ export function HandCraftComposePanel({
   return (
     <section
       id={`hand-craft-step-${step.id}`}
-      className="scroll-mt-20 rounded-xl border border-[#e8e8ed] bg-[#fafafa] px-4 py-4"
+      className="scroll-mt-20 rounded-xl border border-[var(--ecom-divider)] bg-[#fafafa] px-4 py-4"
     >
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h3 className="text-sm font-semibold text-[#1d1d1f]">
+          <h3 className="text-sm font-semibold text-[var(--ecom-ink)]">
             第 {step.no} 步 · {step.label}
           </h3>
-          <p className="mt-0.5 text-[11px] text-[#6e6e73]">
+          <p className="mt-0.5 text-[11px] text-[var(--ecom-muted)]">
             {step.summary} · 版式由代码排版，浏览器抓图后存入云端
             <span className="ml-1">
               已拼 {done}/{pages.length || step.count}
@@ -292,8 +292,8 @@ export function HandCraftComposePanel({
           本步要引用前序成图，尚缺：{blocked.join("、")}。补齐后按钮才会解锁。
         </p>
       ) : step.id === "licensing" ? (
-        <p className="mb-3 rounded-lg border border-[#e8e8ed] bg-[#f5f5f7] px-3 py-2 text-[11px] text-[#6e6e73]">
-          本步仅依赖第 1、3、4 步成图，<strong className="font-semibold text-[#1d1d1f]">无需</strong>
+        <p className="mb-3 rounded-lg border border-[var(--ecom-divider)] bg-[var(--ecom-parchment)] px-3 py-2 text-[11px] text-[var(--ecom-muted)]">
+          本步仅依赖第 1、3、4 步成图，<strong className="font-semibold text-[var(--ecom-ink)]">无需</strong>
           等第 9 步作品集拼完。
         </p>
       ) : null}
@@ -311,20 +311,20 @@ export function HandCraftComposePanel({
           return (
             <article
               key={page.index}
-              className="flex min-w-0 flex-col overflow-hidden rounded-xl border border-[#e8e8ed] bg-white"
+              className="flex min-w-0 flex-col overflow-hidden rounded-xl border border-[var(--ecom-divider)] bg-white"
             >
               <div className="flex items-center gap-1.5 border-b border-[#f0f0f2] px-2.5 py-1.5">
-                <span className="shrink-0 text-[10px] font-semibold text-[#86868b]">
+                <span className="shrink-0 text-[10px] font-semibold text-[var(--ecom-subtle)]">
                   P{String(page.index).padStart(2, "0")}
                 </span>
-                <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-[#1d1d1f]">
+                <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-[var(--ecom-ink)]">
                   {page.title}
                 </span>
               </div>
 
               <div
                 className={cn(
-                  "group/image relative w-full shrink-0 bg-[#f5f5f7]",
+                  "group/image relative w-full shrink-0 bg-[var(--ecom-parchment)]",
                   isLongScrollPage
                     ? "max-h-[min(72vh,880px)] overflow-y-auto overscroll-y-contain"
                     : "overflow-hidden",
@@ -344,7 +344,7 @@ export function HandCraftComposePanel({
                         alt={page.title}
                         className="block w-full h-auto"
                       />
-                      <div className="sticky bottom-0 flex flex-wrap justify-end gap-1.5 border-t border-[#e8e8ed] bg-white/95 p-2 backdrop-blur-sm sm:gap-2">
+                      <div className="sticky bottom-0 flex flex-wrap justify-end gap-1.5 border-t border-[var(--ecom-divider)] bg-white/95 p-2 backdrop-blur-sm sm:gap-2">
                         {onPreviewImage ? (
                           <button
                             type="button"
@@ -421,12 +421,12 @@ export function HandCraftComposePanel({
                     type="button"
                     disabled={locked}
                     className={cn(
-                      "flex w-full flex-col items-center justify-center gap-1 text-[11px] text-[#6e6e73] disabled:cursor-not-allowed disabled:opacity-60",
+                      "flex w-full flex-col items-center justify-center gap-1 text-[11px] text-[var(--ecom-muted)] disabled:cursor-not-allowed disabled:opacity-60",
                       isLongScrollPage ? "min-h-[240px]" : "h-full",
                     )}
                     onClick={() => void composePages([page.index])}
                   >
-                    <span className="text-sm font-semibold text-[#1d1d1f]">拼版本页</span>
+                    <span className="text-sm font-semibold text-[var(--ecom-ink)]">拼版本页</span>
                     <span>引用前序成图自动排版</span>
                   </button>
                 )}
@@ -437,7 +437,7 @@ export function HandCraftComposePanel({
       </div>
 
       {progress ? (
-        <p className="mt-2 flex items-center gap-2 text-[11px] text-[#6e6e73]">
+        <p className="mt-2 flex items-center gap-2 text-[11px] text-[var(--ecom-muted)]">
           <Loader2 className="h-3.5 w-3.5 animate-spin" />
           {progress}
         </p>

@@ -32,9 +32,9 @@ export function FilmPullStepper({ phase, pendingStep, className }: Props) {
               className={cn(
                 "flex h-7 min-w-7 items-center justify-center rounded-full text-xs font-semibold",
                 done && "bg-[#34c759] text-white",
-                active && !done && !pending && "bg-[#0071e3] text-white",
-                pending && "bg-[#0071e3] text-white",
-                !active && !done && !pending && "bg-[#e8e8ed] text-[#6e6e73]",
+                active && !done && !pending && "bg-[var(--ecom-primary)] text-white",
+                pending && "bg-[var(--ecom-primary)] text-white",
+                !active && !done && !pending && "bg-[var(--ecom-divider)] text-[var(--ecom-muted)]",
               )}
             >
               {pending ? (
@@ -48,13 +48,13 @@ export function FilmPullStepper({ phase, pendingStep, className }: Props) {
             <span
               className={cn(
                 "text-sm font-medium",
-                active || pending ? "text-[#1d1d1f]" : "text-[#6e6e73]",
+                active || pending ? "text-[var(--ecom-ink)]" : "text-[var(--ecom-muted)]",
               )}
             >
               {pending ? `${step.label}中…` : step.label}
             </span>
             {i < STEPS.length - 1 ? (
-              <span className="mx-1 h-px w-8 bg-[#d2d2d7]" aria-hidden />
+              <span className="mx-1 h-px w-8 bg-[var(--ecom-border-soft)]" aria-hidden />
             ) : null}
           </div>
         );

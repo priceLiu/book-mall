@@ -114,7 +114,7 @@ export function ImageBgRemoverPanel({
 
   return (
     <div className="mt-6 space-y-4 sm:mt-8 sm:space-y-6">
-      <div className="rounded-xl border border-sky-100 bg-sky-50/80 px-3 py-3 text-sm leading-relaxed text-[#1d1d1f] sm:px-4">
+      <div className="rounded-xl border border-sky-100 bg-sky-50/80 px-3 py-3 text-sm leading-relaxed text-[var(--ecom-ink)] sm:px-4">
         上传照片即可获得透明 PNG。经 Gateway 调用百炼 / Seedream 模型抠图，无水印。透明模式适合编辑，白色适合电商平台，模糊适合人像，自定义颜色适合缩略图。
       </div>
 
@@ -127,7 +127,7 @@ export function ImageBgRemoverPanel({
         />
 
         <div className="mt-6">
-          <p className="flex items-center gap-1 text-sm font-medium text-[#1d1d1f]">
+          <p className="flex items-center gap-1 text-sm font-medium text-[var(--ecom-ink)]">
             <Palette className="h-4 w-4" />
             后台模式
           </p>
@@ -154,20 +154,20 @@ export function ImageBgRemoverPanel({
                 type="color"
                 value={customColor}
                 onChange={(e) => setCustomColor(e.target.value)}
-                className="h-10 w-14 cursor-pointer rounded border border-[#d2d2d7]"
+                className="h-10 w-14 cursor-pointer rounded border border-[var(--ecom-border-soft)]"
               />
-              <span className="text-sm text-[#6e6e73]">自定义背景色 {customColor}</span>
+              <span className="text-sm text-[var(--ecom-muted)]">自定义背景色 {customColor}</span>
             </div>
           ) : null}
         </div>
 
         <div className="mt-6 grid gap-4 sm:grid-cols-3">
           <div>
-            <label className="text-sm font-medium text-[#1d1d1f]">模型</label>
+            <label className="text-sm font-medium text-[var(--ecom-ink)]">模型</label>
             <select
               value={removalModel}
               onChange={(e) => setRemovalModel(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-[#d2d2d7] bg-white px-3 py-2.5 text-sm"
+              className="mt-1 w-full rounded-lg border border-[var(--ecom-border-soft)] bg-white px-3 py-2.5 text-sm"
             >
               {BG_REMOVAL_MODEL_OPTIONS.map((o) => (
                 <option key={o.id} value={o.id}>
@@ -177,11 +177,11 @@ export function ImageBgRemoverPanel({
             </select>
           </div>
           <div>
-            <label className="text-sm font-medium text-[#1d1d1f]">边缘质量</label>
+            <label className="text-sm font-medium text-[var(--ecom-ink)]">边缘质量</label>
             <select
               value={edgeQuality}
               onChange={(e) => setEdgeQuality(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-[#d2d2d7] bg-white px-3 py-2.5 text-sm"
+              className="mt-1 w-full rounded-lg border border-[var(--ecom-border-soft)] bg-white px-3 py-2.5 text-sm"
             >
               {BG_EDGE_QUALITY_OPTIONS.map((o) => (
                 <option key={o.id} value={o.id}>
@@ -191,11 +191,11 @@ export function ImageBgRemoverPanel({
             </select>
           </div>
           <div>
-            <label className="text-sm font-medium text-[#1d1d1f]">输出格式</label>
+            <label className="text-sm font-medium text-[var(--ecom-ink)]">输出格式</label>
             <select
               value={outputFormat}
               onChange={(e) => setOutputFormat(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-[#d2d2d7] bg-white px-3 py-2.5 text-sm"
+              className="mt-1 w-full rounded-lg border border-[var(--ecom-border-soft)] bg-white px-3 py-2.5 text-sm"
             >
               {BG_OUTPUT_FORMAT_OPTIONS.map((o) => (
                 <option key={o.id} value={o.id}>
@@ -237,12 +237,12 @@ export function ImageBgRemoverPanel({
       </div>
 
       <section className="rounded-2xl border border-[#e5e5ea] bg-white p-4 sm:p-6">
-        <h3 className="text-lg font-semibold text-[#1d1d1f]">你可以删减的内容</h3>
+        <h3 className="text-lg font-semibold text-[var(--ecom-ink)]">你可以删减的内容</h3>
         <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {useCases.map((c) => (
             <div key={c.title} className="rounded-xl border border-[#e5e5ea] bg-[#fafafa] p-4">
-              <p className="font-medium text-[#1d1d1f]">{c.title}</p>
-              <p className="mt-1 text-sm text-[#6e6e73]">{c.desc}</p>
+              <p className="font-medium text-[var(--ecom-ink)]">{c.title}</p>
+              <p className="mt-1 text-sm text-[var(--ecom-muted)]">{c.desc}</p>
             </div>
           ))}
         </div>

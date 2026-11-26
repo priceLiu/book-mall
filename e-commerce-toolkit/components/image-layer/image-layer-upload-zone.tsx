@@ -42,8 +42,8 @@ export function ImageLayerUploadZone({
         "flex flex-1 flex-col items-center justify-center rounded-2xl border border-dashed outline-none transition-colors",
         "min-h-[min(420px,50vh)] w-full cursor-pointer",
         dragOver
-          ? "border-[var(--ecom-outline-border)] bg-[#f0f6ff] ring-2 ring-[#1d1d1f]/15"
-          : "border-[#d2d2d7] bg-[#fafafa] hover:border-[var(--ecom-outline-border)]/50 hover:bg-white",
+          ? "border-[var(--ecom-outline-border)] bg-[var(--ecom-content-selected-bg)] ring-2 ring-[var(--ecom-ink)]/15"
+          : "border-[var(--ecom-border-soft)] bg-[#fafafa] hover:border-[var(--ecom-outline-border)]/50 hover:bg-white",
         className,
       )}
       onClick={(e) => {
@@ -86,8 +86,8 @@ export function ImageLayerUploadZone({
         className={cn(
           "flex h-16 w-16 items-center justify-center rounded-full border transition-colors sm:h-20 sm:w-20",
           dragOver
-            ? "border-[var(--ecom-outline-border)] bg-[#0071e3] text-white"
-            : "border-[#d2d2d7] bg-white text-[#6e6e73] hover:border-[var(--ecom-outline-border)] hover:text-[#0071e3]",
+            ? "border-[var(--ecom-outline-border)] bg-[var(--ecom-primary)] text-white"
+            : "border-[var(--ecom-border-soft)] bg-white text-[var(--ecom-muted)] hover:border-[var(--ecom-outline-border)] hover:text-[var(--ecom-primary)]",
           busy && "opacity-60",
         )}
         aria-label="选择图片文件"
@@ -99,10 +99,10 @@ export function ImageLayerUploadZone({
         )}
       </button>
 
-      <p className="mt-5 text-base font-medium text-[#1d1d1f] sm:text-lg">
+      <p className="mt-5 text-base font-medium text-[var(--ecom-ink)] sm:text-lg">
         {dragOver ? "松开以上传" : busy ? "处理中…" : "点击或拖入图片"}
       </p>
-      <p className="mt-2 text-sm text-[#86868b]">
+      <p className="mt-2 text-sm text-[var(--ecom-subtle)]">
         {pasteReady ? "支持 Ctrl+V / ⌘V 粘贴 · png / jpeg" : "支持拖放、粘贴 · png / jpeg"}
       </p>
       <p className="mt-4 max-w-md px-6 text-center text-xs leading-relaxed text-[#aeaeb2] sm:text-sm">

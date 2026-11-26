@@ -36,13 +36,13 @@ type Props = {
   onAlert: (opts: { title: string; message: string; variant?: "error" }) => Promise<void>;
 };
 
-const sectionClass = "mb-3 rounded-xl border border-[#e8e8ed] bg-white px-3 py-3";
+const sectionClass = "mb-3 rounded-xl border border-[var(--ecom-divider)] bg-white px-3 py-3";
 const optionBtnClass = (active: boolean) =>
   cn(
     "w-full rounded-lg border px-2.5 py-2 text-left text-[11px] transition",
     active
-      ? "border-[var(--ecom-outline-border)] bg-[#f0f6ff]"
-      : "border-transparent hover:border-[#e8e8ed] hover:bg-[#fafafa]",
+      ? "border-[var(--ecom-outline-border)] bg-[var(--ecom-content-selected-bg)]"
+      : "border-transparent hover:border-[var(--ecom-divider)] hover:bg-[#fafafa]",
   );
 
 function ChoiceRow({
@@ -65,9 +65,9 @@ function ChoiceRow({
       className={optionBtnClass(Boolean(active))}
       onClick={onClick}
     >
-      <p className="font-medium text-[#1d1d1f]">{label}</p>
+      <p className="font-medium text-[var(--ecom-ink)]">{label}</p>
       {description ? (
-        <p className="mt-0.5 line-clamp-2 text-[10px] leading-relaxed text-[#86868b]">
+        <p className="mt-0.5 line-clamp-2 text-[10px] leading-relaxed text-[var(--ecom-subtle)]">
           {description}
         </p>
       ) : null}
@@ -215,7 +215,7 @@ export function ModelShotConfigSidebar({
             请先在中栏上传服装参考图。
           </p>
         ) : phaseHint ? (
-          <p className="shrink-0 border-b border-[var(--ecom-assistant-border)] px-4 py-2 text-[10px] text-[#6e6e73]">
+          <p className="shrink-0 border-b border-[var(--ecom-assistant-border)] px-4 py-2 text-[10px] text-[var(--ecom-muted)]">
             {phaseHint}
           </p>
         ) : null}
@@ -228,7 +228,7 @@ export function ModelShotConfigSidebar({
         ) : null}
 
         <section className={sectionClass}>
-          <p className="mb-2 text-xs font-semibold text-[#1d1d1f]">风格调性</p>
+          <p className="mb-2 text-xs font-semibold text-[var(--ecom-ink)]">风格调性</p>
           <div className="space-y-1">
             {MODEL_SHOT_STYLE_CHOICES.map((s) => {
               const active = Boolean(
@@ -251,7 +251,7 @@ export function ModelShotConfigSidebar({
         </section>
 
         <section className={sectionClass}>
-          <p className="mb-2 text-xs font-semibold text-[#1d1d1f]">主要用途</p>
+          <p className="mb-2 text-xs font-semibold text-[var(--ecom-ink)]">主要用途</p>
           <div className="space-y-1">
             {MODEL_SHOT_USAGE_CHOICES.map((u) => {
               const active = brief.platform === u.platform && brief.industry === u.industry;
@@ -272,7 +272,7 @@ export function ModelShotConfigSidebar({
         </section>
 
         <section className={sectionClass}>
-          <p className="mb-2 text-xs font-semibold text-[#1d1d1f]">姿势张数</p>
+          <p className="mb-2 text-xs font-semibold text-[var(--ecom-ink)]">姿势张数</p>
           <div className="flex gap-2">
             {MODEL_SHOT_COUNT_CHOICES.map((c) => (
               <button
@@ -282,8 +282,8 @@ export function ModelShotConfigSidebar({
                 className={cn(
                   "flex-1 rounded-lg border px-2 py-2 text-[11px] font-medium",
                   brief.poseCount === c.poseCount
-                    ? "border-[var(--ecom-outline-border)] bg-[#f0f6ff] text-[#1d1d1f]"
-                    : "border-[#e8e8ed] text-[#6e6e73] hover:bg-[#fafafa]",
+                    ? "border-[var(--ecom-outline-border)] bg-[var(--ecom-content-selected-bg)] text-[var(--ecom-ink)]"
+                    : "border-[var(--ecom-divider)] text-[var(--ecom-muted)] hover:bg-[#fafafa]",
                 )}
                 onClick={() => void persistBrief({ poseCount: c.poseCount })}
               >
@@ -295,13 +295,13 @@ export function ModelShotConfigSidebar({
 
         {summaryRows.length > 0 ? (
           <section className={sectionClass}>
-            <p className="mb-2 text-xs font-semibold text-[#1d1d1f]">采集摘要</p>
+            <p className="mb-2 text-xs font-semibold text-[var(--ecom-ink)]">采集摘要</p>
             <table className="w-full text-[10px]">
               <tbody>
                 {summaryRows.map((row) => (
                   <tr key={row.label} className="border-t border-[#f0f0f5] first:border-t-0">
-                    <td className="py-1 pr-2 text-[#86868b]">{row.label}</td>
-                    <td className="py-1 text-[#1d1d1f]">{row.value}</td>
+                    <td className="py-1 pr-2 text-[var(--ecom-subtle)]">{row.label}</td>
+                    <td className="py-1 text-[var(--ecom-ink)]">{row.value}</td>
                   </tr>
                 ))}
               </tbody>
@@ -310,7 +310,7 @@ export function ModelShotConfigSidebar({
         ) : null}
 
         {phase === "confirm" || phase === "generate" ? (
-          <p className="text-[10px] leading-relaxed text-[#86868b]">
+          <p className="text-[10px] leading-relaxed text-[var(--ecom-subtle)]">
             姿势脚本与出图请在中栏操作：核对表内 Prompt → 确认计划 → 模特图卡片生成。
           </p>
         ) : null}
@@ -318,7 +318,7 @@ export function ModelShotConfigSidebar({
 
       <div className="shrink-0 border-t border-[var(--ecom-assistant-border)] p-4">
         {busy ? (
-          <p className="mb-2 flex items-center gap-2 text-[11px] text-[#6e6e73]">
+          <p className="mb-2 flex items-center gap-2 text-[11px] text-[var(--ecom-muted)]">
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
             {busy}
           </p>
@@ -352,7 +352,7 @@ export function ModelShotConfigSidebar({
           )}
         </EcomButtonPrimary>
         {!readyForPosePlan && garmentReady ? (
-          <p className="mt-2 text-[10px] text-[#86868b]">
+          <p className="mt-2 text-[10px] text-[var(--ecom-subtle)]">
             中栏完成模特后，在此选择风格、用途与张数即可生成。
           </p>
         ) : null}

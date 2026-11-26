@@ -29,7 +29,7 @@ export function EcomPoseLibraryFilterBar({
   return (
     <div className={cn("space-y-2", className)}>
       <div className="flex flex-wrap items-center gap-1.5">
-        <span className="text-[10px] font-medium text-[#86868b]">性别</span>
+        <span className="text-[10px] font-medium text-[var(--ecom-subtle)]">性别</span>
         {ECOM_POSE_GENDER_OPTIONS.map((opt) => {
           const active = selectedGenders.includes(opt.value);
           return (
@@ -39,8 +39,8 @@ export function EcomPoseLibraryFilterBar({
               className={cn(
                 "rounded-full border px-2 py-0.5 text-[10px] transition-colors",
                 active
-                  ? "border-[var(--ecom-outline-border)] bg-[#f0f6ff] text-[#0071e3]"
-                  : "border-[#d2d2d7] bg-white text-[#424245] hover:border-[#86868b]",
+                  ? "border-[var(--ecom-outline-border)] bg-[var(--ecom-content-selected-bg)] text-[var(--ecom-primary)]"
+                  : "border-[var(--ecom-border-soft)] bg-white text-[#424245] hover:border-[var(--ecom-subtle)]",
               )}
               onClick={() => onGendersChange(toggleValue(selectedGenders, opt.value))}
             >
@@ -51,7 +51,7 @@ export function EcomPoseLibraryFilterBar({
         {selectedGenders.length ? (
           <button
             type="button"
-            className="text-[10px] text-[#86868b] underline"
+            className="text-[10px] text-[var(--ecom-subtle)] underline"
             onClick={() => onGendersChange([])}
           >
             清除
@@ -59,7 +59,7 @@ export function EcomPoseLibraryFilterBar({
         ) : null}
       </div>
       <div className="flex flex-wrap items-center gap-1.5">
-        <span className="text-[10px] font-medium text-[#86868b]">标签</span>
+        <span className="text-[10px] font-medium text-[var(--ecom-subtle)]">标签</span>
         {ECOM_POSE_SCENE_TAG_OPTIONS.map((opt) => {
           const active = selectedSceneTags.includes(opt.value);
           return (
@@ -69,8 +69,8 @@ export function EcomPoseLibraryFilterBar({
               className={cn(
                 "rounded-full border px-2 py-0.5 text-[10px] transition-colors",
                 active
-                  ? "border-[var(--ecom-outline-border)] bg-[#f0f6ff] text-[#0071e3]"
-                  : "border-[#d2d2d7] bg-white text-[#424245] hover:border-[#86868b]",
+                  ? "border-[var(--ecom-outline-border)] bg-[var(--ecom-content-selected-bg)] text-[var(--ecom-primary)]"
+                  : "border-[var(--ecom-border-soft)] bg-white text-[#424245] hover:border-[var(--ecom-subtle)]",
               )}
               onClick={() => onSceneTagsChange(toggleValue(selectedSceneTags, opt.value))}
             >
@@ -81,7 +81,7 @@ export function EcomPoseLibraryFilterBar({
         {selectedSceneTags.length ? (
           <button
             type="button"
-            className="text-[10px] text-[#86868b] underline"
+            className="text-[10px] text-[var(--ecom-subtle)] underline"
             onClick={() => onSceneTagsChange([])}
           >
             清除

@@ -209,7 +209,7 @@ export function SubtitleBurnInPreview({
           textAlign: "center",
           fontSize: 11,
           lineHeight: 1.35,
-          color: "#86868b",
+          color: "var(--ecom-subtle)",
         }}
       >
         {aspectLabel ? `${aspectLabel} · ` : ""}

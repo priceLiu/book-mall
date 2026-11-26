@@ -33,7 +33,7 @@ export function EcomSaveToPoseLibraryButton({
     <>
       <button
         type="button"
-        className={cn("text-[10px] text-[#0071e3] underline-offset-2 hover:underline", className)}
+        className={cn("text-[10px] text-[var(--ecom-primary)] underline-offset-2 hover:underline", className)}
         onClick={(e) => {
           e.stopPropagation();
           setOpen(true);

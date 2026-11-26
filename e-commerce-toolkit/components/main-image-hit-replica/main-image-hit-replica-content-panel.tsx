@@ -93,9 +93,9 @@ export function MainImageHitReplicaContentPanel({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
-      <div className="border-b border-[#e8e8ed] px-5 py-4">
+      <div className="border-b border-[var(--ecom-divider)] px-5 py-4">
         <EcomWorkspaceTitleHeading title="爆款图复刻" />
-        <p className="mt-1 text-[11px] text-[#6e6e73]">
+        <p className="mt-1 text-[11px] text-[var(--ecom-muted)]">
           在中栏先上传产品原图（可选），再上传爆款参考图；右侧配置后一键复刻。
         </p>
       </div>
@@ -103,8 +103,8 @@ export function MainImageHitReplicaContentPanel({
       <div className="space-y-6 px-5 py-5">
         <section>
           <div className="mb-2 flex items-center gap-1">
-            <h3 className="text-[11px] font-semibold text-[#1d1d1f]">产品原图</h3>
-            <span className="text-[10px] text-[#86868b]">（选填）</span>
+            <h3 className="text-[11px] font-semibold text-[var(--ecom-ink)]">产品原图</h3>
+            <span className="text-[10px] text-[var(--ecom-subtle)]">（选填）</span>
           </div>
           {productRefs.length > 0 ? (
             <>
@@ -164,10 +164,10 @@ export function MainImageHitReplicaContentPanel({
 
         <section>
           <div className="mb-2 flex items-center justify-between gap-2">
-            <h3 className="text-[11px] font-semibold text-[#1d1d1f]">参考内容</h3>
+            <h3 className="text-[11px] font-semibold text-[var(--ecom-ink)]">参考内容</h3>
             <button
               type="button"
-              className="text-[10px] text-[#86868b] hover:text-[#1d1d1f]"
+              className="text-[10px] text-[var(--ecom-subtle)] hover:text-[var(--ecom-ink)]"
               onClick={() =>
                 void alert({
                   title: "图片采集插件",
@@ -184,8 +184,8 @@ export function MainImageHitReplicaContentPanel({
               className={cn(
                 "text-[11px]",
                 refTab === "upload"
-                  ? "font-semibold text-[#1d1d1f]"
-                  : "text-[#86868b]",
+                  ? "font-semibold text-[var(--ecom-ink)]"
+                  : "text-[var(--ecom-subtle)]",
               )}
               onClick={() => setRefTab("upload")}
             >
@@ -195,7 +195,7 @@ export function MainImageHitReplicaContentPanel({
               type="button"
               className={cn(
                 "text-[11px]",
-                refTab === "link" ? "font-semibold text-[#1d1d1f]" : "text-[#86868b]",
+                refTab === "link" ? "font-semibold text-[var(--ecom-ink)]" : "text-[var(--ecom-subtle)]",
               )}
               onClick={() => {
                 setRefTab("link");
@@ -233,22 +233,22 @@ export function MainImageHitReplicaContentPanel({
                   />
                 ) : null}
               </div>
-              <div className="mb-3 rounded-xl border border-[#e8e8ed] bg-[#f5f5f7]">
+              <div className="mb-3 rounded-xl border border-[var(--ecom-divider)] bg-[var(--ecom-parchment)]">
                 <button
                   type="button"
-                  className="flex w-full items-center justify-between px-3 py-2.5 text-[11px] font-semibold text-[#1d1d1f]"
+                  className="flex w-full items-center justify-between px-3 py-2.5 text-[11px] font-semibold text-[var(--ecom-ink)]"
                   onClick={() => setPerRefOpen((v) => !v)}
                 >
                   单张参考要求
                   {perRefOpen ? (
-                    <ChevronUp className="h-3.5 w-3.5 text-[#86868b]" />
+                    <ChevronUp className="h-3.5 w-3.5 text-[var(--ecom-subtle)]" />
                   ) : (
-                    <ChevronDown className="h-3.5 w-3.5 text-[#86868b]" />
+                    <ChevronDown className="h-3.5 w-3.5 text-[var(--ecom-subtle)]" />
                   )}
                 </button>
                 {perRefOpen ? (
-                  <div className="space-y-2 border-t border-[#e8e8ed] px-3 py-3">
-                    <p className="text-[10px] leading-relaxed text-[#86868b]">
+                  <div className="space-y-2 border-t border-[var(--ecom-divider)] px-3 py-3">
+                    <p className="text-[10px] leading-relaxed text-[var(--ecom-subtle)]">
                       每张参考图可单独备注参考要求，不填默认处理。
                     </p>
                     {referenceRefs.map((ref, i) => {
@@ -256,7 +256,7 @@ export function MainImageHitReplicaContentPanel({
                         perRefDraft[ref.id] ?? ref.referenceRequirement ?? "";
                       return (
                         <label key={ref.id} className="block">
-                          <span className="mb-1 block text-[10px] font-medium text-[#6e6e73]">
+                          <span className="mb-1 block text-[10px] font-medium text-[var(--ecom-muted)]">
                             参考图{i + 1}
                           </span>
                           <input
@@ -264,7 +264,7 @@ export function MainImageHitReplicaContentPanel({
                             disabled={replicating}
                             placeholder="参考要求（选填）"
                             value={draft}
-                            className="w-full rounded-lg border border-[#e8e8ed] bg-white px-2.5 py-2 text-[11px] text-[#1d1d1f] placeholder:text-[#c7c7cc] focus:border-[var(--ecom-chrome-accent)] focus:outline-none"
+                            className="w-full rounded-lg border border-[var(--ecom-divider)] bg-white px-2.5 py-2 text-[11px] text-[var(--ecom-ink)] placeholder:text-[#c7c7cc] focus:border-[var(--ecom-chrome-accent)] focus:outline-none"
                             onChange={(e) =>
                               setPerRefDraft((prev) => ({
                                 ...prev,
@@ -325,7 +325,7 @@ export function MainImageHitReplicaContentPanel({
 
         {results.length > 0 ? (
           <section>
-            <h3 className="mb-3 text-[11px] font-semibold text-[#1d1d1f]">复刻结果</h3>
+            <h3 className="mb-3 text-[11px] font-semibold text-[var(--ecom-ink)]">复刻结果</h3>
             <div className={ECOM_WORKSPACE_RESULT_GRID_CLASS}>
               {results.map((row) => (
                 <article
@@ -370,7 +370,7 @@ export function MainImageHitReplicaContentPanel({
             </div>
           </section>
         ) : (
-          <div className="flex items-center gap-2 rounded-lg border border-dashed border-[#e8e8ed] px-4 py-8 text-[11px] text-[#86868b]">
+          <div className="flex items-center gap-2 rounded-lg border border-dashed border-[var(--ecom-divider)] px-4 py-8 text-[11px] text-[var(--ecom-subtle)]">
             <Link2 className="h-4 w-4 shrink-0" />
             上传参考图并在右下「一键复刻爆款图（N）」后，成片将按统一规格追加展示在此
           </div>
@@ -382,7 +382,7 @@ export function MainImageHitReplicaContentPanel({
 
 function PendingResultPlaceholder({ label = "待出图" }: { label?: string }) {
   return (
-    <div className="flex h-full items-center justify-center text-[11px] text-[#86868b]">
+    <div className="flex h-full items-center justify-center text-[11px] text-[var(--ecom-subtle)]">
       {label}
     </div>
   );
@@ -411,7 +411,7 @@ function HitReplicaUploadProgress({
           }
         />
       </div>
-      <p className="text-[10px] text-[#0071e3]">
+      <p className="text-[10px] text-[var(--ecom-primary)]">
         {typeof progress === "number" && progress >= 100 ? "完成" : label}
       </p>
     </div>
@@ -438,7 +438,7 @@ function HitReplicaRefThumb({
         removeLabel={`删除${caption}`}
         onRemove={removeDisabled ? undefined : onRemove}
       />
-      <p className="mt-1 truncate text-center text-[10px] text-[#86868b]">{caption}</p>
+      <p className="mt-1 truncate text-center text-[10px] text-[var(--ecom-subtle)]">{caption}</p>
     </div>
   );
 }
@@ -485,8 +485,8 @@ function HitReplicaPasteUploadZone({
       className={cn(
         "flex w-full min-h-[7.5rem] flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed px-4 py-5 text-center outline-none transition-colors",
         dragOver
-          ? "border-[var(--ecom-chrome-accent)] bg-[#f0f6ff] ring-2 ring-[#1d1d1f]/10"
-          : "border-[#d2d2d7] text-[#6e6e73] hover:border-[var(--ecom-chrome-accent)]",
+          ? "border-[var(--ecom-chrome-accent)] bg-[var(--ecom-content-selected-bg)] ring-2 ring-[var(--ecom-ink)]/10"
+          : "border-[var(--ecom-border-soft)] text-[var(--ecom-muted)] hover:border-[var(--ecom-chrome-accent)]",
         disabled && "pointer-events-none opacity-50",
       )}
       onClick={(e) => {
@@ -524,12 +524,12 @@ function HitReplicaPasteUploadZone({
         onClick={(e) => e.stopPropagation()}
       />
       {uploading ? (
-        <Loader2 className="h-6 w-6 animate-spin text-[#0071e3]" aria-hidden />
+        <Loader2 className="h-6 w-6 animate-spin text-[var(--ecom-primary)]" aria-hidden />
       ) : (
-        <Plus className="h-6 w-6 text-[#86868b]" />
+        <Plus className="h-6 w-6 text-[var(--ecom-subtle)]" />
       )}
       <span className="text-[11px] font-medium text-[#424245]">{title}</span>
-      <span className="max-w-md text-[10px] leading-relaxed text-[#86868b]">{hint}</span>
+      <span className="max-w-md text-[10px] leading-relaxed text-[var(--ecom-subtle)]">{hint}</span>
       <span className="text-[10px] text-[#c7c7cc]">
         {dragOver
           ? "松开以上传"
@@ -575,8 +575,8 @@ function HitReplicaRefAddTile({
         className={cn(
           "flex h-[72px] w-[72px] cursor-pointer flex-col items-center justify-center gap-0.5 rounded-lg border border-dashed p-1 outline-none transition-colors",
           dragOver
-            ? "border-[var(--ecom-chrome-accent)] bg-[#f0f6ff]"
-            : "border-[#d2d2d7] text-[#86868b] hover:border-[var(--ecom-chrome-accent)]",
+            ? "border-[var(--ecom-chrome-accent)] bg-[var(--ecom-content-selected-bg)]"
+            : "border-[var(--ecom-border-soft)] text-[var(--ecom-subtle)] hover:border-[var(--ecom-chrome-accent)]",
           disabled && "pointer-events-none opacity-50",
         )}
         role="button"
@@ -606,7 +606,7 @@ function HitReplicaRefAddTile({
                 }}
               />
             </div>
-            <Loader2 className="h-4 w-4 animate-spin text-[#0071e3]" />
+            <Loader2 className="h-4 w-4 animate-spin text-[var(--ecom-primary)]" />
           </>
         ) : (
           <Plus className="h-5 w-5" />

@@ -452,7 +452,7 @@ export function ProductDesignPromptMentionTextarea({
   const pickerPanel = popoverOpen ? (
     <div
       ref={pickerRef}
-      className="pointer-events-none overflow-hidden rounded-xl border border-[#e8e8ed] bg-white shadow-lg"
+      className="pointer-events-none overflow-hidden rounded-xl border border-[var(--ecom-divider)] bg-white shadow-lg"
       style={{
         position: "fixed",
         left: pickerPos?.left ?? -9999,
@@ -465,11 +465,11 @@ export function ProductDesignPromptMentionTextarea({
       aria-label="选择引用图片"
     >
       {referenceImages.length === 0 ? (
-        <p className="px-4 py-3 text-xs text-[#86868b]">
+        <p className="px-4 py-3 text-xs text-[var(--ecom-subtle)]">
           请先上传风格参考与产品实拍，再输入 @ 引用
         </p>
       ) : filteredImages.length === 0 ? (
-        <p className="px-4 py-3 text-xs text-[#86868b]">没有匹配的参考图</p>
+        <p className="px-4 py-3 text-xs text-[var(--ecom-subtle)]">没有匹配的参考图</p>
       ) : (
         <ul className="pointer-events-auto max-h-[260px] overflow-y-auto p-2">
           {filteredImages.map((item, listIndex) => {
@@ -482,13 +482,13 @@ export function ProductDesignPromptMentionTextarea({
                   aria-selected={active}
                   className={cn(
                     "flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left transition",
-                    active ? "bg-[#f0f6ff]" : "hover:bg-[#f5f5f7]",
+                    active ? "bg-[var(--ecom-content-selected-bg)]" : "hover:bg-[var(--ecom-parchment)]",
                   )}
                   onMouseEnter={() => setPopoverIndex(listIndex)}
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => insertImageRef(item.index)}
                 >
-                  <span className="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-[#f5f5f7]">
+                  <span className="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-[var(--ecom-parchment)]">
                     {item.cropBbox ? (
                       <NormalizedBboxCropImg
                         url={item.url}
@@ -501,10 +501,10 @@ export function ProductDesignPromptMentionTextarea({
                     )}
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block text-sm font-medium text-[#1d1d1f]">
+                    <span className="block text-sm font-medium text-[var(--ecom-ink)]">
                       {item.token} · {mentionRefRoleLabel(item.role, item.kind)}
                     </span>
-                    <span className="block truncate text-xs text-[#86868b]">{item.label}</span>
+                    <span className="block truncate text-xs text-[var(--ecom-subtle)]">{item.label}</span>
                   </span>
                 </button>
               </li>
@@ -518,7 +518,7 @@ export function ProductDesignPromptMentionTextarea({
   return (
     <div ref={wrapperRef} className="relative">
       {showEmbeddedRefBar ? (
-        <div className="mb-2 rounded-lg border border-[#e8e8ed] bg-[#fafafa] px-2.5 py-2">
+        <div className="mb-2 rounded-lg border border-[var(--ecom-divider)] bg-[#fafafa] px-2.5 py-2">
           <EcomPromptMentionRefBar refs={refBarImages} hint={refBarHint} />
         </div>
       ) : null}
@@ -531,7 +531,7 @@ export function ProductDesignPromptMentionTextarea({
         suppressContentEditableWarning
         spellCheck={false}
         className={cn(
-          "w-full whitespace-pre-wrap break-words rounded-lg border border-[#e8e8ed] px-3 py-2 text-[12px] leading-relaxed outline-none focus-visible:ring-2 focus-visible:ring-[#1d1d1f]/15",
+          "w-full whitespace-pre-wrap break-words rounded-lg border border-[var(--ecom-divider)] px-3 py-2 text-[12px] leading-relaxed outline-none focus-visible:ring-2 focus-visible:ring-[var(--ecom-ink)]/15",
           minHeightClass,
           className,
         )}
@@ -550,7 +550,7 @@ export function ProductDesignPromptMentionTextarea({
         }}
       />
       {isEmpty ? (
-        <p className="mt-1 text-[10px] text-[#86868b]">
+        <p className="mt-1 text-[10px] text-[var(--ecom-subtle)]">
           {mentionBadgeVariant === "top-bar-bound"
             ? "输入 @ 插入代号（如 人物A）；参考图见上方顶栏"
             : "输入 @ 引用参考图，或点下方缩略图快速插入"}
@@ -565,7 +565,7 @@ export function ProductDesignPromptMentionTextarea({
               tabIndex={disabled ? -1 : 0}
               aria-disabled={disabled || undefined}
               className={cn(
-                "inline-flex cursor-pointer items-center gap-1 rounded-lg border border-[#e8e8ed] bg-white px-1.5 py-0.5 text-[10px] text-[#6e6e73] hover:border-[var(--ecom-outline-border)] hover:bg-[#f0f6ff]",
+                "inline-flex cursor-pointer items-center gap-1 rounded-lg border border-[var(--ecom-divider)] bg-white px-1.5 py-0.5 text-[10px] text-[var(--ecom-muted)] hover:border-[var(--ecom-outline-border)] hover:bg-[var(--ecom-content-selected-bg)]",
                 disabled && "pointer-events-none opacity-50",
               )}
               title={`插入 ${item.token}`}
@@ -609,7 +609,7 @@ export function ProductDesignPromptMentionTextarea({
         ? createPortal(
             <div
               ref={hoverPreviewRef}
-              className="pointer-events-none overflow-hidden rounded-xl border border-[#e8e8ed] bg-white shadow-xl"
+              className="pointer-events-none overflow-hidden rounded-xl border border-[var(--ecom-divider)] bg-white shadow-xl"
               style={{
                 position: "fixed",
                 left: hoverPreview.left,
@@ -635,7 +635,7 @@ export function ProductDesignPromptMentionTextarea({
                   referrerPolicy="no-referrer"
                 />
               )}
-              <p className="truncate px-2 py-1.5 text-[11px] text-[#6e6e73]">{hoverPreview.label}</p>
+              <p className="truncate px-2 py-1.5 text-[11px] text-[var(--ecom-muted)]">{hoverPreview.label}</p>
             </div>,
             document.body,
           )

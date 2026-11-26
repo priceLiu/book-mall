@@ -66,13 +66,13 @@ export function SeedVideoRenderProgressPanel({
       <button
         type="button"
         className={cn(
-          "fixed bottom-4 right-4 z-[90] flex max-w-[min(100vw-2rem,320px)] items-center gap-2 rounded-full border border-[#e8e8ed] bg-white px-4 py-2 text-xs font-medium text-[#1d1d1f] shadow-lg transition-all ease-in-out",
+          "fixed bottom-4 right-4 z-[90] flex max-w-[min(100vw-2rem,320px)] items-center gap-2 rounded-full border border-[var(--ecom-divider)] bg-white px-4 py-2 text-xs font-medium text-[var(--ecom-ink)] shadow-lg transition-all ease-in-out",
           dismissing &&
             "pointer-events-none translate-y-6 opacity-0 duration-[1400ms]",
         )}
         onClick={() => onPanelOpenChange(true)}
       >
-        <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-[#0071e3]" />
+        <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-[var(--ecom-primary)]" />
         <span className="truncate">
           合成中 {pct}% · {state.progressLabel}
         </span>
@@ -87,16 +87,16 @@ export function SeedVideoRenderProgressPanel({
   return createPortal(
     <div
       className={cn(
-        "fixed bottom-4 right-4 z-[90] w-[min(100vw-2rem,380px)] overflow-hidden rounded-xl border border-[#e8e8ed] bg-white shadow-lg transition-all ease-in-out",
+        "fixed bottom-4 right-4 z-[90] w-[min(100vw-2rem,380px)] overflow-hidden rounded-xl border border-[var(--ecom-divider)] bg-white shadow-lg transition-all ease-in-out",
         dismissing && "pointer-events-none translate-y-8 opacity-0 duration-[1400ms]",
       )}
     >
-      <div className="flex items-center justify-between border-b border-[#e8e8ed] bg-[#f5f5f7] px-3 py-2">
+      <div className="flex items-center justify-between border-b border-[var(--ecom-divider)] bg-[var(--ecom-parchment)] px-3 py-2">
         <div className="min-w-0 flex-1 pr-2">
-          <p className="text-xs font-semibold text-[#1d1d1f]">
+          <p className="text-xs font-semibold text-[var(--ecom-ink)]">
             {seedVideoRenderPhaseTitle(state.phase)}
           </p>
-          <p className="truncate text-[10px] text-[#6e6e73]">
+          <p className="truncate text-[10px] text-[var(--ecom-muted)]">
             {active ? `已用时 ${formatSeedVideoRenderElapsed(state.startedAt)}` : "任务已结束"}
             {active ? ` · ${pct}%` : ""}
           </p>
@@ -104,7 +104,7 @@ export function SeedVideoRenderProgressPanel({
         <div className="flex shrink-0 items-center gap-1">
           <button
             type="button"
-            className="rounded p-1 text-[#6e6e73] hover:bg-white"
+            className="rounded p-1 text-[var(--ecom-muted)] hover:bg-white"
             aria-label={state.collapsed ? "展开" : "折叠"}
             onClick={() => onCollapsedChange(!state.collapsed)}
           >
@@ -116,7 +116,7 @@ export function SeedVideoRenderProgressPanel({
           </button>
           <button
             type="button"
-            className="rounded p-1 text-[#6e6e73] hover:bg-white"
+            className="rounded p-1 text-[var(--ecom-muted)] hover:bg-white"
             aria-label="收起为小窗"
             onClick={() => onPanelOpenChange(false)}
           >
@@ -126,27 +126,27 @@ export function SeedVideoRenderProgressPanel({
       </div>
 
       <div className="px-3 py-2">
-        <div className="mb-2 h-1.5 overflow-hidden rounded-full bg-[#e8e8ed]">
+        <div className="mb-2 h-1.5 overflow-hidden rounded-full bg-[var(--ecom-divider)]">
           <div
             className={cn(
               "h-full rounded-full transition-[width] duration-500",
-              state.phase === "failed" ? "bg-[#ff3b30]" : "bg-[#0071e3]",
+              state.phase === "failed" ? "bg-[#ff3b30]" : "bg-[var(--ecom-primary)]",
             )}
             style={{ width: `${pct}%` }}
           />
         </div>
-        <p className="text-[11px] font-medium text-[#1d1d1f]">{currentStep}</p>
+        <p className="text-[11px] font-medium text-[var(--ecom-ink)]">{currentStep}</p>
       </div>
 
       {!state.collapsed ? (
-        <ul className="max-h-52 overflow-y-auto border-t border-[#e8e8ed] px-3 py-2">
+        <ul className="max-h-52 overflow-y-auto border-t border-[var(--ecom-divider)] px-3 py-2">
           {completedSteps.length === 0 ? (
-            <li className="py-2 text-[11px] text-[#86868b]">步骤详情将在此显示…</li>
+            <li className="py-2 text-[11px] text-[var(--ecom-subtle)]">步骤详情将在此显示…</li>
           ) : (
             completedSteps.map((step, i) => (
               <li
                 key={`${i}-${step}`}
-                className="mb-1.5 flex items-start gap-2 text-[11px] text-[#6e6e73] last:mb-0"
+                className="mb-1.5 flex items-start gap-2 text-[11px] text-[var(--ecom-muted)] last:mb-0"
               >
                 <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#34c759]" />
                 <span className="leading-relaxed">{step}</span>
@@ -154,7 +154,7 @@ export function SeedVideoRenderProgressPanel({
             ))
           )}
           {active ? (
-            <li className="mt-1 flex items-start gap-2 text-[11px] font-medium text-[#0071e3]">
+            <li className="mt-1 flex items-start gap-2 text-[11px] font-medium text-[var(--ecom-primary)]">
               <Loader2 className="mt-0.5 h-3.5 w-3.5 shrink-0 animate-spin" />
               <span className="leading-relaxed">{currentStep}</span>
             </li>

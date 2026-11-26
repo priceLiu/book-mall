@@ -633,8 +633,8 @@ export function ProductCreationStudio({ module }: StudioProps) {
     return (
       <EcomWorkspaceLayout fullWidth>
         <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4 px-6 py-16 text-center">
-          <h2 className="text-xl font-semibold text-[#1d1d1f]">{entry.title}</h2>
-          <p className="max-w-md text-sm text-[#6e6e73]">{entry.blurb}</p>
+          <h2 className="text-xl font-semibold text-[var(--ecom-ink)]">{entry.title}</h2>
+          <p className="max-w-md text-sm text-[var(--ecom-muted)]">{entry.blurb}</p>
           <div className="flex flex-wrap items-center justify-center gap-2">
             <EcomButtonSecondary
               type="button"

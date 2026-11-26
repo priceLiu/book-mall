@@ -127,10 +127,10 @@ export function OutfitModelRefsPanel({
 
   return (
     <>
-      <section className="space-y-3 rounded-xl border border-[#e8e8ed] bg-white p-4">
+      <section className="space-y-3 rounded-xl border border-[var(--ecom-divider)] bg-white p-4">
         <div>
-          <h2 className="text-sm font-semibold text-[#1d1d1f]">穿搭参考</h2>
-          <p className="mt-1 text-xs text-[#6e6e73]">
+          <h2 className="text-sm font-semibold text-[var(--ecom-ink)]">穿搭参考</h2>
+          <p className="mt-1 text-xs text-[var(--ecom-muted)]">
             上传并选择参考图，以便对人物比例、构图与风格进行针对性参考；场景图用于后续融图。
           </p>
         </div>
@@ -194,18 +194,18 @@ export function OutfitModelRefsPanel({
         />
 
         {sceneLibraryPreset?.entryName && !sceneCardItems.length ? (
-          <div className="flex items-center gap-2 rounded-lg border border-[#e8e8ed] bg-[#fafafa] px-2.5 py-2">
-            <BookOpen className="h-3.5 w-3.5 shrink-0 text-[#0071e3]" />
+          <div className="flex items-center gap-2 rounded-lg border border-[var(--ecom-divider)] bg-[#fafafa] px-2.5 py-2">
+            <BookOpen className="h-3.5 w-3.5 shrink-0 text-[var(--ecom-primary)]" />
             <div className="min-w-0 flex-1">
-              <p className="truncate text-xs font-medium text-[#1d1d1f]">
+              <p className="truncate text-xs font-medium text-[var(--ecom-ink)]">
                 {sceneLibraryPreset.entryName}
               </p>
-              <p className="truncate text-[10px] text-[#86868b]">场景词库 · 无参考图</p>
+              <p className="truncate text-[10px] text-[var(--ecom-subtle)]">场景词库 · 无参考图</p>
             </div>
             {!refsDisabled ? (
               <button
                 type="button"
-                className="rounded-full p-1 text-[#86868b] hover:bg-[#e8e8ed] hover:text-[#1d1d1f]"
+                className="rounded-full p-1 text-[var(--ecom-subtle)] hover:bg-[var(--ecom-divider)] hover:text-[var(--ecom-ink)]"
                 aria-label="清除场景词库"
                 onClick={() => void onRemoveSceneRef()}
               >
@@ -216,7 +216,7 @@ export function OutfitModelRefsPanel({
         ) : null}
 
         {refsLocked ? (
-          <p className="text-[11px] text-[#86868b]">
+          <p className="text-[11px] text-[var(--ecom-subtle)]">
             参考图已锁定，如需更改请先解锁或新建项目。
           </p>
         ) : null}

@@ -142,11 +142,11 @@ export function FilmPullProductionPanel({
   const pickerModels = picker.kind === "image" ? imageModels : videoModels;
 
   return (
-    <div className="space-y-3 rounded-xl border border-[#e8e8ed] bg-white p-4">
+    <div className="space-y-3 rounded-xl border border-[var(--ecom-divider)] bg-white p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h2 className="text-sm font-semibold text-[#1d1d1f]">制作成片</h2>
-          <p className="text-[11px] text-[#6e6e73]">可选逐镜生图，再逐镜生视频；也可直接生视频。</p>
+          <h2 className="text-sm font-semibold text-[var(--ecom-ink)]">制作成片</h2>
+          <p className="text-[11px] text-[var(--ecom-muted)]">可选逐镜生图，再逐镜生视频；也可直接生视频。</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <EcomButtonSecondary
@@ -179,7 +179,7 @@ export function FilmPullProductionPanel({
 
       {finalUrl ? (
         <div className="rounded-lg border border-[#d4edda] bg-[#f6fff8] p-3">
-          <p className="mb-2 text-xs font-medium text-[#1d1d1f]">成片预览</p>
+          <p className="mb-2 text-xs font-medium text-[var(--ecom-ink)]">成片预览</p>
           <EcomButtonSecondary size="sm" type="button" onClick={() => onPreviewVideo(finalUrl, "制作成片")}>
             播放成片
           </EcomButtonSecondary>
@@ -189,7 +189,7 @@ export function FilmPullProductionPanel({
       <div className="overflow-x-auto">
         <table className="w-full min-w-[960px] border-collapse text-xs">
           <thead>
-            <tr className="border-b border-[#e8e8ed] text-left text-[#6e6e73]">
+            <tr className="border-b border-[var(--ecom-divider)] text-left text-[var(--ecom-muted)]">
               <th className="px-2 py-2 font-medium">镜</th>
               <th className="px-2 py-2 font-medium">时间</th>
               <th className="px-2 py-2 font-medium">生图 Prompt</th>
@@ -203,13 +203,13 @@ export function FilmPullProductionPanel({
             {plan.shots.map((shot) => (
               <tr key={shot.shotNo} className="border-b border-[#f0f0f2] align-top">
                 <td className="px-2 py-2 font-medium">{shot.shotNo}</td>
-                <td className="whitespace-nowrap px-2 py-2 text-[#6e6e73]">
+                <td className="whitespace-nowrap px-2 py-2 text-[var(--ecom-muted)]">
                   {shot.startTimeSec.toFixed(1)}–{shot.endTimeSec.toFixed(1)}s
                 </td>
                 <td className="max-w-[10rem] px-2 py-2">
                   <textarea
                     key={`img-${shot.shotNo}-${shot.imagePrompt}`}
-                    className="min-h-[3rem] w-full rounded border border-[#e8e8ed] p-1 text-[10px]"
+                    className="min-h-[3rem] w-full rounded border border-[var(--ecom-divider)] p-1 text-[10px]"
                     defaultValue={shot.imagePrompt}
                     disabled={locked}
                     onBlur={(e) => {
@@ -223,15 +223,15 @@ export function FilmPullProductionPanel({
                 <td className="px-2 py-2">
                   {shot.imageUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={shot.imageUrl} alt="" className="h-14 w-14 rounded object-cover ring-1 ring-[#e8e8ed]" />
+                    <img src={shot.imageUrl} alt="" className="h-14 w-14 rounded object-cover ring-1 ring-[var(--ecom-divider)]" />
                   ) : (
-                    <span className="text-[#86868b]">—</span>
+                    <span className="text-[var(--ecom-subtle)]">—</span>
                   )}
                 </td>
                 <td className="max-w-[10rem] px-2 py-2">
                   <textarea
                     key={`vid-${shot.shotNo}-${shot.videoPrompt}`}
-                    className="min-h-[3rem] w-full rounded border border-[#e8e8ed] p-1 text-[10px]"
+                    className="min-h-[3rem] w-full rounded border border-[var(--ecom-divider)] p-1 text-[10px]"
                     defaultValue={shot.videoPrompt}
                     disabled={locked}
                     onBlur={(e) => {
@@ -246,13 +246,13 @@ export function FilmPullProductionPanel({
                   {shot.videoUrl ? (
                     <button
                       type="button"
-                      className="text-[#0071e3] underline"
+                      className="text-[var(--ecom-primary)] underline"
                       onClick={() => onPreviewVideo(shot.videoUrl!, `镜 ${shot.shotNo}`)}
                     >
                       预览
                     </button>
                   ) : (
-                    <span className="text-[#86868b]">—</span>
+                    <span className="text-[var(--ecom-subtle)]">—</span>
                   )}
                 </td>
                 <td className="px-2 py-2">

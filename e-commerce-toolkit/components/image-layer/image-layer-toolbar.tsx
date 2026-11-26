@@ -29,7 +29,7 @@ import { cn } from "@/lib/utils";
 function ToolbarDivider() {
   return (
     <div
-      className="mx-0.5 hidden h-6 w-px shrink-0 bg-[#d2d2d7] sm:block"
+      className="mx-0.5 hidden h-6 w-px shrink-0 bg-[var(--ecom-border-soft)] sm:block"
       aria-hidden
     />
   );
@@ -107,7 +107,7 @@ export function ImageLayerToolbar({
   };
 
   return (
-    <header className="z-20 border-b border-[#e8e8ed] bg-white px-5 py-3 shadow-[0_1px_0_0_rgba(0,0,0,0.04)]">
+    <header className="z-20 border-b border-[var(--ecom-divider)] bg-white px-5 py-3 shadow-[0_1px_0_0_rgba(0,0,0,0.04)]">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <EcomWorkspaceTitleHeading
           guideModuleId="image-layer"
@@ -116,7 +116,7 @@ export function ImageLayerToolbar({
             <span className="truncate">{projectTitle?.trim() || "图片处理"}</span>
           }
         >
-          <p className="text-[11px] text-[#6e6e73]">
+          <p className="text-[11px] text-[var(--ecom-muted)]">
             背景与主体 / 擦除 / 重绘 / 拆层
           </p>
         </EcomWorkspaceTitleHeading>

@@ -87,7 +87,7 @@ export function OutfitShotSceneFusionCell({
 
   return (
     <div className="relative flex min-w-[9rem] flex-col gap-1.5">
-      <div className="relative aspect-[9/16] w-14 overflow-hidden rounded-md border border-[#e8e8ed] bg-[#fafafa]">
+      <div className="relative aspect-[9/16] w-14 overflow-hidden rounded-md border border-[var(--ecom-divider)] bg-[#fafafa]">
         {fusedUrl ? (
           <>
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -107,17 +107,17 @@ export function OutfitShotSceneFusionCell({
             ) : null}
           </>
         ) : (
-          <div className="flex h-full items-center justify-center px-1 text-center text-[9px] leading-tight text-[#86868b]">
+          <div className="flex h-full items-center justify-center px-1 text-center text-[9px] leading-tight text-[var(--ecom-subtle)]">
             场景图
           </div>
         )}
         {fusing ? (
           <div className="absolute inset-0 flex items-center justify-center bg-white/70">
-            <Loader2 className="h-4 w-4 animate-spin text-[#0071e3]" />
+            <Loader2 className="h-4 w-4 animate-spin text-[var(--ecom-primary)]" />
           </div>
         ) : null}
       </div>
-      <p className="max-w-[9rem] truncate text-[10px] text-[#6e6e73]" title={subtitle}>
+      <p className="max-w-[9rem] truncate text-[10px] text-[var(--ecom-muted)]" title={subtitle}>
         {modeLabel(fusion?.mode)}
         {subtitle !== modeLabel(fusion?.mode) ? ` · ${subtitle}` : ""}
       </p>
@@ -143,8 +143,8 @@ export function OutfitShotSceneFusionCell({
       </div>
 
       {pickerOpen ? (
-        <div className="absolute z-30 mt-1 w-56 rounded-lg border border-[#e8e8ed] bg-white p-2 shadow-lg">
-          <p className="mb-1 text-[10px] font-medium text-[#6e6e73]">场景来源</p>
+        <div className="absolute z-30 mt-1 w-56 rounded-lg border border-[var(--ecom-divider)] bg-white p-2 shadow-lg">
+          <p className="mb-1 text-[10px] font-medium text-[var(--ecom-muted)]">场景来源</p>
           <div className="space-y-1">
             {MODE_OPTIONS.map((opt) => (
               <button
@@ -153,8 +153,8 @@ export function OutfitShotSceneFusionCell({
                 className={cn(
                   "w-full rounded-md border px-2 py-1.5 text-left text-[11px]",
                   fusion?.mode === opt.id
-                    ? "border-[var(--ecom-outline-border)] bg-[#f0f6ff]"
-                    : "border-[#e8e8ed] hover:border-[#d2d2d7]",
+                    ? "border-[var(--ecom-outline-border)] bg-[var(--ecom-content-selected-bg)]"
+                    : "border-[var(--ecom-divider)] hover:border-[var(--ecom-border-soft)]",
                 )}
                 disabled={busy}
                 onClick={() => {
@@ -166,21 +166,21 @@ export function OutfitShotSceneFusionCell({
                   void onPickMode(shot.index, opt.id).then(() => setPickerOpen(false));
                 }}
               >
-                <span className="font-medium text-[#1d1d1f]">{opt.label}</span>
-                <span className="mt-0.5 block text-[10px] text-[#86868b]">{opt.hint}</span>
+                <span className="font-medium text-[var(--ecom-ink)]">{opt.label}</span>
+                <span className="mt-0.5 block text-[10px] text-[var(--ecom-subtle)]">{opt.hint}</span>
               </button>
             ))}
           </div>
           {catalogLoading ? (
-            <p className="mt-2 text-[10px] text-[#86868b]">加载场景库…</p>
+            <p className="mt-2 text-[10px] text-[var(--ecom-subtle)]">加载场景库…</p>
           ) : catalog.length > 0 ? (
-            <div className="mt-2 max-h-36 space-y-1 overflow-y-auto border-t border-[#e8e8ed] pt-2">
-              <p className="text-[10px] font-medium text-[#6e6e73]">场景库快捷选择</p>
+            <div className="mt-2 max-h-36 space-y-1 overflow-y-auto border-t border-[var(--ecom-divider)] pt-2">
+              <p className="text-[10px] font-medium text-[var(--ecom-muted)]">场景库快捷选择</p>
               {catalog.map((entry) => (
                 <button
                   key={entry.id}
                   type="button"
-                  className="block w-full truncate rounded px-1 py-0.5 text-left text-[10px] text-[#0071e3] hover:bg-[#f0f6ff]"
+                  className="block w-full truncate rounded px-1 py-0.5 text-left text-[10px] text-[var(--ecom-primary)] hover:bg-[var(--ecom-content-selected-bg)]"
                   disabled={busy}
                   onClick={() => {
                     void onPickMode(shot.index, "library", entry.id).then(() =>
@@ -193,7 +193,7 @@ export function OutfitShotSceneFusionCell({
               ))}
             </div>
           ) : null}
-          <p className="mt-2 text-[9px] leading-relaxed text-[#86868b]">
+          <p className="mt-2 text-[9px] leading-relaxed text-[var(--ecom-subtle)]">
             融图模型：{fusionModelKey}
           </p>
         </div>

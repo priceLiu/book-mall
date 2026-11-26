@@ -4,7 +4,7 @@ import { type FormEvent, useCallback, useState } from "react";
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
 
 const INPUT_CLASS =
-  "w-full rounded-xl border border-[#e8e8ed] bg-white px-3.5 py-2.5 text-sm text-[#1d1d1f] outline-none transition focus:border-[var(--ecom-outline-border)]";
+  "w-full rounded-xl border border-[var(--ecom-divider)] bg-white px-3.5 py-2.5 text-sm text-[var(--ecom-ink)] outline-none transition focus:border-[var(--ecom-outline-border)]";
 
 function buildPortalSigninHref(
   bookOrigin: string,
@@ -110,11 +110,11 @@ export function EcomLoginForm({
   return (
     <div className="mx-auto flex w-full max-w-sm flex-col gap-5">
       <div>
-        <h1 className="text-2xl font-semibold text-[#1d1d1f]">登录电商工具箱</h1>
-        <p className="mt-1 text-sm text-[#6e6e73]">主图 · 详情 · 带货视频 · 品牌 VI</p>
+        <h1 className="text-2xl font-semibold text-[var(--ecom-ink)]">登录电商工具箱</h1>
+        <p className="mt-1 text-sm text-[var(--ecom-muted)]">主图 · 详情 · 带货视频 · 品牌 VI</p>
       </div>
 
-      <div className="flex gap-1 rounded-full bg-[#f5f5f7] p-1">
+      <div className="flex gap-1 rounded-full bg-[var(--ecom-parchment)] p-1">
         {(
           [
             ["password", "密码登录"],
@@ -126,7 +126,7 @@ export function EcomLoginForm({
             type="button"
             onClick={() => setTab(key)}
             className={`flex-1 rounded-full py-2 text-sm font-medium transition ${
-              tab === key ? "bg-white text-[#1d1d1f] shadow-sm" : "text-[#6e6e73]"
+              tab === key ? "bg-white text-[var(--ecom-ink)] shadow-sm" : "text-[var(--ecom-muted)]"
             }`}
           >
             {label}
@@ -173,7 +173,7 @@ export function EcomLoginForm({
           </div>
         )}
 
-        {hint ? <p className="text-xs text-[#6e6e73]">{hint}</p> : null}
+        {hint ? <p className="text-xs text-[var(--ecom-muted)]">{hint}</p> : null}
         {error ? (
           <p className="text-sm text-red-500" role="alert">
             {error}
@@ -185,7 +185,7 @@ export function EcomLoginForm({
         </EcomButtonPrimary>
       </form>
 
-      <p className="text-center text-sm text-[#6e6e73]">
+      <p className="text-center text-sm text-[var(--ecom-muted)]">
         还没有账号？{" "}
         <a
           href={`/register?redirect=${encodeURIComponent(redirect)}`}

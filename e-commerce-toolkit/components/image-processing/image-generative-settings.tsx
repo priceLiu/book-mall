@@ -74,11 +74,11 @@ export function ImageGenerativeSettings({
       >
         {hideModelSelect ? null : (
           <div>
-            <label className="text-sm font-medium text-[#1d1d1f]">模型</label>
+            <label className="text-sm font-medium text-[var(--ecom-ink)]">模型</label>
             <select
               value={generativeModel}
               onChange={(e) => onGenerativeModelChange(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-[#d2d2d7] bg-white px-3 py-2.5 text-sm"
+              className="mt-1 w-full rounded-lg border border-[var(--ecom-border-soft)] bg-white px-3 py-2.5 text-sm"
             >
               {modelOptions.map((o) => (
                 <option key={o.id} value={o.id}>
@@ -90,11 +90,11 @@ export function ImageGenerativeSettings({
         )}
         {hideImageCount ? null : (
           <div>
-            <label className="text-sm font-medium text-[#1d1d1f]">图片</label>
+            <label className="text-sm font-medium text-[var(--ecom-ink)]">图片</label>
             <select
               value={imageCount}
               onChange={(e) => onImageCountChange(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-[#d2d2d7] bg-white px-3 py-2.5 text-sm"
+              className="mt-1 w-full rounded-lg border border-[var(--ecom-border-soft)] bg-white px-3 py-2.5 text-sm"
             >
               {GENERATIVE_IMAGE_COUNT_OPTIONS.map((o) => (
                 <option key={o.id} value={o.id}>
@@ -105,19 +105,19 @@ export function ImageGenerativeSettings({
           </div>
         )}
         <div>
-          <label className="text-sm font-medium text-[#1d1d1f]">种子</label>
+          <label className="text-sm font-medium text-[var(--ecom-ink)]">种子</label>
           <input
             type="text"
             placeholder="随机的"
             value={seed}
             onChange={(e) => onSeedChange(e.target.value)}
-            className="mt-1 w-full rounded-lg border border-[#d2d2d7] bg-white px-3 py-2.5 text-sm"
+            className="mt-1 w-full rounded-lg border border-[var(--ecom-border-soft)] bg-white px-3 py-2.5 text-sm"
           />
         </div>
       </div>
 
       <div className="mt-4">
-        <p className="text-sm font-medium text-[#1d1d1f]">长宽比</p>
+        <p className="text-sm font-medium text-[var(--ecom-ink)]">长宽比</p>
         <div className="mt-2 flex flex-wrap gap-2">
           {ASPECT_OPTIONS.map((a) => (
             <button
@@ -127,8 +127,8 @@ export function ImageGenerativeSettings({
               className={cn(
                 "rounded-lg border px-3 py-2 text-xs font-medium",
                 aspect === a
-                  ? "border-[var(--ecom-outline-border)] bg-[#f0f6ff] text-[#0071e3]"
-                  : "border-[#e5e5ea] bg-white text-[#1d1d1f]",
+                  ? "border-[var(--ecom-outline-border)] bg-[var(--ecom-content-selected-bg)] text-[var(--ecom-primary)]"
+                  : "border-[#e5e5ea] bg-white text-[var(--ecom-ink)]",
               )}
             >
               {a}
@@ -140,7 +140,7 @@ export function ImageGenerativeSettings({
       <button
         type="button"
         onClick={() => onAdvancedOpenChange(!advancedOpen)}
-        className="mt-4 inline-flex items-center gap-1 text-sm text-[#0071e3]"
+        className="mt-4 inline-flex items-center gap-1 text-sm text-[var(--ecom-primary)]"
       >
         {advancedOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
         高级选项
@@ -149,7 +149,7 @@ export function ImageGenerativeSettings({
       {advancedOpen ? (
         <div className="mt-3 space-y-4 rounded-xl border border-[#e5e5ea] bg-white p-4">
           <label className="block text-sm">
-            <span className="mb-1 block text-[#1d1d1f]">负面提示（应避免的情况）</span>
+            <span className="mb-1 block text-[var(--ecom-ink)]">负面提示（应避免的情况）</span>
             <input
               type="text"
               placeholder={DEFAULT_NEGATIVE_PROMPT_PLACEHOLDER}
@@ -157,12 +157,12 @@ export function ImageGenerativeSettings({
               onChange={(e) =>
                 onParamsChange({ ...params, negative_prompt: e.target.value })
               }
-              className="w-full rounded-lg border border-[#d2d2d7] px-3 py-2 text-sm"
+              className="w-full rounded-lg border border-[var(--ecom-border-soft)] px-3 py-2 text-sm"
             />
           </label>
 
           <div className="block text-sm">
-            <span className="mb-2 block text-[#1d1d1f]">风格参考图</span>
+            <span className="mb-2 block text-[var(--ecom-ink)]">风格参考图</span>
             <ImageSingleUpload
               image={styleImage}
               onChange={onStyleImageChange}
@@ -173,9 +173,9 @@ export function ImageGenerativeSettings({
           </div>
 
           <label className="block text-sm">
-            <span className="mb-1 flex items-center justify-between text-[#1d1d1f]">
+            <span className="mb-1 flex items-center justify-between text-[var(--ecom-ink)]">
               力量
-              <span className="text-xs text-[#6e6e73]">{strength.toFixed(1)}</span>
+              <span className="text-xs text-[var(--ecom-muted)]">{strength.toFixed(1)}</span>
             </span>
             <input
               type="range"

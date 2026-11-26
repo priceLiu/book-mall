@@ -47,18 +47,18 @@ export function SeedVideoComposeDialog({
       aria-modal
       aria-labelledby="seed-video-compose-title"
     >
-      <div className="relative w-full max-w-lg rounded-2xl border border-[#e8e8ed] bg-white p-5 pr-12 shadow-xl">
+      <div className="relative w-full max-w-lg rounded-2xl border border-[var(--ecom-divider)] bg-white p-5 pr-12 shadow-xl">
         <EcomDialogCloseButton disabled={busy} onClick={() => onOpenChange(false)} />
-        <h2 id="seed-video-compose-title" className="text-base font-semibold text-[#1d1d1f]">
+        <h2 id="seed-video-compose-title" className="text-base font-semibold text-[var(--ecom-ink)]">
           合成成片 · 字幕样式
         </h2>
-        <p className="mt-1 text-[12px] leading-relaxed text-[#6e6e73]">
+        <p className="mt-1 text-[12px] leading-relaxed text-[var(--ecom-muted)]">
           将合并 {shotCount} 个镜头并烧录口播字幕。此前未设置时默认 ASS 字号{" "}
-          <span className="font-medium text-[#1d1d1f]">{SEED_VIDEO_LEGACY_SUBTITLE_ASS_SIZE}</span>
+          <span className="font-medium text-[var(--ecom-ink)]">{SEED_VIDEO_LEGACY_SUBTITLE_ASS_SIZE}</span>
           （偏大）；可在下方调整字体与字号，右侧以「{SUBTITLE_PREVIEW_SAMPLE_TEXT}」预览效果。
         </p>
 
-        <div className="mt-4 rounded-xl border border-[#e8e8ed] bg-[#fafafa] px-4 py-3">
+        <div className="mt-4 rounded-xl border border-[var(--ecom-divider)] bg-[#fafafa] px-4 py-3">
           <div className="flex flex-nowrap items-start gap-5">
             <div className="min-w-0 flex-1">
               <SubtitleBurnInFields

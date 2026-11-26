@@ -212,7 +212,7 @@ export function VtonModelWorkbenchPanel({
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="inline-flex items-center gap-1 text-xs font-medium text-[#6e6e73]">
+        <span className="inline-flex items-center gap-1 text-xs font-medium text-[var(--ecom-muted)]">
           模特全身照
           <VtonAiModelGenerateHelp />
         </span>
@@ -302,12 +302,12 @@ export function VtonModelWorkbenchPanel({
         className={cn(
           "flex items-start gap-3 rounded-xl border bg-[#fafafa] p-3 outline-none transition-colors",
           dragOver
-            ? "border-[var(--ecom-outline-border)] bg-[#f0f6ff] ring-1 ring-[#1d1d1f]/15"
-            : "border-[#e8e8ed]",
+            ? "border-[var(--ecom-outline-border)] bg-[var(--ecom-content-selected-bg)] ring-1 ring-[var(--ecom-ink)]/15"
+            : "border-[var(--ecom-divider)]",
         )}
       >
         <aside className={SIDE_COLUMN_CLASS}>
-          <p className="text-[10px] font-medium text-[#86868b]">上传历史</p>
+          <p className="text-[10px] font-medium text-[var(--ecom-subtle)]">上传历史</p>
           {candidates.length > 0 ? (
             <div className={THUMB_LIST_CLASS}>
               {candidates.map((g, index) => (
@@ -343,7 +343,7 @@ export function VtonModelWorkbenchPanel({
               <div className="ecom-upload-progress ecom-upload-progress-indeterminate">
                 <span />
               </div>
-              <p className="text-[10px] text-[#0071e3]">
+              <p className="text-[10px] text-[var(--ecom-primary)]">
                 {modelPipelineBusy === "importing-model" ? "正在导入模特…" : "正在上传模特…"}
               </p>
             </div>
@@ -359,7 +359,7 @@ export function VtonModelWorkbenchPanel({
                   key={centerModel.id}
                   src={centerModel.ossUrl}
                   alt={centerModelLabel}
-                  className="rounded-lg border border-[#e8e8ed]"
+                  className="rounded-lg border border-[var(--ecom-divider)]"
                 />
                 {(modelGenerating || modelExpanding) && (
                   <EcomMediaGeneratingBusy className="absolute inset-0 rounded-lg" />
@@ -405,16 +405,16 @@ export function VtonModelWorkbenchPanel({
               ) : null}
             </div>
           ) : (
-            <div className="flex min-h-[300px] flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-[#e8e8ed] bg-white px-4 text-center">
+            <div className="flex min-h-[300px] flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-[var(--ecom-divider)] bg-white px-4 text-center">
               {(modelGenerating || modelExpanding) && (
                 <div
-                  className="relative overflow-hidden rounded-md border border-[#d2d2d7]"
+                  className="relative overflow-hidden rounded-md border border-[var(--ecom-border-soft)]"
                   style={{ width: THUMB_COLUMN_PX, height: (THUMB_COLUMN_PX * 4) / 3 }}
                 >
                   <EcomMediaGeneratingBusy className="absolute inset-0" />
                 </div>
               )}
-              <p className="text-[11px] leading-relaxed text-[#86868b]">
+              <p className="text-[11px] leading-relaxed text-[var(--ecom-subtle)]">
                 {modelGenerating || modelExpanding
                   ? modelExpanding
                     ? "头像扩全身生成中…"
@@ -426,7 +426,7 @@ export function VtonModelWorkbenchPanel({
         </div>
 
         <aside className={SIDE_COLUMN_CLASS}>
-          <p className="text-[10px] font-medium text-[#86868b]">待试衣</p>
+          <p className="text-[10px] font-medium text-[var(--ecom-subtle)]">待试衣</p>
           {confirmed.length > 0 ? (
             <div className={THUMB_LIST_CLASS}>
               {confirmed.map((g, index) => (
@@ -542,7 +542,7 @@ function ModelGenerationThumb({
       disabled={selectLocked}
       className={cn(
         "group/image relative block w-full shrink-0 rounded-lg border-2 bg-white text-left transition",
-        active ? "border-[#1d1d1f]" : "border-[#e8e8ed] hover:border-[#86868b]",
+        active ? "border-[var(--ecom-ink)]" : "border-[var(--ecom-divider)] hover:border-[var(--ecom-subtle)]",
         selectLocked && "cursor-not-allowed opacity-60",
       )}
       onClick={onSelect}

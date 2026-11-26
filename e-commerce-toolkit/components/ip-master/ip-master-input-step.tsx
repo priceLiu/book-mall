@@ -65,7 +65,7 @@ export function IpMasterInputStep({
   return (
     <div className="mb-6 space-y-4">
       <fieldset className="space-y-2">
-        <legend className="text-xs font-medium uppercase tracking-wide text-[#6e6e73]">
+        <legend className="text-xs font-medium uppercase tracking-wide text-[var(--ecom-muted)]">
           输入模式
         </legend>
         <div className="grid gap-2 sm:grid-cols-2">
@@ -75,8 +75,8 @@ export function IpMasterInputStep({
               className={cn(
                 "flex cursor-pointer gap-2 rounded-xl border px-3 py-2.5 text-sm transition",
                 inputMode === opt.id
-                  ? "border-[var(--ecom-outline-border)] bg-[#f0f6ff]"
-                  : "border-[#e8e8ed] bg-white hover:border-[#d2d2d7]",
+                  ? "border-[var(--ecom-outline-border)] bg-[var(--ecom-content-selected-bg)]"
+                  : "border-[var(--ecom-divider)] bg-white hover:border-[var(--ecom-border-soft)]",
               )}
             >
               <input
@@ -88,8 +88,8 @@ export function IpMasterInputStep({
                 onChange={() => onInputModeChange(opt.id)}
               />
               <span>
-                <span className="font-medium text-[#1d1d1f]">{opt.label}</span>
-                <span className="mt-0.5 block text-xs text-[#6e6e73]">{opt.hint}</span>
+                <span className="font-medium text-[var(--ecom-ink)]">{opt.label}</span>
+                <span className="mt-0.5 block text-xs text-[var(--ecom-muted)]">{opt.hint}</span>
               </span>
             </label>
           ))}
@@ -99,7 +99,7 @@ export function IpMasterInputStep({
       {allowUpload ? (
         <div>
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-            <span className="text-xs font-medium uppercase tracking-wide text-[#6e6e73]">
+            <span className="text-xs font-medium uppercase tracking-wide text-[var(--ecom-muted)]">
               角色基准图
             </span>
             <div className="flex items-center gap-2">
@@ -131,7 +131,7 @@ export function IpMasterInputStep({
                   </IpMasterHelpHover>
                 </>
               ) : null}
-              <span className="text-[10px] text-[#86868b]">{IMAGE_UPLOAD_DROP_HINT}</span>
+              <span className="text-[10px] text-[var(--ecom-subtle)]">{IMAGE_UPLOAD_DROP_HINT}</span>
             </div>
           </div>
           <EcomRefUploadCard
@@ -174,25 +174,25 @@ export function IpMasterInputStep({
           />
         </div>
       ) : inputMode === "4" ? (
-        <p className="rounded-lg bg-[#f5f5f7] px-3 py-2 text-xs text-[#6e6e73]">
+        <p className="rounded-lg bg-[var(--ecom-parchment)] px-3 py-2 text-xs text-[var(--ecom-muted)]">
           模式 4 先填大白话并生成模板；在「校对」页确认生图提示词后再点「生成基准图」。
         </p>
       ) : (
-        <p className="rounded-lg bg-[#f5f5f7] px-3 py-2 text-xs text-[#6e6e73]">
+        <p className="rounded-lg bg-[var(--ecom-parchment)] px-3 py-2 text-xs text-[var(--ecom-muted)]">
           当前模式不需要上传基准图；解析将仅依据 BRIEF 文字。
         </p>
       )}
 
       {allowBrief ? (
         <div>
-          <label className="text-xs font-medium uppercase tracking-wide text-[#6e6e73]">
+          <label className="text-xs font-medium uppercase tracking-wide text-[var(--ecom-muted)]">
             文字描述（大白话即可）
           </label>
-          <p className="mt-1 text-[11px] text-[#86868b]">
+          <p className="mt-1 text-[11px] text-[var(--ecom-subtle)]">
             不用写刚性/柔性格式；系统默认可改。生成时由大模型整理为标准结构化模板。
           </p>
           <textarea
-            className="mt-2 min-h-[120px] w-full rounded-xl border border-[#d2d2d7] px-3 py-2 text-sm leading-relaxed"
+            className="mt-2 min-h-[120px] w-full rounded-xl border border-[var(--ecom-border-soft)] px-3 py-2 text-sm leading-relaxed"
             value={briefDraft}
             disabled={busy}
             placeholder={IP_MASTER_BRIEF_PLACEHOLDER}
@@ -201,7 +201,7 @@ export function IpMasterInputStep({
           />
         </div>
       ) : (
-        <p className="rounded-lg bg-[#f5f5f7] px-3 py-2 text-xs text-[#6e6e73]">
+        <p className="rounded-lg bg-[var(--ecom-parchment)] px-3 py-2 text-xs text-[var(--ecom-muted)]">
           模式 1 可不填 Brief；解析将以基准图识图结果为主。
         </p>
       )}

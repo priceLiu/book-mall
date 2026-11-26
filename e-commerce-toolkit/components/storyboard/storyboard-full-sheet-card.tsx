@@ -98,7 +98,7 @@ export function StoryboardFullSheetCard({
   return (
     <div className="isolate flex h-full min-w-0 flex-col">
       <div className="mb-2 flex items-center justify-between gap-2">
-        <p className="text-sm font-bold text-[#1d1d1f]">{label}</p>
+        <p className="text-sm font-bold text-[var(--ecom-ink)]">{label}</p>
         {onPreview && hasPreview && !busy ? (
           <EcomButtonSecondary
             size="sm"
@@ -113,7 +113,7 @@ export function StoryboardFullSheetCard({
       </div>
       <div
         className={cn(
-          "relative w-full overflow-hidden rounded-xl border border-[#e8e8ed] bg-white shadow-sm",
+          "relative w-full overflow-hidden rounded-xl border border-[var(--ecom-divider)] bg-white shadow-sm",
           STORYBOARD_PREVIEW_MIN_H,
           (hasPreview || busy || sheet) && storyboardPreviewAspectClass(aspectRatio),
         )}
@@ -123,7 +123,7 @@ export function StoryboardFullSheetCard({
         {busy ? (
           <>
             {renderSheetVisual()}
-            <div className="absolute inset-0 z-10 flex min-h-[200px] items-center justify-center gap-2 bg-white/80 text-sm text-[#6e6e73] backdrop-blur-[1px]">
+            <div className="absolute inset-0 z-10 flex min-h-[200px] items-center justify-center gap-2 bg-white/80 text-sm text-[var(--ecom-muted)] backdrop-blur-[1px]">
               <Loader2 className="h-5 w-5 animate-spin" />
               {busyLabel}
             </div>
@@ -190,11 +190,11 @@ export function StoryboardFullSheetCard({
           </>
         ) : (
           <div className="flex h-full min-h-[200px] flex-col items-center justify-center gap-3 px-4 text-center">
-            <p className="text-xs text-[#86868b]">{emptyHint}</p>
+            <p className="text-xs text-[var(--ecom-subtle)]">{emptyHint}</p>
             {primaryActionLabel && onPrimaryAction ? (
               <button
                 type="button"
-                className="inline-flex items-center gap-2 rounded-lg border border-[#d2d2d7] bg-[#f5f5f7] px-3 py-1.5 text-xs font-medium text-[#1d1d1f] hover:bg-[#ebebed]"
+                className="inline-flex items-center gap-2 rounded-lg border border-[var(--ecom-border-soft)] bg-[var(--ecom-parchment)] px-3 py-1.5 text-xs font-medium text-[var(--ecom-ink)] hover:bg-[#ebebed]"
                 onClick={onPrimaryAction}
               >
                 {primaryActionLabel}

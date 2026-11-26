@@ -151,47 +151,47 @@ export function ImagePosterPanel({
 
   return (
     <div className="mt-6 space-y-4 sm:mt-8 sm:space-y-6">
-      <div className="rounded-xl border border-sky-100 bg-sky-50/80 px-3 py-3 text-sm leading-relaxed text-[#1d1d1f] sm:px-4">
+      <div className="rounded-xl border border-sky-100 bg-sky-50/80 px-3 py-3 text-sm leading-relaxed text-[var(--ecom-ink)] sm:px-4">
         生成可直接打印的海报，固定长宽比与排版留白。经 Gateway 调用 Seedream 5.0 Lite 或 KIE NanoBanana Pro，无水印。
       </div>
 
       <div className="rounded-2xl border border-[#e5e5ea] bg-white p-4 shadow-sm sm:p-6">
         <div className="grid gap-4 sm:grid-cols-2">
-          <label className="block text-sm font-medium text-[#1d1d1f]">
+          <label className="block text-sm font-medium text-[var(--ecom-ink)]">
             标题（主标题）
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="演唱会主标题"
-              className="mt-1 w-full rounded-lg border border-[#d2d2d7] px-3 py-2.5 text-sm font-normal"
+              className="mt-1 w-full rounded-lg border border-[var(--ecom-border-soft)] px-3 py-2.5 text-sm font-normal"
             />
           </label>
-          <label className="block text-sm font-medium text-[#1d1d1f]">
+          <label className="block text-sm font-medium text-[var(--ecom-ink)]">
             副标题 / 日期 / 地点
             <input
               type="text"
               value={subtitle}
               onChange={(e) => setSubtitle(e.target.value)}
               placeholder="2026 · 上海"
-              className="mt-1 w-full rounded-lg border border-[#d2d2d7] px-3 py-2.5 text-sm font-normal"
+              className="mt-1 w-full rounded-lg border border-[var(--ecom-border-soft)] px-3 py-2.5 text-sm font-normal"
             />
           </label>
         </div>
 
-        <label className="mt-4 block text-sm font-medium text-[#1d1d1f]">
+        <label className="mt-4 block text-sm font-medium text-[var(--ecom-ink)]">
           场景描述
           <textarea
             value={sceneDescription}
             onChange={(e) => setSceneDescription(e.target.value)}
             rows={4}
             placeholder="日落时分，音乐节舞台上人群剪影，彩色纸屑飘落……"
-            className="mt-1 w-full resize-y rounded-xl border border-[#d2d2d7] px-4 py-3 text-sm font-normal"
+            className="mt-1 w-full resize-y rounded-xl border border-[var(--ecom-border-soft)] px-4 py-3 text-sm font-normal"
           />
         </label>
 
         <div className="mt-4">
-          <p className="text-sm font-medium text-[#1d1d1f]">风格</p>
+          <p className="text-sm font-medium text-[var(--ecom-ink)]">风格</p>
           <div className="mt-2 flex flex-wrap gap-2">
             {POSTER_STYLE_OPTIONS.map((o) => {
               const Icon = STYLE_ICONS[o.id] ?? Sparkles;
@@ -217,11 +217,11 @@ export function ImagePosterPanel({
 
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="text-sm font-medium text-[#1d1d1f]">打印格式</label>
+            <label className="text-sm font-medium text-[var(--ecom-ink)]">打印格式</label>
             <select
               value={printFormat}
               onChange={(e) => setPrintFormat(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-[#d2d2d7] bg-white px-3 py-2.5 text-sm"
+              className="mt-1 w-full rounded-lg border border-[var(--ecom-border-soft)] bg-white px-3 py-2.5 text-sm"
             >
               {POSTER_PRINT_FORMAT_OPTIONS.map((o) => (
                 <option key={o.id} value={o.id}>
@@ -231,14 +231,14 @@ export function ImagePosterPanel({
             </select>
           </div>
           <div>
-            <label className="text-sm font-medium text-[#1d1d1f]">数数</label>
+            <label className="text-sm font-medium text-[var(--ecom-ink)]">数数</label>
             <select
               value={posterCount}
               onChange={(e) => {
                 setPosterCount(e.target.value);
                 setImageCount(e.target.value);
               }}
-              className="mt-1 w-full rounded-lg border border-[#d2d2d7] bg-white px-3 py-2.5 text-sm"
+              className="mt-1 w-full rounded-lg border border-[var(--ecom-border-soft)] bg-white px-3 py-2.5 text-sm"
             >
               {COUNT_OPTIONS.map((o) => (
                 <option key={o.id} value={o.id}>
@@ -283,13 +283,13 @@ export function ImagePosterPanel({
       </div>
 
       <section className="rounded-2xl border border-[#e5e5ea] bg-white p-4 sm:p-6">
-        <h3 className="text-lg font-semibold text-[#1d1d1f]">用例</h3>
+        <h3 className="text-lg font-semibold text-[var(--ecom-ink)]">用例</h3>
         <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {USE_CASES.map((c) => (
             <div key={c.title} className="rounded-xl border border-[#e5e5ea] bg-[#fafafa] p-4">
               <c.icon className={cn("mb-2 h-5 w-5", c.color)} />
-              <p className="font-medium text-[#1d1d1f]">{c.title}</p>
-              <p className="mt-1 text-sm text-[#6e6e73]">{c.desc}</p>
+              <p className="font-medium text-[var(--ecom-ink)]">{c.title}</p>
+              <p className="mt-1 text-sm text-[var(--ecom-muted)]">{c.desc}</p>
             </div>
           ))}
         </div>

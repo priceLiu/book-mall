@@ -9,7 +9,7 @@ export type ProgressRailStepState = "done" | "active" | "pending" | "skipped";
 export function progressRailStepButtonClass(state: ProgressRailStepState): string {
   return cn(
     "relative flex w-full flex-col items-center gap-0.5 px-0.5 py-1.5 text-center transition-colors",
-    "cursor-pointer hover:bg-[#f5f5f7]",
+    "cursor-pointer hover:bg-[var(--ecom-parchment)]",
     state === "pending"
       ? "text-[var(--ecom-rail-label-muted)]"
       : "text-[var(--ecom-rail-label)]",
@@ -20,10 +20,10 @@ export function progressRailStepDotClass(state: ProgressRailStepState): string {
   return cn(
     "flex h-6 w-6 items-center justify-center rounded-full text-[9px] font-bold transition-colors",
     state === "active" &&
-      "bg-[var(--ecom-rail-dot-active-bg)] text-[#1d1d1f] ring-2 ring-[#1d1d1f]",
-    state === "done" && "bg-[#1d1d1f] text-white",
+      "bg-[var(--ecom-rail-dot-active-bg)] text-[var(--ecom-ink)] ring-2 ring-[var(--ecom-ink)]",
+    state === "done" && "bg-[var(--ecom-ink)] text-white",
     state === "skipped" &&
-      "border border-[#d2d2d7] bg-[var(--ecom-rail-dot-skipped-bg)] text-[var(--ecom-rail-label-muted)]",
+      "border border-[var(--ecom-border-soft)] bg-[var(--ecom-rail-dot-skipped-bg)] text-[var(--ecom-rail-label-muted)]",
     state === "pending" &&
       "border border-[var(--ecom-rail-dot-pending-border)] bg-white text-[var(--ecom-rail-label-muted)]",
   );

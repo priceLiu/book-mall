@@ -34,9 +34,9 @@ export function EcomAssistantPanelHeader({
   return (
     <div className="flex shrink-0 items-center justify-between gap-2 border-b border-[var(--ecom-assistant-border)] bg-[var(--ecom-assistant-bg)] px-4 py-3">
       <div className="min-w-0">
-        <p className="text-sm font-semibold text-[#1d1d1f]">{title}</p>
+        <p className="text-sm font-semibold text-[var(--ecom-ink)]">{title}</p>
         {subtitle ? (
-          <p className="truncate text-[10px] text-[#6e6e73]">{subtitle}</p>
+          <p className="truncate text-[10px] text-[var(--ecom-muted)]">{subtitle}</p>
         ) : null}
       </div>
       <div className="flex shrink-0 items-center gap-1.5">

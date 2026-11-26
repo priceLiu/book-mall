@@ -41,17 +41,17 @@ export function SeedVideoAssistantChoiceCards({
   return (
     <div className={cn("space-y-3", className)}>
       <div>
-        <p className="text-sm font-semibold leading-snug text-[#1d1d1f]">{title}</p>
-        {subtitle ? <p className="mt-1 text-[11px] text-[#6e6e73]">{subtitle}</p> : null}
+        <p className="text-sm font-semibold leading-snug text-[var(--ecom-ink)]">{title}</p>
+        {subtitle ? <p className="mt-1 text-[11px] text-[var(--ecom-muted)]">{subtitle}</p> : null}
       </div>
       <div className="space-y-2">
         {choices.map((choice) => {
           const selected = isChoiceSelected(choice, selectedMessage);
           const shellClass = cn(
             "flex w-full items-start gap-3 rounded-2xl border px-4 py-3 text-left transition",
-            "border-[#e8e8ed] bg-white",
-            selected && "border-[#1d1d1f] bg-[#fafafa]",
-            !readOnly && !disabled && "hover:border-[#86868b] hover:bg-[#fafafa]",
+            "border-[var(--ecom-divider)] bg-white",
+            selected && "border-[var(--ecom-ink)] bg-[#fafafa]",
+            !readOnly && !disabled && "hover:border-[var(--ecom-subtle)] hover:bg-[#fafafa]",
             !readOnly && disabled && "cursor-not-allowed opacity-50",
             readOnly && "cursor-default",
           );
@@ -61,22 +61,22 @@ export function SeedVideoAssistantChoiceCards({
                 className={cn(
                   "mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition",
                   selected
-                    ? "border-[#1d1d1f] bg-[#1d1d1f] text-white"
-                    : "border-[#86868b] bg-white text-transparent",
+                    ? "border-[var(--ecom-ink)] bg-[var(--ecom-ink)] text-white"
+                    : "border-[var(--ecom-subtle)] bg-white text-transparent",
                 )}
                 aria-hidden
               >
                 <Check className="h-3 w-3" strokeWidth={3} />
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block text-sm font-semibold leading-snug text-[#1d1d1f]">
+                <span className="block text-sm font-semibold leading-snug text-[var(--ecom-ink)]">
                   {choice.title}
                   {choice.recommended ? (
-                    <span className="font-medium text-[#6e6e73]">（推荐）</span>
+                    <span className="font-medium text-[var(--ecom-muted)]">（推荐）</span>
                   ) : null}
                 </span>
                 {choice.description ? (
-                  <span className="mt-1 block text-xs leading-relaxed text-[#6e6e73]">
+                  <span className="mt-1 block text-xs leading-relaxed text-[var(--ecom-muted)]">
                     {choice.description}
                   </span>
                 ) : null}

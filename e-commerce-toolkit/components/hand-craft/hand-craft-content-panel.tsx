@@ -338,13 +338,13 @@ export function HandCraftContentPanel({
         ref={scrollRootRef}
         className="ecom-scrollbar-overlay h-full min-h-0 w-full overflow-x-hidden overflow-y-auto overscroll-y-contain [overflow-anchor:none]"
       >
-        <header className="sticky top-0 z-20 border-b border-[#e8e8ed] bg-white px-5 py-3 shadow-[0_1px_0_0_rgba(0,0,0,0.04)]">
+        <header className="sticky top-0 z-20 border-b border-[var(--ecom-divider)] bg-white px-5 py-3 shadow-[0_1px_0_0_rgba(0,0,0,0.04)]">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <EcomWorkspaceTitleHeading
               guideModuleId="hand-craft"
               title={project.title?.trim() || "手办盲盒 SOP"}
             >
-              <p className="text-[11px] text-[#6e6e73]">
+              <p className="text-[11px] text-[var(--ecom-muted)]">
                 线稿转潮玩盲盒 IP 全案 · 10 步 · 已出 {progress}/{totalSlots} 张
                 {project.meta?.workflow?.heroLockedUrl ? " · 主形象已定稿" : ""}
                 {" · 成图自动入库「我的资产 · 手办盲盒 SOP」"}
@@ -398,7 +398,7 @@ export function HandCraftContentPanel({
           </div>
         </header>
 
-        <section className="border-b border-[#e8e8ed] px-5 py-4">
+        <section className="border-b border-[var(--ecom-divider)] px-5 py-4">
           <HandCraftRefUploader
             references={project.references}
             onUpload={onRefUpload}
@@ -410,7 +410,7 @@ export function HandCraftContentPanel({
             sketchGenBusy={sketchGenBusy}
             uploadProgress={uploadProgress}
           />
-          <p className="mt-2 text-[11px] leading-relaxed text-[#6e6e73]">
+          <p className="mt-2 text-[11px] leading-relaxed text-[var(--ecom-muted)]">
             成图均以线稿造型为准；第 1 步定稿的主形象会作为后续每步的参考图。
             更换主线稿会重置 10 步产出。
           </p>

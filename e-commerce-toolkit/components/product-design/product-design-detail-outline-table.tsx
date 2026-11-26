@@ -29,7 +29,7 @@ const TAG_CLASS: Record<OutlineRow["tag"], string> = {
   emotion: "bg-violet-50 text-violet-700",
   proof: "bg-sky-50 text-sky-700",
   risk: "bg-amber-50 text-amber-800",
-  other: "bg-[#f5f5f7] text-[#6e6e73]",
+  other: "bg-[var(--ecom-parchment)] text-[var(--ecom-muted)]",
 };
 
 const TAG_OPTIONS: OutlineRow["tag"][] = ["emotion", "proof", "risk", "other"];
@@ -68,7 +68,7 @@ function EditableCell({
     return (
       <div className="space-y-1.5" onClick={(e) => e.stopPropagation()}>
         <textarea
-          className="w-full rounded-lg border border-[var(--ecom-outline-border)] bg-white px-2 py-1.5 text-[11px] leading-relaxed text-[#1d1d1f] outline-none ring-2 ring-[#1d1d1f]/12"
+          className="w-full rounded-lg border border-[var(--ecom-outline-border)] bg-white px-2 py-1.5 text-[11px] leading-relaxed text-[var(--ecom-ink)] outline-none ring-2 ring-[var(--ecom-ink)]/12"
           rows={3}
           value={draft}
           disabled={saving}
@@ -111,12 +111,12 @@ function EditableCell({
 
   return (
     <div className="group flex min-w-0 items-start gap-1">
-      <div className="min-w-0 flex-1 text-[11px] leading-relaxed text-[#1d1d1f]">
+      <div className="min-w-0 flex-1 text-[11px] leading-relaxed text-[var(--ecom-ink)]">
         {renderCell(value, "cell")}
       </div>
       <button
         type="button"
-        className="mt-0.5 shrink-0 rounded-md p-1 text-[#86868b] opacity-0 transition hover:bg-[#f0f0f2] hover:text-[#1d1d1f] group-hover:opacity-100"
+        className="mt-0.5 shrink-0 rounded-md p-1 text-[var(--ecom-subtle)] opacity-0 transition hover:bg-[#f0f0f2] hover:text-[var(--ecom-ink)] group-hover:opacity-100"
         title="编辑"
         onClick={() => setEditing(true)}
       >
@@ -159,7 +159,7 @@ function EditableTag({
     return (
       <div className="space-y-1.5" onClick={(e) => e.stopPropagation()}>
         <select
-          className="w-full rounded-lg border border-[var(--ecom-outline-border)] bg-white px-2 py-1 text-[11px] text-[#1d1d1f] outline-none ring-2 ring-[#1d1d1f]/12"
+          className="w-full rounded-lg border border-[var(--ecom-outline-border)] bg-white px-2 py-1 text-[11px] text-[var(--ecom-ink)] outline-none ring-2 ring-[var(--ecom-ink)]/12"
           value={draft}
           disabled={saving}
           onChange={(e) => setDraft(e.target.value as OutlineRow["tag"])}
@@ -206,7 +206,7 @@ function EditableTag({
       </span>
       <button
         type="button"
-        className="shrink-0 rounded-md p-1 text-[#86868b] opacity-0 transition hover:bg-[#f0f0f2] hover:text-[#1d1d1f] group-hover:opacity-100"
+        className="shrink-0 rounded-md p-1 text-[var(--ecom-subtle)] opacity-0 transition hover:bg-[#f0f0f2] hover:text-[var(--ecom-ink)] group-hover:opacity-100"
         title="编辑"
         onClick={() => setEditing(true)}
       >
@@ -236,7 +236,7 @@ export function ProductDesignDetailOutlineTable({ rows, onSaveRows }: Props) {
   }
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-[#e8e8ed]">
+    <div className="overflow-x-auto rounded-lg border border-[var(--ecom-divider)]">
       <table className="w-full min-w-[720px] table-fixed border-collapse text-left text-xs">
         <colgroup>
           <col style={{ width: "8%" }} />
@@ -246,7 +246,7 @@ export function ProductDesignDetailOutlineTable({ rows, onSaveRows }: Props) {
           <col style={{ width: "16%" }} />
         </colgroup>
         <thead>
-          <tr className="bg-[#1d1d1f] text-white">
+          <tr className="bg-[var(--ecom-ink)] text-white">
             <th className="px-3 py-2 font-medium">屏号</th>
             <th className="px-3 py-2 font-medium">核心营销任务</th>
             <th className="px-3 py-2 font-medium">解答下单疑虑</th>
@@ -256,11 +256,11 @@ export function ProductDesignDetailOutlineTable({ rows, onSaveRows }: Props) {
         </thead>
         <tbody>
           {rows.map((row) => (
-            <tr key={row.index} className="border-t border-[#e8e8ed] bg-white">
-              <td className="px-3 py-2 align-top font-semibold text-[#1d1d1f]">
+            <tr key={row.index} className="border-t border-[var(--ecom-divider)] bg-white">
+              <td className="px-3 py-2 align-top font-semibold text-[var(--ecom-ink)]">
                 第{row.index}屏
               </td>
-              <td className="px-3 py-2 align-top text-[#1d1d1f]">
+              <td className="px-3 py-2 align-top text-[var(--ecom-ink)]">
                 {onSaveRows ? (
                   <EditableCell
                     value={row.mission}

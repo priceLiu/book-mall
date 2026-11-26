@@ -19,7 +19,7 @@ export const ECOM_MEDIA_STAGE_PREVIEW_OVERLAY_CLASS =
   "pointer-events-none absolute inset-0 z-[2] flex items-center justify-center gap-2 bg-black/0 opacity-0 transition duration-150 group-hover/stage:bg-black/45 group-hover/stage:opacity-100 group-focus-within/stage:bg-black/45 group-focus-within/stage:opacity-100";
 
 export const ECOM_MEDIA_STAGE_PREVIEW_BTN_CLASS =
-  "pointer-events-auto inline-flex shrink-0 items-center justify-center rounded-full border border-white/40 bg-white/25 text-[#1d1d1f] shadow-lg ring-1 ring-black/[0.06] backdrop-blur-md transition hover:bg-white/35 hover:scale-[1.03]";
+  "pointer-events-auto inline-flex shrink-0 items-center justify-center rounded-full border border-white/40 bg-white/25 text-[var(--ecom-ink)] shadow-lg ring-1 ring-black/[0.06] backdrop-blur-md transition hover:bg-white/35 hover:scale-[1.03]";
 
 export function resolveEcomMediaStagePreviewChrome(
   stageShortSidePx: number,

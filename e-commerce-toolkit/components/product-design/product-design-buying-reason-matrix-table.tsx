@@ -16,7 +16,7 @@ function renderCellText(text: string, keyPrefix: string): React.ReactNode {
   return parts.map((part, i) => {
     if (part.startsWith("**") && part.endsWith("**")) {
       return (
-        <strong key={`${keyPrefix}-b-${i}`} className="font-semibold text-[#1d1d1f]">
+        <strong key={`${keyPrefix}-b-${i}`} className="font-semibold text-[var(--ecom-ink)]">
           {part.slice(2, -2)}
         </strong>
       );
@@ -64,7 +64,7 @@ function EditableCell({
     return (
       <div className="space-y-1.5" onClick={(e) => e.stopPropagation()}>
         <textarea
-          className="w-full rounded-lg border border-[var(--ecom-outline-border)] bg-white px-2 py-1.5 text-[11px] leading-relaxed text-[#1d1d1f] outline-none ring-2 ring-[#1d1d1f]/12"
+          className="w-full rounded-lg border border-[var(--ecom-outline-border)] bg-white px-2 py-1.5 text-[11px] leading-relaxed text-[var(--ecom-ink)] outline-none ring-2 ring-[var(--ecom-ink)]/12"
           rows={3}
           value={draft}
           disabled={saving}
@@ -107,12 +107,12 @@ function EditableCell({
 
   return (
     <div className="group flex min-w-0 items-start gap-1">
-      <div className="min-w-0 flex-1 text-[11px] leading-relaxed text-[#1d1d1f]">
+      <div className="min-w-0 flex-1 text-[11px] leading-relaxed text-[var(--ecom-ink)]">
         {renderCellText(value, "cell")}
       </div>
       <button
         type="button"
-        className="mt-0.5 shrink-0 rounded-md p-1 text-[#86868b] opacity-0 transition hover:bg-[#f0f0f2] hover:text-[#1d1d1f] group-hover:opacity-100"
+        className="mt-0.5 shrink-0 rounded-md p-1 text-[var(--ecom-subtle)] opacity-0 transition hover:bg-[#f0f0f2] hover:text-[var(--ecom-ink)] group-hover:opacity-100"
         title="编辑"
         onClick={() => setEditing(true)}
       >
@@ -139,10 +139,10 @@ export function ProductDesignBuyingReasonMatrixTable({ intro, table, onSaveTable
       {intro ? (
         <p className="mb-3 text-[11px] leading-relaxed text-[#424245]">{intro}</p>
       ) : null}
-      <div className="overflow-x-auto rounded-lg border border-[#e8e8ed]">
+      <div className="overflow-x-auto rounded-lg border border-[var(--ecom-divider)]">
         <table className="w-full min-w-[560px] border-collapse text-left text-xs">
           <thead>
-            <tr className="bg-[#1d1d1f] text-white">
+            <tr className="bg-[var(--ecom-ink)] text-white">
               {table.headers.map((header, hi) => (
                 <th key={hi} className="px-3 py-2 font-medium whitespace-nowrap">
                   {header}
@@ -152,7 +152,7 @@ export function ProductDesignBuyingReasonMatrixTable({ intro, table, onSaveTable
           </thead>
           <tbody>
             {table.rows.map((row, ri) => (
-              <tr key={ri} className="border-t border-[#e8e8ed] bg-white">
+              <tr key={ri} className="border-t border-[var(--ecom-divider)] bg-white">
                 {table.headers.map((_, ci) => (
                   <td key={ci} className="px-3 py-2 align-top">
                     <EditableCell

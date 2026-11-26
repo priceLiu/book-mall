@@ -129,10 +129,10 @@ export function IpMasterContentPanel({
   function renderStepHeader(step: typeof inputStep, opts?: { help?: boolean }) {
     return (
       <header className="mb-4">
-        <p className="text-xs font-medium uppercase tracking-wide text-[#6e6e73]">
+        <p className="text-xs font-medium uppercase tracking-wide text-[var(--ecom-muted)]">
           第 {step.no} 步 · {step.label}
         </p>
-        <h2 className="flex items-center text-xl font-semibold text-[#1d1d1f]">
+        <h2 className="flex items-center text-xl font-semibold text-[var(--ecom-ink)]">
           {step.summary}
           {opts?.help ? (
             <IpMasterHelpHover ariaLabel="四种输入模式说明" wide>
@@ -149,7 +149,7 @@ export function IpMasterContentPanel({
       <>
         {renderStepHeader(inputStep, { help: true })}
         <div className="mb-4 flex flex-wrap items-center gap-2">
-          <label className="text-xs text-[#6e6e73]">
+          <label className="text-xs text-[var(--ecom-muted)]">
             结构化解析模型
             {project.references.length > 0 && !isIpMasterVisionChatModel(chatModelKey) ? (
               <span className="ml-2 text-[11px] text-[#b45309]">
@@ -194,10 +194,10 @@ export function IpMasterContentPanel({
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <header className="shrink-0 border-b border-[#e8e8ed] px-5 py-3">
+      <header className="shrink-0 border-b border-[var(--ecom-divider)] px-5 py-3">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <EcomWorkspaceTitleHeading guideModuleId="ip" title={project.title?.trim() || "IP 母版"}>
-            <p className="text-[11px] text-[#6e6e73]">
+            <p className="text-[11px] text-[var(--ecom-muted)]">
               母版库 = 基准图 + 结构化模板 · 手办 / 品牌 VI 可选导入
               {activeVersion ? ` · 当前 ${activeVersion}` : ""}
             </p>
@@ -238,7 +238,7 @@ export function IpMasterContentPanel({
 
         {showReviewSection ? (
           <section
-            className={showInputSection ? "mt-10 border-t border-[#e8e8ed] pt-8" : undefined}
+            className={showInputSection ? "mt-10 border-t border-[var(--ecom-divider)] pt-8" : undefined}
           >
             {renderStepHeader(reviewStep)}
             <IpMasterTemplateGeneratingShell
@@ -247,7 +247,7 @@ export function IpMasterContentPanel({
               minHeightClass="min-h-[24rem]"
             >
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-xs text-[#6e6e73]">
+              <p className="text-xs text-[var(--ecom-muted)]">
                 确认生图提示词与结构化字段后，再生成基准图并保存进母版库（手办 / VI 可选导入）。
               </p>
               <EcomButtonPrimary
@@ -273,8 +273,8 @@ export function IpMasterContentPanel({
 
             <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] lg:items-start">
               <div className="order-2 min-w-0 space-y-4 lg:order-1">
-                <div className="flex flex-wrap gap-2 border-t border-[#e8e8ed] pt-4">
-                  <span className="w-full text-[11px] text-[#6e6e73]">
+                <div className="flex flex-wrap gap-2 border-t border-[var(--ecom-divider)] pt-4">
+                  <span className="w-full text-[11px] text-[var(--ecom-muted)]">
                     基于当前草稿重新生成（不会自动生图或入库）：
                   </span>
                   <EcomButtonSecondary
@@ -325,7 +325,7 @@ export function IpMasterContentPanel({
 
         {currentStepId === "versions" && versions.length > 0 ? (
           <div className="mt-8">
-            <p className="text-xs font-medium uppercase tracking-wide text-[#6e6e73]">
+            <p className="text-xs font-medium uppercase tracking-wide text-[var(--ecom-muted)]">
               母版库版本
             </p>
             <ul className="mt-2 space-y-2">
@@ -333,7 +333,7 @@ export function IpMasterContentPanel({
                 <li key={v.version}>
                   <button
                     type="button"
-                    className="flex w-full items-center justify-between rounded-lg border border-[#e8e8ed] px-3 py-2 text-left text-sm hover:bg-[#f5f5f7]"
+                    className="flex w-full items-center justify-between rounded-lg border border-[var(--ecom-divider)] px-3 py-2 text-left text-sm hover:bg-[var(--ecom-parchment)]"
                     onClick={() => {
                       if (v.json && typeof v.json === "object") {
                         onDraftTemplateChange(v.json as IpMasterTemplate);
@@ -342,7 +342,7 @@ export function IpMasterContentPanel({
                     }}
                   >
                     <span className="font-medium">{v.label?.trim() || v.version}</span>
-                    <span className="text-[11px] text-[#86868b]">
+                    <span className="text-[11px] text-[var(--ecom-subtle)]">
                       {v.version} · {v.source} · {new Date(v.createdAt).toLocaleString("zh-CN")}
                       {v.version === activeVersion ? " · 当前" : ""}
                     </span>

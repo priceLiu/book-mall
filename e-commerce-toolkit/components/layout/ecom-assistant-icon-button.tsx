@@ -39,7 +39,7 @@ export function EcomAssistantIconButton({
         ECOM_ASSISTANT_ICON_BTN_SIZE_CLASS,
         variant === "outline"
           ? "border-[var(--ecom-outline-border)] text-[var(--ecom-outline-text)] hover:border-[var(--ecom-outline-border)] hover:bg-[var(--ecom-outline-hover-bg)]"
-          : "border-[#e8e8ed] text-[#6e6e73] hover:border-[var(--ecom-outline-border)]",
+          : "border-[var(--ecom-divider)] text-[var(--ecom-muted)] hover:border-[var(--ecom-outline-border)]",
         className,
       )}
       whileTap={disabled ? undefined : { scale: 0.95 }}

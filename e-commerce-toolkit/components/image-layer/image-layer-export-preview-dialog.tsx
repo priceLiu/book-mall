@@ -39,15 +39,15 @@ export function ImageLayerExportPreviewDialog({
       }}
     >
       <div
-        className="relative flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-[#e8e8ed] bg-white shadow-xl"
+        className="relative flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-[var(--ecom-divider)] bg-white shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <EcomDialogCloseButton disabled={anyBusy} onClick={() => onOpenChange(false)} />
-        <div className="border-b border-[#e8e8ed] px-5 py-4 pr-12">
-          <h2 id="image-layer-export-preview-title" className="text-base font-semibold text-[#1d1d1f]">
+        <div className="border-b border-[var(--ecom-divider)] px-5 py-4 pr-12">
+          <h2 id="image-layer-export-preview-title" className="text-base font-semibold text-[var(--ecom-ink)]">
             成品预览
           </h2>
-          <p className="mt-1 text-[12px] leading-relaxed text-[#6e6e73]">
+          <p className="mt-1 text-[12px] leading-relaxed text-[var(--ecom-muted)]">
             以下为当前画布合成结果（底图 + 各图层位置）。确认无误后再导出 PNG 到本地。
           </p>
         </div>
@@ -72,7 +72,7 @@ export function ImageLayerExportPreviewDialog({
           )}
         </div>
 
-        <div className="flex flex-wrap justify-end gap-2 border-t border-[#e8e8ed] px-5 py-4">
+        <div className="flex flex-wrap justify-end gap-2 border-t border-[var(--ecom-divider)] px-5 py-4">
           <EcomButtonSecondary disabled={anyBusy} onClick={() => onOpenChange(false)}>
             关闭
           </EcomButtonSecondary>

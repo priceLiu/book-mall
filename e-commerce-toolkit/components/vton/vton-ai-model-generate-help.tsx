@@ -17,7 +17,7 @@ export function VtonAiModelGenerateHelp({ className, iconClassName }: Props) {
         type="button"
         tabIndex={0}
         className={cn(
-          "inline-flex h-4 w-4 items-center justify-center rounded-full text-[#86868b] transition-colors hover:text-[#1d1d1f] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0071e3]/40",
+          "inline-flex h-4 w-4 items-center justify-center rounded-full text-[var(--ecom-subtle)] transition-colors hover:text-[var(--ecom-ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ecom-primary)]/40",
           iconClassName,
         )}
         aria-label="AI 生模特功能说明"

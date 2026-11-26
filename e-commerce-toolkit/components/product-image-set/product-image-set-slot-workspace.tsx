@@ -317,11 +317,11 @@ export function ProductImageSetSlotWorkspace({
   const workspaceFrozen = Boolean(disabled) || busy;
 
   return (
-    <section className="rounded-xl border border-[#e8e8ed] bg-[#fafafa] px-4 py-4">
+    <section className="rounded-xl border border-[var(--ecom-divider)] bg-[#fafafa] px-4 py-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h3 className="text-sm font-semibold text-[#1d1d1f]">套图工作区</h3>
-          <p className="mt-0.5 text-[11px] text-[#6e6e73]">
+          <h3 className="text-sm font-semibold text-[var(--ecom-ink)]">套图工作区</h3>
+          <p className="mt-0.5 text-[11px] text-[var(--ecom-muted)]">
             按侧栏套图结构分组 · 比例 {ratio} · 勾选后批量出图；单张生成时其它槽位仍可继续出图。
             {rows.length > 0 ? (
               <span className="ml-1">
@@ -346,10 +346,10 @@ export function ProductImageSetSlotWorkspace({
 
       {rows.length > 0 ? (
         <div className="mb-3 flex items-center gap-2">
-          <label className="flex cursor-pointer items-center gap-1.5 text-[11px] text-[#6e6e73]">
+          <label className="flex cursor-pointer items-center gap-1.5 text-[11px] text-[var(--ecom-muted)]">
             <input
               type="checkbox"
-              className="rounded border-[#d2d2d7]"
+              className="rounded border-[var(--ecom-border-soft)]"
               checked={
                 rows.filter((r) => !isSlotGenerating(r.id)).length > 0 &&
                 selected.size === rows.filter((r) => !isSlotGenerating(r.id)).length
@@ -371,14 +371,14 @@ export function ProductImageSetSlotWorkspace({
           return (
             <div
               key={section.kind}
-              className="rounded-xl border border-[#e8e8ed] bg-white p-4"
+              className="rounded-xl border border-[var(--ecom-divider)] bg-white p-4"
             >
               <div className="mb-2 flex flex-wrap items-center gap-2">
-                <span className="text-sm font-medium text-[#1d1d1f]">{section.label}</span>
-                <label className="flex items-center gap-1 text-xs text-[#6e6e73]">
+                <span className="text-sm font-medium text-[var(--ecom-ink)]">{section.label}</span>
+                <label className="flex items-center gap-1 text-xs text-[var(--ecom-muted)]">
                   <input
                     type="checkbox"
-                    className="rounded border-[#d2d2d7]"
+                    className="rounded border-[var(--ecom-border-soft)]"
                     checked={pick === "all"}
                     ref={(el) => {
                       if (el) el.indeterminate = pick === "partial";
@@ -388,7 +388,7 @@ export function ProductImageSetSlotWorkspace({
                   />
                   全选
                 </label>
-                <span className="text-[11px] text-[#86868b]">
+                <span className="text-[11px] text-[var(--ecom-subtle)]">
                   {sectionDone}/{section.slots.length} 张 · 与侧栏「{section.label}」数量一致
                 </span>
               </div>
@@ -424,7 +424,7 @@ export function ProductImageSetSlotWorkspace({
       </div>
 
       {busy ? (
-        <p className="mt-2 flex items-center gap-2 text-[11px] text-[#6e6e73]">
+        <p className="mt-2 flex items-center gap-2 text-[11px] text-[var(--ecom-muted)]">
           <Loader2 className="h-3.5 w-3.5 animate-spin" />
           正在保存…
         </p>
@@ -528,8 +528,8 @@ function SlotCard({
         "group relative isolate flex shrink-0 flex-col overflow-hidden rounded-xl border bg-white shadow-sm transition",
         generating && "ecom-media-generating-sweep border-[var(--ecom-outline-border)]",
         !generating && selected
-          ? "border-[var(--ecom-outline-border)] ring-2 ring-[#1d1d1f]/15"
-          : !generating && "border-[#e8e8ed]",
+          ? "border-[var(--ecom-outline-border)] ring-2 ring-[var(--ecom-ink)]/15"
+          : !generating && "border-[var(--ecom-divider)]",
       )}
       style={{ width: cardWidth }}
       onClick={(e) => {
@@ -541,19 +541,19 @@ function SlotCard({
       <div className="flex items-center gap-1.5 border-b border-[#f0f0f2] px-2 py-1.5">
         <input
           type="checkbox"
-          className="rounded border-[#d2d2d7]"
+          className="rounded border-[var(--ecom-border-soft)]"
           checked={selected}
           onChange={onToggleSelect}
           disabled={workspaceFrozen || slotLocked}
         />
-        <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-[#1d1d1f]">
+        <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-[var(--ecom-ink)]">
           {row.title}
         </span>
       </div>
 
       <div
         className={cn(
-          "group/image relative w-full shrink-0 overflow-hidden bg-[#f5f5f7]",
+          "group/image relative w-full shrink-0 overflow-hidden bg-[var(--ecom-parchment)]",
           aspectClass,
         )}
       >
@@ -603,7 +603,7 @@ function SlotCard({
         )}
       </div>
 
-      <p className="line-clamp-4 border-t border-[#f0f0f2] px-2 py-2 text-[10px] leading-snug text-[#6e6e73]">
+      <p className="line-clamp-4 border-t border-[#f0f0f2] px-2 py-2 text-[10px] leading-snug text-[var(--ecom-muted)]">
         {row.prompt.trim() || "（空 Prompt）"}
       </p>
       {row.failMessage ? (

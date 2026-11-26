@@ -31,13 +31,13 @@ export function EcomPromptMentionRefBar({
   if (refs.length === 0) {
     if (!refsEmptyHint) return null;
     return (
-      <p className={cn("text-[11px] leading-relaxed text-[#86868b]", className)}>{refsEmptyHint}</p>
+      <p className={cn("text-[11px] leading-relaxed text-[var(--ecom-subtle)]", className)}>{refsEmptyHint}</p>
     );
   }
 
   return (
     <div className={cn("space-y-1.5", className)}>
-      <p className="text-[10px] font-medium uppercase tracking-wide text-[#6e6e73]">{hint}</p>
+      <p className="text-[10px] font-medium uppercase tracking-wide text-[var(--ecom-muted)]">{hint}</p>
       <div className="flex flex-wrap gap-2">
         {refs.map((ref) => {
           const alias = mentionTokenDisplay(ref.token);
@@ -46,7 +46,7 @@ export function EcomPromptMentionRefBar({
             <>
               {!hasImage ? (
                 <span
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-[#e8e8ed] bg-[#f0f6ff] text-[#0071e3]"
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-[var(--ecom-divider)] bg-[var(--ecom-content-selected-bg)] text-[var(--ecom-primary)]"
                   title={ref.label}
                 >
                   <BookOpen className="h-4 w-4" />
@@ -56,20 +56,20 @@ export function EcomPromptMentionRefBar({
                   url={ref.url}
                   bbox={ref.cropBbox}
                   alt={ref.label}
-                  className="h-10 w-10 shrink-0 rounded-md border border-[#e8e8ed]"
+                  className="h-10 w-10 shrink-0 rounded-md border border-[var(--ecom-divider)]"
                 />
               ) : (
                 /* eslint-disable-next-line @next/next/no-img-element */
                 <img
                   src={buildEcomOssThumbUrl(ref.url)}
                   alt={ref.label}
-                  className="h-10 w-10 shrink-0 rounded-md border border-[#e8e8ed] object-cover"
+                  className="h-10 w-10 shrink-0 rounded-md border border-[var(--ecom-divider)] object-cover"
                   referrerPolicy="no-referrer"
                 />
               )}
               <span className="min-w-0 pr-1">
-                <span className="block font-mono text-[10px] font-medium text-[#0071e3]">{ref.token}</span>
-                <span className="block truncate text-[9px] text-[#86868b]">代号 {alias}</span>
+                <span className="block font-mono text-[10px] font-medium text-[var(--ecom-primary)]">{ref.token}</span>
+                <span className="block truncate text-[9px] text-[var(--ecom-subtle)]">代号 {alias}</span>
               </span>
             </>
           );
@@ -78,7 +78,7 @@ export function EcomPromptMentionRefBar({
               <button
                 key={ref.token}
                 type="button"
-                className="flex items-center gap-1.5 rounded-lg border border-[#e8e8ed] bg-white px-1.5 py-1 text-left transition hover:border-[var(--ecom-outline-border)] hover:bg-[#f0f6ff]"
+                className="flex items-center gap-1.5 rounded-lg border border-[var(--ecom-divider)] bg-white px-1.5 py-1 text-left transition hover:border-[var(--ecom-outline-border)] hover:bg-[var(--ecom-content-selected-bg)]"
                 title={`${ref.label} · 点击放大`}
                 onClick={() => onPreviewImage(ref.url, ref.label)}
               >
@@ -89,7 +89,7 @@ export function EcomPromptMentionRefBar({
           return (
             <div
               key={ref.token}
-              className="flex items-center gap-1.5 rounded-lg border border-[#e8e8ed] bg-white px-1.5 py-1"
+              className="flex items-center gap-1.5 rounded-lg border border-[var(--ecom-divider)] bg-white px-1.5 py-1"
               title={ref.label}
             >
               {inner}

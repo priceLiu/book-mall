@@ -59,11 +59,11 @@ export function ProductDesignMainCopyPanel({ items, onSaveItem }: Props) {
       {items.map((item) => (
         <article
           key={item.index}
-          className="overflow-hidden rounded-xl border border-[#e8e8ed] bg-white"
+          className="overflow-hidden rounded-xl border border-[var(--ecom-divider)] bg-white"
         >
           <header className="border-b border-[#f0f0f2] bg-[#fafafa] px-4 py-2.5">
             <div className="flex items-start gap-2">
-              <p className="shrink-0 text-sm font-semibold text-[#1d1d1f]">
+              <p className="shrink-0 text-sm font-semibold text-[var(--ecom-ink)]">
                 主图 {item.index}
               </p>
               {onSaveItem ? (
@@ -77,7 +77,7 @@ export function ProductDesignMainCopyPanel({ items, onSaveItem }: Props) {
                   />
                 </div>
               ) : item.purpose.trim() ? (
-                <span className="text-sm font-normal text-[#6e6e73]">
+                <span className="text-sm font-normal text-[var(--ecom-muted)]">
                   · {item.purpose}
                 </span>
               ) : null}
@@ -100,7 +100,7 @@ export function ProductDesignMainCopyPanel({ items, onSaveItem }: Props) {
                         onSave={(text) => saveLayer(item, "bullets", text)}
                       />
                     ) : (
-                      <ul className="list-inside list-disc space-y-1 text-xs text-[#1d1d1f]">
+                      <ul className="list-inside list-disc space-y-1 text-xs text-[var(--ecom-ink)]">
                         {bullets.map((b, i) => (
                           <li key={i}>{b}</li>
                         ))}
@@ -126,8 +126,8 @@ export function ProductDesignMainCopyPanel({ items, onSaveItem }: Props) {
                     />
                   ) : (
                     <div className="grid grid-cols-[7rem_1fr] gap-3 text-xs">
-                      <span className="font-medium text-[#86868b]">{row.label}</span>
-                      <span className="text-[#1d1d1f]">{value || "—"}</span>
+                      <span className="font-medium text-[var(--ecom-subtle)]">{row.label}</span>
+                      <span className="text-[var(--ecom-ink)]">{value || "—"}</span>
                     </div>
                   )}
                 </div>
@@ -180,14 +180,14 @@ export function ProductDesignMainCopyPanel({ items, onSaveItem }: Props) {
               ) : (
                 <>
                   {item.emphasis.bold.length > 0 ? (
-                    <p className="text-[11px] text-[#6e6e73]">
-                      <span className="font-medium text-[#1d1d1f]">加粗强调：</span>
+                    <p className="text-[11px] text-[var(--ecom-muted)]">
+                      <span className="font-medium text-[var(--ecom-ink)]">加粗强调：</span>
                       {item.emphasis.bold.join("、")}
                     </p>
                   ) : null}
                   {item.emphasis.color.length > 0 ? (
-                    <p className="text-[11px] text-[#6e6e73]">
-                      <span className="font-medium text-[#1d1d1f]">彩色强调：</span>
+                    <p className="text-[11px] text-[var(--ecom-muted)]">
+                      <span className="font-medium text-[var(--ecom-ink)]">彩色强调：</span>
                       {item.emphasis.color.join("、")}
                     </p>
                   ) : null}

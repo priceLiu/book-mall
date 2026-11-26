@@ -92,10 +92,10 @@ function PresetPicker({
 
   return (
     <div className="mb-4 space-y-2">
-      <p className="text-xs font-medium text-[#6e6e73]">
+      <p className="text-xs font-medium text-[var(--ecom-muted)]">
         内置{role === "scene" ? "场景" : "道具"}词库 · 点击切换提示词
       </p>
-      <div className="ecom-scrollbar-thin max-h-[28vh] space-y-1.5 overflow-y-auto rounded-lg border border-[#e8e8ed] bg-[#fafafa] p-2">
+      <div className="ecom-scrollbar-thin max-h-[28vh] space-y-1.5 overflow-y-auto rounded-lg border border-[var(--ecom-divider)] bg-[#fafafa] p-2">
         {presets.map((preset) => {
           const active = preset.id === selectedId;
           const desc =
@@ -110,13 +110,13 @@ function PresetPicker({
               className={cn(
                 "w-full rounded-lg border px-3 py-2 text-left transition",
                 active
-                  ? "border-[var(--ecom-outline-border)] bg-[#f0f6ff]"
+                  ? "border-[var(--ecom-outline-border)] bg-[var(--ecom-content-selected-bg)]"
                   : "border-transparent bg-white hover:border-[var(--ecom-outline-border)]",
               )}
               onClick={() => onSelect(preset)}
             >
-              <p className="text-[13px] font-medium text-[#1d1d1f]">{preset.name}</p>
-              <p className="mt-0.5 line-clamp-2 text-[11px] leading-relaxed text-[#6e6e73]">
+              <p className="text-[13px] font-medium text-[var(--ecom-ink)]">{preset.name}</p>
+              <p className="mt-0.5 line-clamp-2 text-[11px] leading-relaxed text-[var(--ecom-muted)]">
                 {desc}
               </p>
             </button>
@@ -228,16 +228,16 @@ export function ModelShotRefGenerateDialog({
       <div className="relative flex max-h-[85vh] w-full max-w-3xl flex-col rounded-2xl bg-white shadow-2xl">
         <EcomDialogCloseButton disabled={busy} onClick={onClose} />
         <div className="border-b border-[#e5e5ea] px-5 py-4 pr-14">
-          <h3 id="model-shot-ref-gen-title" className="text-base font-semibold text-[#1d1d1f]">
+          <h3 id="model-shot-ref-gen-title" className="text-base font-semibold text-[var(--ecom-ink)]">
             {ROLE_TITLE[role]}
           </h3>
-          <p className="mt-1 text-xs text-[#86868b]">{ROLE_HINT[role]}</p>
+          <p className="mt-1 text-xs text-[var(--ecom-subtle)]">{ROLE_HINT[role]}</p>
         </div>
 
         <>
             <div className="min-h-0 flex-1 overflow-y-auto p-5">
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[#e8e8ed] bg-[#fafafa] px-3 py-2">
-                <span className="text-xs text-[#6e6e73]">生图模型</span>
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[var(--ecom-divider)] bg-[#fafafa] px-3 py-2">
+                <span className="text-xs text-[var(--ecom-muted)]">生图模型</span>
                 <EcomButtonSecondary
                   size="sm"
                   type="button"
@@ -250,11 +250,11 @@ export function ModelShotRefGenerateDialog({
               </div>
 
               {localLoadError && effectiveImageModels.length === 0 ? (
-                <p className="mb-4 rounded-lg border border-[#ffd6a5] bg-[#fff8ed] px-3 py-2 text-xs text-[#6e6e73]">
+                <p className="mb-4 rounded-lg border border-[#ffd6a5] bg-[#fff8ed] px-3 py-2 text-xs text-[var(--ecom-muted)]">
                   {localLoadError}
                   <button
                     type="button"
-                    className="ml-2 text-[#0071e3]"
+                    className="ml-2 text-[var(--ecom-primary)]"
                     disabled={localLoading}
                     onClick={() => void refreshModels()}
                   >
@@ -289,9 +289,9 @@ export function ModelShotRefGenerateDialog({
                 />
               ) : null}
 
-              <p className="mb-2 text-xs font-medium text-[#6e6e73]">生图 Prompt（可微调）</p>
+              <p className="mb-2 text-xs font-medium text-[var(--ecom-muted)]">生图 Prompt（可微调）</p>
               <textarea
-                className="min-h-[20vh] w-full resize-y rounded-lg border border-[#e8e8ed] px-3 py-2.5 text-[13px] leading-relaxed text-[#1d1d1f] focus:border-[var(--ecom-outline-border)] focus:outline-none focus:ring-2 focus:ring-[#1d1d1f]/12 disabled:cursor-not-allowed disabled:bg-[#f5f5f7]"
+                className="min-h-[20vh] w-full resize-y rounded-lg border border-[var(--ecom-divider)] px-3 py-2.5 text-[13px] leading-relaxed text-[var(--ecom-ink)] focus:border-[var(--ecom-outline-border)] focus:outline-none focus:ring-2 focus:ring-[var(--ecom-ink)]/12 disabled:cursor-not-allowed disabled:bg-[var(--ecom-parchment)]"
                 value={draft}
                 autoFocus={role === "model"}
                 disabled={busy}

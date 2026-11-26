@@ -131,7 +131,7 @@ const DetailPageSuiteHitComponentEditor = dynamic(
     import("@/components/detail-page-suite/detail-page-suite-hit-component-editor").then(
       (m) => m.DetailPageSuiteHitComponentEditor,
     ),
-  { ssr: false, loading: () => <div className="h-40 animate-pulse rounded-lg bg-[#f5f5f7]" /> },
+  { ssr: false, loading: () => <div className="h-40 animate-pulse rounded-lg bg-[var(--ecom-parchment)]" /> },
 );
 
 const StoryboardModelPickerDialog = dynamic(
@@ -1212,11 +1212,11 @@ function DetailPageSuiteHitStudioInner() {
           {...chromeProjectHandlers}
         />
         <div className="ecom-scrollbar-overlay min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-y-contain">
-          <div className="border-b border-[#e8e8ed] bg-[#fff8e8] px-5 py-2 text-[11px] text-[#6e4b00]">
+          <div className="border-b border-[var(--ecom-divider)] bg-[#fff8e8] px-5 py-2 text-[11px] text-[#6e4b00]">
             {HIT_COMPLIANCE_COPY}
           </div>
-          <div className="border-b border-[#e8e8ed] bg-[#fafafa] px-5 py-4">
-            <h1 className="mb-3 text-base font-semibold text-[#1d1d1f]">上传与拆解</h1>
+          <div className="border-b border-[var(--ecom-divider)] bg-[#fafafa] px-5 py-4">
+            <h1 className="mb-3 text-base font-semibold text-[var(--ecom-ink)]">上传与拆解</h1>
             <div className="mb-4 grid gap-4 lg:grid-cols-3">
               <EcomRefUploadCard
                 title="竞品详情长截图"
@@ -1287,12 +1287,12 @@ function DetailPageSuiteHitStudioInner() {
               />
             </div>
             <div className="mb-3">
-              <label className="mb-1 block text-sm font-medium text-[#1d1d1f]">
+              <label className="mb-1 block text-sm font-medium text-[var(--ecom-ink)]">
                 新品卖点（五段式）
               </label>
               <EcomSellpointFivePartHint />
               <textarea
-                className="min-h-[160px] w-full rounded-lg border border-[#d2d2d7] px-3 py-2 font-mono text-sm leading-relaxed"
+                className="min-h-[160px] w-full rounded-lg border border-[var(--ecom-border-soft)] px-3 py-2 font-mono text-sm leading-relaxed"
                 value={sellpointDraft}
                 onChange={(e) => setSellpointDraft(e.target.value)}
                 placeholder={ECOM_SELLPOINT_FIVE_PART_PLACEHOLDER}
@@ -1318,7 +1318,7 @@ function DetailPageSuiteHitStudioInner() {
               </div>
             </div>
             {project.meta?.hitStatus === "decomposed" && template && !hitBusy ? (
-              <p className="text-sm text-[#0066cc]">
+              <p className="text-sm text-[var(--ecom-primary)]">
                 拆解已完成。模块文案不会随拆解自动生成，请点击下方「生成原创文案与
                 Prompt」写入各格。
               </p>
@@ -1332,7 +1332,7 @@ function DetailPageSuiteHitStudioInner() {
             {project.meta?.hitWarning ? (
               <p className="mt-2 text-xs text-amber-800">{project.meta.hitWarning}</p>
             ) : null}
-            <p className="mt-2 text-[11px] text-[#86868b]">
+            <p className="mt-2 text-[11px] text-[var(--ecom-subtle)]">
               拆解仅依赖竞品长图；新品图/模特用于识图卖点与出图，可在拆解后补传。
             </p>
           </div>

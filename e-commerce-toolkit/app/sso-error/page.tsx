@@ -36,7 +36,7 @@ export default function SsoErrorPage({
       <div className="mt-8 flex flex-col items-center gap-3">
         <a
           href={buildEcomLoginUrl("/")}
-          className="inline-flex rounded-full bg-[#1d1d1f] px-6 py-2.5 text-sm font-medium text-white hover:bg-black"
+          className="inline-flex rounded-full bg-[var(--ecom-ink)] px-6 py-2.5 text-sm font-medium text-white hover:bg-black"
         >
           重新登录
         </a>

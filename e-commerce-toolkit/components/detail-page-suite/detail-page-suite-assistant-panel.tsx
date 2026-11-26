@@ -467,30 +467,30 @@ export function DetailPageSuiteAssistantPanel() {
             })}
 
             {!showChoices && workspaceGuide ? (
-              <div className="rounded-2xl border border-[var(--ecom-outline-border)] bg-[#f0f6ff] p-4 shadow-sm">
-                <p className="text-sm font-semibold text-[#1d1d1f]">{workspaceGuide.title}</p>
-                <p className="mt-1 text-xs leading-relaxed text-[#6e6e73]">{workspaceGuide.body}</p>
+              <div className="rounded-2xl border border-[var(--ecom-outline-border)] bg-[var(--ecom-content-selected-bg)] p-4 shadow-sm">
+                <p className="text-sm font-semibold text-[var(--ecom-ink)]">{workspaceGuide.title}</p>
+                <p className="mt-1 text-xs leading-relaxed text-[var(--ecom-muted)]">{workspaceGuide.body}</p>
               </div>
             ) : null}
 
             {showChoices && liveStep ? (
               <div className="flex flex-col items-start">
                 <div className={ECOM_ASSISTANT_CHOICE_SHELL_CLASS}>
-                  <div className="rounded-2xl border border-[var(--ecom-outline-border)] bg-[#f0f6ff] p-4 shadow-sm">
+                  <div className="rounded-2xl border border-[var(--ecom-outline-border)] bg-[var(--ecom-content-selected-bg)] p-4 shadow-sm">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="text-sm font-semibold text-[#1d1d1f]">
+                        <p className="text-sm font-semibold text-[var(--ecom-ink)]">
                           {liveStep.title}
                         </p>
-                        <p className="mt-1 text-xs leading-relaxed text-[#6e6e73]">
+                        <p className="mt-1 text-xs leading-relaxed text-[var(--ecom-muted)]">
                           {liveStep.subtitle}
                         </p>
-                        <p className="mt-2 text-[11px] text-[#86868b]">
+                        <p className="mt-2 text-[11px] text-[var(--ecom-subtle)]">
                           请选择（无需输入）：点选后将写入会话并同步中栏。
                         </p>
                       </div>
                       {liveStep.progress ? (
-                        <span className="shrink-0 rounded-full bg-white px-2.5 py-0.5 text-[10px] font-medium text-[#0071e3]">
+                        <span className="shrink-0 rounded-full bg-white px-2.5 py-0.5 text-[10px] font-medium text-[var(--ecom-primary)]">
                           {liveStep.progress}
                         </span>
                       ) : null}

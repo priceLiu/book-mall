@@ -25,10 +25,10 @@ export function EcomCopyOverlayMultiLineText({
   hint = "支持多行：主标题与副标题分行输入，预览与导出 PNG 按换行排版。",
   rows = 4,
   className = "space-y-2",
-  labelClassName = "block text-sm text-[#6e6e73]",
+  labelClassName = "block text-sm text-[var(--ecom-muted)]",
   textareaClassName =
-    "mt-1 min-h-[7.5rem] max-h-[min(14rem,32vh)] w-full resize-y rounded-lg border border-[#d2d2d7] bg-white px-3 py-2 text-sm leading-relaxed text-[#1d1d1f] outline-none focus:border-[#424245] whitespace-pre-wrap",
-  hintClassName = "text-[11px] leading-relaxed text-[#86868b]",
+    "mt-1 min-h-[7.5rem] max-h-[min(14rem,32vh)] w-full resize-y rounded-lg border border-[var(--ecom-border-soft)] bg-white px-3 py-2 text-sm leading-relaxed text-[var(--ecom-ink)] outline-none focus:border-[#424245] whitespace-pre-wrap",
+  hintClassName = "text-[11px] leading-relaxed text-[var(--ecom-subtle)]",
 }: EcomCopyOverlayMultiLineTextProps) {
   return (
     <div className={className}>

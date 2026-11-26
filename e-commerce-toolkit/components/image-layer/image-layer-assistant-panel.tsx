@@ -45,7 +45,7 @@ function ParamFields({
               disabled={disabled}
               checked={Boolean(values[f.name] ?? f.defaultValue)}
               onChange={(e) => onChange(f.name, e.target.checked)}
-              className="h-4 w-4 rounded border-[#d2d2d7]"
+              className="h-4 w-4 rounded border-[var(--ecom-border-soft)]"
             />
           ) : f.type === "select" ? (
             <select
@@ -115,7 +115,7 @@ function LocalEditModelButton({
       onClick={onClick}
       className={cn(
         "flex w-full items-center gap-2 rounded-lg border border-[#e5e7eb] bg-white px-3 py-2 text-left",
-        "transition hover:border-[#2563eb]/40 hover:bg-[#f0f6ff]/50",
+        "transition hover:border-[#2563eb]/40 hover:bg-[var(--ecom-content-selected-bg)]/50",
         busy && "opacity-60",
       )}
     >

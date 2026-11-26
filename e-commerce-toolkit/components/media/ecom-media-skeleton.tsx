@@ -20,7 +20,7 @@ export function EcomMediaSkeletonTile({
   return (
     <div
       className={cn(
-        "overflow-hidden rounded-lg border border-[#e8e8ed] bg-[#f5f5f7]",
+        "overflow-hidden rounded-lg border border-[var(--ecom-divider)] bg-[var(--ecom-parchment)]",
         className,
       )}
       aria-hidden

@@ -30,18 +30,18 @@ function formatWhen(iso: string): string {
 
 export function EcomPromptLibraryPageHeader() {
   return (
-    <header className="flex shrink-0 flex-col gap-2 border-b border-[#e8e8ed] bg-white px-4 py-4 sm:px-6">
+    <header className="flex shrink-0 flex-col gap-2 border-b border-[var(--ecom-divider)] bg-white px-4 py-4 sm:px-6">
       <div className="flex items-center gap-3">
         <Link
           href="/library"
-          className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg text-[#6e6e73] hover:bg-[#f5f5f7]"
+          className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg text-[var(--ecom-muted)] hover:bg-[var(--ecom-parchment)]"
           aria-label="返回我的资产"
         >
           <ArrowLeft className="size-5" />
         </Link>
         <div className="min-w-0 flex-1">
-          <h1 className="text-lg font-semibold text-[#1d1d1f]">提示词库</h1>
-          <p className="text-xs text-[#6e6e73]">
+          <h1 className="text-lg font-semibold text-[var(--ecom-ink)]">提示词库</h1>
+          <p className="text-xs text-[var(--ecom-muted)]">
             每条成图/成片对应一条完整提示词，便于检索与复用
           </p>
         </div>
@@ -107,7 +107,7 @@ export function EcomPromptLibraryPanel() {
 
   return (
     <>
-      <div className="sticky top-0 z-10 -mx-4 border-b border-[#e8e8ed] bg-white/95 px-4 pb-3 pt-1 backdrop-blur-sm sm:-mx-6 sm:px-6">
+      <div className="sticky top-0 z-10 -mx-4 border-b border-[var(--ecom-divider)] bg-white/95 px-4 pb-3 pt-1 backdrop-blur-sm sm:-mx-6 sm:px-6">
         <div className="flex flex-wrap gap-2">
           {(
             [
@@ -121,8 +121,8 @@ export function EcomPromptLibraryPanel() {
               type="button"
               className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition ${
                 kind === tab.id
-                  ? "border-[#1d1d1f] bg-[#1d1d1f] text-white"
-                  : "border-[#e8e8ed] bg-white text-[#1d1d1f] hover:bg-[#f5f5f7]"
+                  ? "border-[var(--ecom-ink)] bg-[var(--ecom-ink)] text-white"
+                  : "border-[var(--ecom-divider)] bg-white text-[var(--ecom-ink)] hover:bg-[var(--ecom-parchment)]"
               }`}
               onClick={() => setKind(tab.id)}
             >
@@ -130,7 +130,7 @@ export function EcomPromptLibraryPanel() {
               {!loading && counts[tab.id] > 0 ? (
                 <span
                   className={`rounded-full px-1.5 py-0.5 text-[10px] ${
-                    kind === tab.id ? "bg-white/20" : "bg-[#f5f5f7] text-[#6e6e73]"
+                    kind === tab.id ? "bg-white/20" : "bg-[var(--ecom-parchment)] text-[var(--ecom-muted)]"
                   }`}
                 >
                   {counts[tab.id]}
@@ -140,13 +140,13 @@ export function EcomPromptLibraryPanel() {
           ))}
         </div>
         <label className="relative mt-3 flex items-center">
-          <Search className="pointer-events-none absolute left-3 size-4 text-[#86868b]" />
+          <Search className="pointer-events-none absolute left-3 size-4 text-[var(--ecom-subtle)]" />
           <input
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="搜索提示词或标题…"
-            className="h-9 w-full rounded-lg border border-[#e8e8ed] bg-[#f5f5f7] pl-9 pr-3 text-sm text-[#1d1d1f] placeholder:text-[#86868b] focus:border-[var(--ecom-outline-border)] focus:bg-white focus:outline-none"
+            className="h-9 w-full rounded-lg border border-[var(--ecom-divider)] bg-[var(--ecom-parchment)] pl-9 pr-3 text-sm text-[var(--ecom-ink)] placeholder:text-[var(--ecom-subtle)] focus:border-[var(--ecom-outline-border)] focus:bg-white focus:outline-none"
           />
         </label>
       </div>
@@ -156,7 +156,7 @@ export function EcomPromptLibraryPanel() {
       ) : error ? (
         <p className="mt-6 text-sm text-red-600">{error}</p>
       ) : items.length === 0 ? (
-        <p className="mt-6 text-sm text-[#6e6e73]">
+        <p className="mt-6 text-sm text-[var(--ecom-muted)]">
           暂无带提示词的成图/成片。在各模块成功出图后会自动收录（需入库时写入 prompt）。
         </p>
       ) : (
@@ -168,7 +168,7 @@ export function EcomPromptLibraryPanel() {
             return (
               <li
                 key={item.id}
-                className="overflow-hidden rounded-xl border border-[#e8e8ed] bg-white shadow-sm"
+                className="overflow-hidden rounded-xl border border-[var(--ecom-divider)] bg-white shadow-sm"
               >
                 <div className="flex flex-col gap-3 p-4 sm:flex-row sm:gap-4">
                   <div className="w-full shrink-0 sm:w-[120px]">
@@ -185,17 +185,17 @@ export function EcomPromptLibraryPanel() {
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-sm font-medium text-[#1d1d1f]">{title}</p>
-                      <span className="rounded-full bg-[#f5f5f7] px-2 py-0.5 text-[10px] text-[#6e6e73]">
+                      <p className="text-sm font-medium text-[var(--ecom-ink)]">{title}</p>
+                      <span className="rounded-full bg-[var(--ecom-parchment)] px-2 py-0.5 text-[10px] text-[var(--ecom-muted)]">
                         {promptLibraryModuleLabel(item.module)}
                       </span>
                       {item.modelKey ? (
-                        <span className="text-[10px] text-[#86868b]">{item.modelKey}</span>
+                        <span className="text-[10px] text-[var(--ecom-subtle)]">{item.modelKey}</span>
                       ) : null}
-                      <span className="text-[10px] text-[#86868b]">{formatWhen(item.createdAt)}</span>
+                      <span className="text-[10px] text-[var(--ecom-subtle)]">{formatWhen(item.createdAt)}</span>
                     </div>
                     <p
-                      className={`mt-2 whitespace-pre-wrap font-mono text-xs leading-relaxed text-[#1d1d1f] ${
+                      className={`mt-2 whitespace-pre-wrap font-mono text-xs leading-relaxed text-[var(--ecom-ink)] ${
                         expanded ? "" : "line-clamp-4"
                       }`}
                     >
@@ -204,7 +204,7 @@ export function EcomPromptLibraryPanel() {
                     <div className="mt-3 flex flex-wrap gap-2">
                       <button
                         type="button"
-                        className="inline-flex h-8 items-center gap-1.5 rounded-full border border-[#e8e8ed] bg-white px-3 text-xs font-medium text-[#1d1d1f] hover:bg-[#f5f5f7]"
+                        className="inline-flex h-8 items-center gap-1.5 rounded-full border border-[var(--ecom-divider)] bg-white px-3 text-xs font-medium text-[var(--ecom-ink)] hover:bg-[var(--ecom-parchment)]"
                         onClick={() => void copyPrompt(item.prompt)}
                       >
                         <Copy className="h-3.5 w-3.5" />
@@ -212,14 +212,14 @@ export function EcomPromptLibraryPanel() {
                       </button>
                       <button
                         type="button"
-                        className="inline-flex h-8 items-center rounded-full border border-transparent px-3 text-xs font-medium text-[#0071e3] hover:bg-[#f0f6ff]"
+                        className="inline-flex h-8 items-center rounded-full border border-transparent px-3 text-xs font-medium text-[var(--ecom-primary)] hover:bg-[var(--ecom-content-selected-bg)]"
                         onClick={() => setExpandedId(expanded ? null : item.id)}
                       >
                         {expanded ? "收起" : "展开全文"}
                       </button>
                       <Link
                         href="/library"
-                        className="inline-flex h-8 items-center rounded-full px-3 text-xs font-medium text-[#6e6e73] hover:text-[#0071e3]"
+                        className="inline-flex h-8 items-center rounded-full px-3 text-xs font-medium text-[var(--ecom-muted)] hover:text-[var(--ecom-primary)]"
                       >
                         在成图与视频中查看
                       </Link>

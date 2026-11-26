@@ -86,7 +86,7 @@ export function ProductDesignPromptDialog({
   };
 
   const hintBlock = systemAppendHint ? (
-    <p className="mt-2 rounded-lg bg-[#f5f5f7] px-3 py-2 text-[11px] leading-relaxed text-[#6e6e73]">
+    <p className="mt-2 rounded-lg bg-[var(--ecom-parchment)] px-3 py-2 text-[11px] leading-relaxed text-[var(--ecom-muted)]">
       系统将追加：{systemAppendHint}
     </p>
   ) : null;
@@ -105,7 +105,7 @@ export function ProductDesignPromptDialog({
       />
     ) : (
       <textarea
-        className="min-h-[50vh] w-full flex-1 resize-y rounded-lg border border-[#e8e8ed] px-3 py-2.5 font-mono text-[13px] leading-relaxed text-[#1d1d1f] focus:border-[var(--ecom-outline-border)] focus:outline-none focus:ring-2 focus:ring-[#1d1d1f]/12 disabled:cursor-not-allowed disabled:bg-[#f5f5f7]"
+        className="min-h-[50vh] w-full flex-1 resize-y rounded-lg border border-[var(--ecom-divider)] px-3 py-2.5 font-mono text-[13px] leading-relaxed text-[var(--ecom-ink)] focus:border-[var(--ecom-outline-border)] focus:outline-none focus:ring-2 focus:ring-[var(--ecom-ink)]/12 disabled:cursor-not-allowed disabled:bg-[var(--ecom-parchment)]"
         value={draft}
         autoFocus
         disabled={disabled}
@@ -141,12 +141,12 @@ export function ProductDesignPromptDialog({
           <div className="space-y-1.5 pr-8">
             <h2
               id="product-design-prompt-title"
-              className="text-lg font-semibold leading-none tracking-tight text-[#1d1d1f]"
+              className="text-lg font-semibold leading-none tracking-tight text-[var(--ecom-ink)]"
             >
               {title}
             </h2>
             {subtitle ? (
-              <p className="text-sm text-[#6e6e73]">{subtitle}</p>
+              <p className="text-sm text-[var(--ecom-muted)]">{subtitle}</p>
             ) : null}
             {hintBlock}
           </div>

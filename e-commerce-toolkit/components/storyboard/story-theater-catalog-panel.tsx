@@ -27,7 +27,7 @@ function CatalogSection({
 }) {
   return (
     <section className="space-y-2">
-      <h4 className="text-xs font-semibold text-[#86868b]">{title}</h4>
+      <h4 className="text-xs font-semibold text-[var(--ecom-subtle)]">{title}</h4>
       {children}
     </section>
   );
@@ -45,13 +45,13 @@ function TopicTable({
   onRemove?: (entry: EcomStoryTheaterTopicEntry) => void;
 }) {
   if (rows.length === 0) {
-    return <p className="text-xs text-[#86868b]">暂无条目。</p>;
+    return <p className="text-xs text-[var(--ecom-subtle)]">暂无条目。</p>;
   }
   return (
     <div className="overflow-x-auto rounded-xl border border-[#e5e5ea]">
       <table className="min-w-[720px] w-full text-left text-xs">
         <thead>
-          <tr className="bg-[#1d1d1f] text-white">
+          <tr className="bg-[var(--ecom-ink)] text-white">
             <th className="px-3 py-2">标题</th>
             <th className="px-3 py-2">故事类型</th>
             <th className="px-3 py-2">故事核心</th>
@@ -62,10 +62,10 @@ function TopicTable({
         <tbody>
           {rows.map((row) => (
             <tr key={row.id} className="border-t border-[#e5e5ea]">
-              <td className="px-3 py-2 text-[#1d1d1f]">{row.title}</td>
+              <td className="px-3 py-2 text-[var(--ecom-ink)]">{row.title}</td>
               <td className="px-3 py-2 text-[#424245]">{row.storyType}</td>
-              <td className="max-w-md px-3 py-2 text-[#6e6e73]">{row.storyCore}</td>
-              <td className="px-3 py-2 text-[#6e6e73]">
+              <td className="max-w-md px-3 py-2 text-[var(--ecom-muted)]">{row.storyCore}</td>
+              <td className="px-3 py-2 text-[var(--ecom-muted)]">
                 {row.tags?.length ? row.tags.join(" · ") : "—"}
               </td>
               {!readonly ? (
@@ -73,7 +73,7 @@ function TopicTable({
                   {onEdit ? (
                     <button
                       type="button"
-                      className="mr-2 text-[#0071e3]"
+                      className="mr-2 text-[var(--ecom-primary)]"
                       onClick={() => onEdit(row)}
                     >
                       编辑
@@ -218,7 +218,7 @@ export function StoryTheaterCatalogPanel() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap gap-2 border-b border-[#e8e8ed] pb-3">
+      <div className="flex flex-wrap gap-2 border-b border-[var(--ecom-divider)] pb-3">
         {(Object.keys(verticalLabels) as Array<keyof typeof verticalLabels>).map((v) => (
           <button
             key={v}
@@ -226,8 +226,8 @@ export function StoryTheaterCatalogPanel() {
             className={cn(
               "rounded-full px-4 py-1.5 text-sm transition",
               vertical === v
-                ? "bg-[#1d1d1f] text-white"
-                : "bg-[#f5f5f7] text-[#424245] hover:bg-[#e8e8ed]",
+                ? "bg-[var(--ecom-ink)] text-white"
+                : "bg-[var(--ecom-parchment)] text-[#424245] hover:bg-[var(--ecom-divider)]",
             )}
             onClick={() => setVertical(v)}
           >
@@ -236,10 +236,10 @@ export function StoryTheaterCatalogPanel() {
         ))}
       </div>
 
-      {loading ? <p className="text-sm text-[#86868b]">加载中…</p> : null}
+      {loading ? <p className="text-sm text-[var(--ecom-subtle)]">加载中…</p> : null}
 
       <CatalogSection title="系统推荐（只读）">
-        <p className="text-[11px] text-[#86868b]">
+        <p className="text-[11px] text-[var(--ecom-subtle)]">
           共 {platformForVertical.length} 条 · 垂直：{STORY_THEATER_VERTICAL_LABELS[vertical]}
         </p>
         <TopicTable rows={platformForVertical} readonly />
@@ -262,7 +262,7 @@ export function StoryTheaterCatalogPanel() {
           </EcomButtonSecondary>
         </div>
         {userForVertical.length === 0 ? (
-          <p className="text-xs text-[#86868b]">
+          <p className="text-xs text-[var(--ecom-subtle)]">
             暂无自建故事主题。登录后新建，可在故事剧场模式助手选题时参与随机抽取。
           </p>
         ) : (
@@ -285,10 +285,10 @@ export function StoryTheaterCatalogPanel() {
       {form ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-5 shadow-xl">
-            <h3 className="text-base font-semibold text-[#1d1d1f]">
+            <h3 className="text-base font-semibold text-[var(--ecom-ink)]">
               {form.id ? "编辑故事主题" : "新建故事主题"}
             </h3>
-            <p className="mt-1 text-xs text-[#86868b]">
+            <p className="mt-1 text-xs text-[var(--ecom-subtle)]">
               垂直：{STORY_THEATER_VERTICAL_LABELS[vertical]}
             </p>
             <div className="mt-4 space-y-3">

@@ -107,7 +107,7 @@ export function OutfitShotSceneSetupDialog({
       >
         <div className="space-y-4">
           <div>
-            <p className="mb-2 text-xs font-medium text-[#1d1d1f]">场景来源</p>
+            <p className="mb-2 text-xs font-medium text-[var(--ecom-ink)]">场景来源</p>
             <div className="grid gap-2 sm:grid-cols-3">
               {MODE_OPTIONS.map((opt) => (
                 <button
@@ -117,8 +117,8 @@ export function OutfitShotSceneSetupDialog({
                   className={cn(
                     "rounded-xl border px-3 py-2 text-left text-xs transition-colors",
                     fusion?.mode === opt.id
-                      ? "border-[var(--ecom-outline-border)] bg-[#f0f6ff]"
-                      : "border-[#e8e8ed] hover:border-[#d2d2d7]",
+                      ? "border-[var(--ecom-outline-border)] bg-[var(--ecom-content-selected-bg)]"
+                      : "border-[var(--ecom-divider)] hover:border-[var(--ecom-border-soft)]",
                   )}
                   onClick={() => {
                     if (opt.id === "upload_ref") {
@@ -128,8 +128,8 @@ export function OutfitShotSceneSetupDialog({
                     void onPickMode(shot.index, opt.id);
                   }}
                 >
-                  <span className="font-medium text-[#1d1d1f]">{opt.label}</span>
-                  <span className="mt-0.5 block text-[10px] leading-relaxed text-[#86868b]">
+                  <span className="font-medium text-[var(--ecom-ink)]">{opt.label}</span>
+                  <span className="mt-0.5 block text-[10px] leading-relaxed text-[var(--ecom-subtle)]">
                     {opt.hint}
                   </span>
                 </button>
@@ -138,9 +138,9 @@ export function OutfitShotSceneSetupDialog({
           </div>
 
           <label className="block space-y-1.5">
-            <span className="text-xs font-medium text-[#1d1d1f]">场景描述（融图 Prompt 片段）</span>
+            <span className="text-xs font-medium text-[var(--ecom-ink)]">场景描述（融图 Prompt 片段）</span>
             <textarea
-              className="ecom-scrollbar-thin min-h-[5rem] w-full resize-y rounded-lg border border-[#d2d2d7] px-3 py-2 text-xs leading-relaxed text-[#1d1d1f] focus:border-[var(--ecom-outline-border)] focus:outline-none focus:ring-2 focus:ring-[#1d1d1f]/15 disabled:opacity-50"
+              className="ecom-scrollbar-thin min-h-[5rem] w-full resize-y rounded-lg border border-[var(--ecom-border-soft)] px-3 py-2 text-xs leading-relaxed text-[var(--ecom-ink)] focus:border-[var(--ecom-outline-border)] focus:outline-none focus:ring-2 focus:ring-[var(--ecom-ink)]/15 disabled:opacity-50"
               value={promptDraft}
               disabled={busy}
               onChange={(e) => setPromptDraft(e.target.value)}
@@ -150,17 +150,17 @@ export function OutfitShotSceneSetupDialog({
                 }
               }}
             />
-            <p className="text-[10px] text-[#86868b]">
+            <p className="text-[10px] text-[var(--ecom-subtle)]">
               默认继承全局场景预设或制作表光影/场景；可在此修改后再融图。
             </p>
           </label>
 
           {fusion?.mode === "upload_ref" || globalSceneRef?.ossUrl ? (
-            <div className="rounded-lg border border-[#e8e8ed] bg-[#fafafa] p-3">
-              <p className="mb-2 text-xs font-medium text-[#1d1d1f]">场景参考图</p>
+            <div className="rounded-lg border border-[var(--ecom-divider)] bg-[#fafafa] p-3">
+              <p className="mb-2 text-xs font-medium text-[var(--ecom-ink)]">场景参考图</p>
               <div className="flex flex-wrap items-center gap-2">
                 {(fusion?.sceneRefUrl || globalSceneRef?.ossUrl)?.trim() ? (
-                  <div className="relative h-20 w-14 overflow-hidden rounded-md border border-[#e8e8ed]">
+                  <div className="relative h-20 w-14 overflow-hidden rounded-md border border-[var(--ecom-divider)]">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={(fusion?.sceneRefUrl || globalSceneRef?.ossUrl)!}
@@ -169,7 +169,7 @@ export function OutfitShotSceneSetupDialog({
                     />
                   </div>
                 ) : (
-                  <div className="flex h-20 w-14 items-center justify-center rounded-md border border-dashed border-[#d2d2d7] text-[#86868b]">
+                  <div className="flex h-20 w-14 items-center justify-center rounded-md border border-dashed border-[var(--ecom-border-soft)] text-[var(--ecom-subtle)]">
                     <Plus className="h-5 w-5" />
                   </div>
                 )}
@@ -197,10 +197,10 @@ export function OutfitShotSceneSetupDialog({
           ) : null}
 
           {fusion?.mode === "library" || catalog.length > 0 ? (
-            <div className="max-h-36 space-y-1 overflow-y-auto rounded-lg border border-[#e8e8ed] p-2">
-              <p className="text-[10px] font-medium text-[#6e6e73]">平台场景提示词</p>
+            <div className="max-h-36 space-y-1 overflow-y-auto rounded-lg border border-[var(--ecom-divider)] p-2">
+              <p className="text-[10px] font-medium text-[var(--ecom-muted)]">平台场景提示词</p>
               {catalogLoading ? (
-                <p className="text-[10px] text-[#86868b]">加载中…</p>
+                <p className="text-[10px] text-[var(--ecom-subtle)]">加载中…</p>
               ) : (
                 catalog.map((entry) => (
                   <button
@@ -210,13 +210,13 @@ export function OutfitShotSceneSetupDialog({
                     className={cn(
                       "block w-full rounded-md px-2 py-1.5 text-left text-[11px]",
                       fusion?.libraryEntryId === entry.id
-                        ? "bg-[#f0f6ff] text-[#0071e3]"
-                        : "text-[#1d1d1f] hover:bg-[#f5f5f7]",
+                        ? "bg-[var(--ecom-content-selected-bg)] text-[var(--ecom-primary)]"
+                        : "text-[var(--ecom-ink)] hover:bg-[var(--ecom-parchment)]",
                     )}
                     onClick={() => void onPickMode(shot.index, "library", entry.id)}
                   >
                     <span className="font-medium">{entry.name}</span>
-                    <span className="mt-0.5 block truncate text-[10px] text-[#86868b]">
+                    <span className="mt-0.5 block truncate text-[10px] text-[var(--ecom-subtle)]">
                       {entry.visualPrompt}
                     </span>
                   </button>
@@ -225,22 +225,22 @@ export function OutfitShotSceneSetupDialog({
             </div>
           ) : null}
 
-          <div className="rounded-lg border border-[#e8e8ed] bg-white p-3">
-            <p className="mb-2 text-xs font-medium text-[#1d1d1f]">融图结果</p>
+          <div className="rounded-lg border border-[var(--ecom-divider)] bg-white p-3">
+            <p className="mb-2 text-xs font-medium text-[var(--ecom-ink)]">融图结果</p>
             <div className="flex flex-wrap items-start gap-3">
-              <div className="relative aspect-[9/16] w-16 overflow-hidden rounded-md border border-[#e8e8ed] bg-[#fafafa]">
+              <div className="relative aspect-[9/16] w-16 overflow-hidden rounded-md border border-[var(--ecom-divider)] bg-[#fafafa]">
                 {fusedUrl ? (
                   <>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={fusedUrl} alt="融合图" className="h-full w-full object-cover" />
                     {fusing ? (
                       <div className="absolute inset-0 flex items-center justify-center bg-white/70">
-                        <Loader2 className="h-4 w-4 animate-spin text-[#0071e3]" />
+                        <Loader2 className="h-4 w-4 animate-spin text-[var(--ecom-primary)]" />
                       </div>
                     ) : null}
                   </>
                 ) : (
-                  <div className="flex h-full items-center justify-center px-1 text-center text-[9px] text-[#86868b]">
+                  <div className="flex h-full items-center justify-center px-1 text-center text-[9px] text-[var(--ecom-subtle)]">
                     未融图
                   </div>
                 )}
@@ -272,7 +272,7 @@ export function OutfitShotSceneSetupDialog({
                     删除融合图
                   </EcomButtonSecondary>
                 ) : null}
-                <p className="text-[10px] leading-relaxed text-[#86868b]">
+                <p className="text-[10px] leading-relaxed text-[var(--ecom-subtle)]">
                   融图模型：{fusionModelKey}。人物图 + 场景描述/参考图 → 静态融合图，供动作迁移使用。
                 </p>
               </div>

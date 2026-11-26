@@ -34,8 +34,8 @@ export function FilmPullAnalyzeSummarySections({ structured }: Props) {
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div>
-      <h3 className="mb-2 text-sm font-semibold text-[#1d1d1f]">{title}</h3>
-      <div className="whitespace-pre-wrap rounded-lg border border-[#e8e8ed] bg-[#fafafa] p-3 text-sm text-[#424245]">
+      <h3 className="mb-2 text-sm font-semibold text-[var(--ecom-ink)]">{title}</h3>
+      <div className="whitespace-pre-wrap rounded-lg border border-[var(--ecom-divider)] bg-[#fafafa] p-3 text-sm text-[#424245]">
         {children}
       </div>
     </div>

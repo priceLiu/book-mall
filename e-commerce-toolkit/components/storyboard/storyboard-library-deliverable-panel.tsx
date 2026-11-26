@@ -77,16 +77,16 @@ export function StoryboardLibraryDeliverablePanel({
 
   if (mediaLoading && !snapshot) {
     return (
-      <div className="flex min-h-[240px] items-center justify-center rounded-xl border border-[#e8e8ed] bg-white px-4 py-6">
-        <p className="text-xs text-[#86868b]">加载完整故事版…</p>
+      <div className="flex min-h-[240px] items-center justify-center rounded-xl border border-[var(--ecom-divider)] bg-white px-4 py-6">
+        <p className="text-xs text-[var(--ecom-subtle)]">加载完整故事版…</p>
       </div>
     );
   }
 
   if (!snapshot || !hasSheet) {
     return (
-      <div className="flex min-h-[120px] items-center rounded-xl border border-dashed border-[#d2d2d7] bg-white px-4 py-4">
-        <p className="text-xs text-[#86868b]">暂无分镜内容；可在工作室生成后刷新本页。</p>
+      <div className="flex min-h-[120px] items-center rounded-xl border border-dashed border-[var(--ecom-border-soft)] bg-white px-4 py-4">
+        <p className="text-xs text-[var(--ecom-subtle)]">暂无分镜内容；可在工作室生成后刷新本页。</p>
       </div>
     );
   }
@@ -96,7 +96,7 @@ export function StoryboardLibraryDeliverablePanel({
       <div className="space-y-4">
         <section>
           <div className="mb-2 flex items-center justify-between gap-2">
-            <p className="text-[11px] font-medium text-[#6e6e73]">完整故事版</p>
+            <p className="text-[11px] font-medium text-[var(--ecom-muted)]">完整故事版</p>
             {hasPanelImages ? (
               <EcomButtonSecondary
                 size="sm"
@@ -112,11 +112,11 @@ export function StoryboardLibraryDeliverablePanel({
           <button
             type="button"
             disabled={!hasPanelImages}
-            className={`relative w-full overflow-hidden rounded-xl border border-[#e8e8ed] bg-white shadow-sm disabled:cursor-default ${STORYBOARD_PREVIEW_MIN_H} ${storyboardPreviewAspectClass("16:9")}`}
+            className={`relative w-full overflow-hidden rounded-xl border border-[var(--ecom-divider)] bg-white shadow-sm disabled:cursor-default ${STORYBOARD_PREVIEW_MIN_H} ${storyboardPreviewAspectClass("16:9")}`}
             onClick={() => hasPanelImages && setSheetPreviewOpen(true)}
           >
             {mediaLoading ? (
-              <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/70 text-xs text-[#86868b]">
+              <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/70 text-xs text-[var(--ecom-subtle)]">
                 刷新媒体…
               </div>
             ) : null}
@@ -133,7 +133,7 @@ export function StoryboardLibraryDeliverablePanel({
 
         {hasPanelImages ? (
           <section>
-            <p className="mb-1.5 text-[11px] font-medium text-[#6e6e73]">各镜头分镜图</p>
+            <p className="mb-1.5 text-[11px] font-medium text-[var(--ecom-muted)]">各镜头分镜图</p>
             <ul className="flex flex-wrap gap-2">
               {snapshot.sheet.panels.map((panel) => (
                 <li key={panel.index} className="w-[100px]">
@@ -157,11 +157,11 @@ export function StoryboardLibraryDeliverablePanel({
                       }
                     />
                   ) : (
-                    <div className="flex aspect-[9/16] items-center justify-center rounded-lg border border-dashed border-[#d2d2d7] bg-[#f5f5f7] text-[10px] text-[#86868b]">
+                    <div className="flex aspect-[9/16] items-center justify-center rounded-lg border border-dashed border-[var(--ecom-border-soft)] bg-[var(--ecom-parchment)] text-[10px] text-[var(--ecom-subtle)]">
                       无图
                     </div>
                   )}
-                  <p className="mt-1 text-center text-[10px] text-[#6e6e73]">
+                  <p className="mt-1 text-center text-[10px] text-[var(--ecom-muted)]">
                     镜头 {panel.index}
                   </p>
                 </li>
@@ -174,7 +174,7 @@ export function StoryboardLibraryDeliverablePanel({
           <section className="space-y-3">
             {finalVideo ? (
               <div>
-                <p className="mb-1.5 text-[11px] font-medium text-[#6e6e73]">完整成片</p>
+                <p className="mb-1.5 text-[11px] font-medium text-[var(--ecom-muted)]">完整成片</p>
                 <div className="max-w-[160px]">
                   <EcomMediaLibraryTile
                     kind="video"
@@ -193,7 +193,7 @@ export function StoryboardLibraryDeliverablePanel({
             ) : null}
             {panelVideos.length > 0 ? (
               <div>
-                <p className="mb-1.5 text-[11px] font-medium text-[#6e6e73]">分镜视频</p>
+                <p className="mb-1.5 text-[11px] font-medium text-[var(--ecom-muted)]">分镜视频</p>
                 <ul className="flex flex-wrap gap-2">
                   {panelVideos.map((pv) => (
                     <li key={pv.index} className="w-[100px]">
@@ -211,7 +211,7 @@ export function StoryboardLibraryDeliverablePanel({
                           )
                         }
                       />
-                      <p className="mt-1 text-center text-[10px] text-[#6e6e73]">
+                      <p className="mt-1 text-center text-[10px] text-[var(--ecom-muted)]">
                         镜头 {pv.index}
                       </p>
                     </li>

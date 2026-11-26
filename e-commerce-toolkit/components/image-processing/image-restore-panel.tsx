@@ -151,7 +151,7 @@ export function ImageRestorePanel({
             <>
               <Wand2 className="h-10 w-10 text-violet-500" />
               <p className="mt-3 font-medium">上传损坏、质量下降或低质量的图像进行修复</p>
-              <p className="mt-1 text-xs text-[#6e6e73]">JPG、PNG、WebP，最大 10MB</p>
+              <p className="mt-1 text-xs text-[var(--ecom-muted)]">JPG、PNG、WebP，最大 10MB</p>
             </>
           )}
         </button>
@@ -169,11 +169,11 @@ export function ImageRestorePanel({
 
         <div className="mt-6 grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="text-sm font-medium text-[#1d1d1f]">修复类型</label>
+            <label className="text-sm font-medium text-[var(--ecom-ink)]">修复类型</label>
             <select
               value={repairType}
               onChange={(e) => setRepairType(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-[#d2d2d7] bg-white px-3 py-2.5 text-sm"
+              className="mt-1 w-full rounded-lg border border-[var(--ecom-border-soft)] bg-white px-3 py-2.5 text-sm"
             >
               {RESTORE_REPAIR_OPTIONS.map((o) => (
                 <option key={o.id} value={o.id}>
@@ -183,11 +183,11 @@ export function ImageRestorePanel({
             </select>
           </div>
           <div>
-            <label className="text-sm font-medium text-[#1d1d1f]">高档因素</label>
+            <label className="text-sm font-medium text-[var(--ecom-ink)]">高档因素</label>
             <select
               value={upscaleFactor}
               onChange={(e) => setUpscaleFactor(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-[#d2d2d7] bg-white px-3 py-2.5 text-sm"
+              className="mt-1 w-full rounded-lg border border-[var(--ecom-border-soft)] bg-white px-3 py-2.5 text-sm"
             >
               {RESTORE_UPSCALE_OPTIONS.map((o) => (
                 <option key={o.id} value={o.id}>
@@ -199,14 +199,14 @@ export function ImageRestorePanel({
         </div>
 
         <div className="mt-4">
-          <label className="text-sm font-medium text-[#1d1d1f]">模型</label>
+          <label className="text-sm font-medium text-[var(--ecom-ink)]">模型</label>
           <select
             value={model}
             onChange={(e) => {
               setModel(e.target.value);
               setParams({});
             }}
-            className="mt-1 w-full rounded-lg border border-[#d2d2d7] bg-white px-3 py-2.5 text-sm"
+            className="mt-1 w-full rounded-lg border border-[var(--ecom-border-soft)] bg-white px-3 py-2.5 text-sm"
           >
             {restoreModels.map((m) => (
               <option key={m.modelKey} value={m.modelKey}>
@@ -219,7 +219,7 @@ export function ImageRestorePanel({
         <button
           type="button"
           onClick={() => setAdvancedOpen((v) => !v)}
-          className="mt-4 inline-flex items-center gap-1 text-sm text-[#0071e3]"
+          className="mt-4 inline-flex items-center gap-1 text-sm text-[var(--ecom-primary)]"
         >
           {advancedOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
           高级选项
@@ -240,8 +240,8 @@ export function ImageRestorePanel({
       </div>
 
       <section className="rounded-2xl border border-[#e5e5ea] bg-white p-4 sm:p-6">
-        <h3 className="text-lg font-semibold text-[#1d1d1f]">关于 AI 图像修复器</h3>
-        <p className="mt-2 text-sm text-[#6e6e73]">
+        <h3 className="text-lg font-semibold text-[var(--ecom-ink)]">关于 AI 图像修复器</h3>
+        <p className="mt-2 text-sm text-[var(--ecom-muted)]">
           修复损坏或低质量图像，经 Gateway 调用百炼 / 火山方舟模型。结果自动保存到「我的资产」。
         </p>
         <div className="mt-4 grid gap-4 sm:grid-cols-3">
@@ -252,15 +252,15 @@ export function ImageRestorePanel({
           ].map((c) => (
             <div key={c.title} className="rounded-xl border border-[#e5e5ea] bg-[#fafafa] p-4">
               <c.icon className="mb-2 h-5 w-5 text-emerald-600" />
-              <p className="font-medium text-[#1d1d1f]">{c.title}</p>
-              <p className="mt-1 text-sm text-[#6e6e73]">{c.desc}</p>
+              <p className="font-medium text-[var(--ecom-ink)]">{c.title}</p>
+              <p className="mt-1 text-sm text-[var(--ecom-muted)]">{c.desc}</p>
             </div>
           ))}
         </div>
       </section>
 
       <section className="rounded-2xl border border-[#e5e5ea] bg-white p-4 sm:p-6">
-        <h3 className="text-lg font-semibold text-[#1d1d1f]">如何使用 AI 照片修复</h3>
+        <h3 className="text-lg font-semibold text-[var(--ecom-ink)]">如何使用 AI 照片修复</h3>
         <ol className="mt-4 grid gap-4 sm:grid-cols-3">
           {[
             { title: "上传图片", desc: "上传待修复的 JPG / PNG / WebP。" },
@@ -272,8 +272,8 @@ export function ImageRestorePanel({
                 {i + 1}
               </span>
               <div>
-                <p className="font-medium text-[#1d1d1f]">{s.title}</p>
-                <p className="mt-1 text-sm text-[#6e6e73]">{s.desc}</p>
+                <p className="font-medium text-[var(--ecom-ink)]">{s.title}</p>
+                <p className="mt-1 text-sm text-[var(--ecom-muted)]">{s.desc}</p>
               </div>
             </li>
           ))}

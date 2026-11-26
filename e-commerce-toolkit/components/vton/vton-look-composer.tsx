@@ -321,11 +321,11 @@ export function VtonLookComposer({
   }
 
   return (
-    <section className="space-y-3 rounded-xl border border-[#e8e8ed] bg-white p-3">
+    <section className="space-y-3 rounded-xl border border-[var(--ecom-divider)] bg-white p-3">
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
         <div className="min-w-0">
-          <h3 className="text-xs font-semibold text-[#1d1d1f]">搭配编排</h3>
-          <p className="text-[11px] text-[#6e6e73]">
+          <h3 className="text-xs font-semibold text-[var(--ecom-ink)]">搭配编排</h3>
+          <p className="text-[11px] text-[var(--ecom-muted)]">
             已添加 {looks.length}/{ECOM_VTON_MAX_BATCH_LOOKS} 套
             {looks.length > 0 ? (
               <>
@@ -334,7 +334,7 @@ export function VtonLookComposer({
                 {!allSelected ? (
                   <button
                     type="button"
-                    className="ml-1 text-[#0071e3] hover:underline disabled:opacity-50"
+                    className="ml-1 text-[var(--ecom-primary)] hover:underline disabled:opacity-50"
                     disabled={busy || disabled}
                     onClick={onSelectAllLooks}
                   >
@@ -343,7 +343,7 @@ export function VtonLookComposer({
                 ) : (
                   <button
                     type="button"
-                    className="ml-1 text-[#0071e3] hover:underline disabled:opacity-50"
+                    className="ml-1 text-[var(--ecom-primary)] hover:underline disabled:opacity-50"
                     disabled={busy || disabled}
                     onClick={onClearLookSelection}
                   >
@@ -385,8 +385,8 @@ export function VtonLookComposer({
             className={cn(
               "flex flex-wrap items-center gap-3 rounded-lg border px-3 py-2.5",
               selectedSet.has(look.id)
-                ? "border-[var(--ecom-outline-border)] bg-[#f0f6ff]"
-                : "border-[#e8e8ed] bg-[#fafafa]",
+                ? "border-[var(--ecom-outline-border)] bg-[var(--ecom-content-selected-bg)]"
+                : "border-[var(--ecom-divider)] bg-[#fafafa]",
             )}
           >
             <button
@@ -394,7 +394,7 @@ export function VtonLookComposer({
               className={cn(
                 "flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-colors",
                 selectedSet.has(look.id)
-                  ? "border-[var(--ecom-outline-border)] bg-[#0071e3] text-white"
+                  ? "border-[var(--ecom-outline-border)] bg-[var(--ecom-primary)] text-white"
                   : "border-[#c7c7cc] bg-white text-transparent hover:border-[var(--ecom-outline-border)]",
                 (busy || disabled) && "pointer-events-none opacity-40",
               )}
@@ -405,9 +405,9 @@ export function VtonLookComposer({
             >
               <Check className="h-3 w-3" strokeWidth={3} />
             </button>
-            <span className="text-[11px] font-medium text-[#6e6e73]">#{idx + 1}</span>
+            <span className="text-[11px] font-medium text-[var(--ecom-muted)]">#{idx + 1}</span>
             <select
-              className="rounded border border-[#e8e8ed] bg-white px-2 py-1 text-[11px]"
+              className="rounded border border-[var(--ecom-divider)] bg-white px-2 py-1 text-[11px]"
               value={look.kind}
               disabled={busy || disabled}
               onChange={(e) => void changeLookKind(look.id, e.target.value as VtonLookKind)}
@@ -464,7 +464,7 @@ export function VtonLookComposer({
             <button
               type="button"
               className={cn(
-                "ml-auto rounded p-1 text-[#86868b] hover:bg-[#ffecec] hover:text-[#ff3b30]",
+                "ml-auto rounded p-1 text-[var(--ecom-subtle)] hover:bg-[#ffecec] hover:text-[#ff3b30]",
                 (busy || disabled) && "pointer-events-none opacity-40",
               )}
               disabled={busy || disabled}
@@ -476,7 +476,7 @@ export function VtonLookComposer({
           </div>
         ))}
         {looks.length === 0 ? (
-          <p className="py-4 text-center text-[11px] text-[#86868b]">请添加至少 1 套搭配后再试衣</p>
+          <p className="py-4 text-center text-[11px] text-[var(--ecom-subtle)]">请添加至少 1 套搭配后再试衣</p>
         ) : null}
       </div>
     </section>
@@ -531,7 +531,7 @@ function GarmentSlotField({
       : label;
 
   if (options.length === 0) {
-    return <p className="text-[10px] text-[#86868b]">请先在服装池上传{label}</p>;
+    return <p className="text-[10px] text-[var(--ecom-subtle)]">请先在服装池上传{label}</p>;
   }
 
   const canCycle = options.length > 1 && !disabled;
@@ -548,7 +548,7 @@ function GarmentSlotField({
             type="button"
             disabled={disabled}
             title={`${displayName} · 点击切换`}
-            className="shrink-0 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0071e3]/40"
+            className="shrink-0 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ecom-primary)]/40"
             onClick={() => onChange(cycleGarmentId(value, options))}
           >
             {thumb}
@@ -557,14 +557,14 @@ function GarmentSlotField({
           thumb
         )
       ) : (
-        <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-lg border border-dashed border-[#d2d2d7] bg-white text-[10px] text-[#86868b]">
+        <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-lg border border-dashed border-[var(--ecom-border-soft)] bg-white text-[10px] text-[var(--ecom-subtle)]">
           未选
         </div>
       )}
       {selected ? (
-        <span className="text-[10px] text-[#6e6e73]">
+        <span className="text-[10px] text-[var(--ecom-muted)]">
           {displayName}
-          {canCycle ? <span className="ml-1 text-[#0071e3]">点击切换</span> : null}
+          {canCycle ? <span className="ml-1 text-[var(--ecom-primary)]">点击切换</span> : null}
         </span>
       ) : null}
     </div>

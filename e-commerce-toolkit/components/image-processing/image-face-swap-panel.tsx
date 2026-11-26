@@ -132,7 +132,7 @@ export function ImageFaceSwapPanel({
 
   return (
     <div className="mt-6 space-y-4 sm:mt-8 sm:space-y-6">
-      <div className="rounded-xl border border-amber-200 bg-amber-50/80 px-3 py-3 text-sm text-[#1d1d1f] sm:px-4">
+      <div className="rounded-xl border border-amber-200 bg-amber-50/80 px-3 py-3 text-sm text-[var(--ecom-ink)] sm:px-4">
         <span className="mr-2 inline-flex align-middle text-amber-600">
           <AlertTriangle className="h-4 w-4" />
         </span>
@@ -142,7 +142,7 @@ export function ImageFaceSwapPanel({
       <div className="rounded-2xl border border-[#e5e5ea] bg-white p-4 shadow-sm sm:p-6">
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <p className="mb-2 text-sm font-medium text-[#1d1d1f]">源脸 — 要使用的脸</p>
+            <p className="mb-2 text-sm font-medium text-[var(--ecom-ink)]">源脸 — 要使用的脸</p>
             <button
               type="button"
               onClick={() => sourceRef.current?.click()}
@@ -158,7 +158,7 @@ export function ImageFaceSwapPanel({
                 <>
                   <User className="h-8 w-8 text-violet-500" />
                   <p className="mt-2 text-sm">你的正面照片</p>
-                  <p className="mt-1 text-xs text-[#6e6e73]">JPG、PNG、WebP，最大 10MB</p>
+                  <p className="mt-1 text-xs text-[var(--ecom-muted)]">JPG、PNG、WebP，最大 10MB</p>
                 </>
               )}
             </button>
@@ -175,7 +175,7 @@ export function ImageFaceSwapPanel({
             />
           </div>
           <div>
-            <p className="mb-2 text-sm font-medium text-[#1d1d1f]">目标图 — 要替换的脸</p>
+            <p className="mb-2 text-sm font-medium text-[var(--ecom-ink)]">目标图 — 要替换的脸</p>
             <button
               type="button"
               onClick={() => targetRef.current?.click()}
@@ -191,7 +191,7 @@ export function ImageFaceSwapPanel({
                 <>
                   <Users className="h-8 w-8 text-violet-500" />
                   <p className="mt-2 text-sm">用人脸替换的照片</p>
-                  <p className="mt-1 text-xs text-[#6e6e73]">JPG、PNG、WebP，最大 10MB</p>
+                  <p className="mt-1 text-xs text-[var(--ecom-muted)]">JPG、PNG、WebP，最大 10MB</p>
                 </>
               )}
             </button>
@@ -210,7 +210,7 @@ export function ImageFaceSwapPanel({
         </div>
 
         <div className="mt-6">
-          <p className="text-sm font-medium text-[#1d1d1f]">混合模式</p>
+          <p className="text-sm font-medium text-[var(--ecom-ink)]">混合模式</p>
           <div className="mt-2 flex flex-wrap gap-2">
             {FACE_SWAP_BLEND_OPTIONS.map((o) => (
               <button
@@ -220,8 +220,8 @@ export function ImageFaceSwapPanel({
                 className={cn(
                   "rounded-full border px-3 py-1.5 text-xs font-medium",
                   blendMode === o.id
-                    ? "border-[var(--ecom-outline-border)] bg-[#f0f6ff] text-[#0071e3]"
-                    : "border-[#e5e5ea] text-[#1d1d1f]",
+                    ? "border-[var(--ecom-outline-border)] bg-[var(--ecom-content-selected-bg)] text-[var(--ecom-primary)]"
+                    : "border-[#e5e5ea] text-[var(--ecom-ink)]",
                 )}
               >
                 {o.label}
@@ -232,11 +232,11 @@ export function ImageFaceSwapPanel({
 
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="text-sm font-medium text-[#1d1d1f]">后期处理</label>
+            <label className="text-sm font-medium text-[var(--ecom-ink)]">后期处理</label>
             <select
               value={postProcess}
               onChange={(e) => setPostProcess(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-[#d2d2d7] bg-white px-3 py-2.5 text-sm"
+              className="mt-1 w-full rounded-lg border border-[var(--ecom-border-soft)] bg-white px-3 py-2.5 text-sm"
             >
               {FACE_SWAP_POST_OPTIONS.map((o) => (
                 <option key={o.id} value={o.id}>
@@ -246,11 +246,11 @@ export function ImageFaceSwapPanel({
             </select>
           </div>
           <div>
-            <label className="text-sm font-medium text-[#1d1d1f]">模型</label>
+            <label className="text-sm font-medium text-[var(--ecom-ink)]">模型</label>
             <select
               value={algorithm}
               onChange={(e) => setAlgorithm(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-[#d2d2d7] bg-white px-3 py-2.5 text-sm"
+              className="mt-1 w-full rounded-lg border border-[var(--ecom-border-soft)] bg-white px-3 py-2.5 text-sm"
             >
               {FACE_SWAP_ALGORITHM_OPTIONS.map((o) => (
                 <option key={o.id} value={o.id}>
@@ -262,14 +262,14 @@ export function ImageFaceSwapPanel({
         </div>
 
         <div className="mt-4 rounded-xl border border-[#e5e5ea] bg-[#fafafa] p-4">
-          <label className="text-sm font-medium text-[#1d1d1f]">模型</label>
+          <label className="text-sm font-medium text-[var(--ecom-ink)]">模型</label>
           <select
             value={model}
             onChange={(e) => {
               setModel(e.target.value);
               setParams({});
             }}
-            className="mt-1 w-full rounded-lg border border-[#d2d2d7] bg-white px-3 py-2.5 text-sm"
+            className="mt-1 w-full rounded-lg border border-[var(--ecom-border-soft)] bg-white px-3 py-2.5 text-sm"
           >
             {swapModels.map((m) => (
               <option key={m.modelKey} value={m.modelKey}>
@@ -277,13 +277,13 @@ export function ImageFaceSwapPanel({
               </option>
             ))}
           </select>
-          <p className="mt-1 text-xs text-[#6e6e73]">支持 Qwen 图像编辑 / Max、Seedream 5.0 Lite</p>
+          <p className="mt-1 text-xs text-[var(--ecom-muted)]">支持 Qwen 图像编辑 / Max、Seedream 5.0 Lite</p>
         </div>
 
         <button
           type="button"
           onClick={() => setAdvancedOpen((v) => !v)}
-          className="mt-4 inline-flex items-center gap-1 text-sm text-[#0071e3]"
+          className="mt-4 inline-flex items-center gap-1 text-sm text-[var(--ecom-primary)]"
         >
           {advancedOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
           高级选项
@@ -304,7 +304,7 @@ export function ImageFaceSwapPanel({
       </div>
 
       <section className="rounded-2xl border border-[#e5e5ea] bg-white p-4 sm:p-6">
-        <h3 className="text-lg font-semibold text-[#1d1d1f]">负责任地使用 AI 换脸技术</h3>
+        <h3 className="text-lg font-semibold text-[var(--ecom-ink)]">负责任地使用 AI 换脸技术</h3>
         <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {[
             { title: "角色扮演自拍", desc: "万圣节造型、历史人物或幻想角色（需本人授权）。" },
@@ -320,8 +320,8 @@ export function ImageFaceSwapPanel({
           ].map((c) => (
             <div key={c.title} className="rounded-xl border border-[#e5e5ea] bg-[#fafafa] p-4">
               {c.icon ? <c.icon className="mb-2 h-5 w-5 text-rose-600" /> : null}
-              <p className="font-medium text-[#1d1d1f]">{c.title}</p>
-              <p className="mt-1 text-sm text-[#6e6e73]">{c.desc}</p>
+              <p className="font-medium text-[var(--ecom-ink)]">{c.title}</p>
+              <p className="mt-1 text-sm text-[var(--ecom-muted)]">{c.desc}</p>
             </div>
           ))}
         </div>

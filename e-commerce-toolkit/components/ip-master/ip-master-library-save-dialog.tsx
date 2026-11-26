@@ -67,30 +67,30 @@ export function IpMasterLibrarySaveDialog({
       >
         <div className="mb-4 flex items-start justify-between gap-3">
           <div>
-            <h2 id="ip-master-library-save-title" className="text-lg font-semibold text-[#1d1d1f]">
+            <h2 id="ip-master-library-save-title" className="text-lg font-semibold text-[var(--ecom-ink)]">
               保存进母版库
             </h2>
-            <p className="mt-1 text-sm text-[#6e6e73]">
+            <p className="mt-1 text-sm text-[var(--ecom-muted)]">
               系统已生成默认名称，可修改后在母版库 / 导入列表中显示。
             </p>
           </div>
           <EcomDialogCloseButton onClick={() => !busy && onOpenChange(false)} />
         </div>
-        <label className="block text-xs font-medium text-[#6e6e73]">母版库条目名称</label>
+        <label className="block text-xs font-medium text-[var(--ecom-muted)]">母版库条目名称</label>
         <input
-          className="mt-1 w-full rounded-lg border border-[#d2d2d7] px-3 py-2 text-sm"
+          className="mt-1 w-full rounded-lg border border-[var(--ecom-border-soft)] px-3 py-2 text-sm"
           value={name}
           onChange={(e) => setName(e.target.value)}
           disabled={busy}
           placeholder={defaultLabel}
         />
-        <p className="mt-2 text-[11px] text-[#86868b]">
+        <p className="mt-2 text-[11px] text-[var(--ecom-subtle)]">
           默认规则：IP 名称 + 版本号（如「波波仔 · V1.0」）。版本号仍由系统自动递增。
         </p>
         <div className="mt-6 flex justify-end gap-2">
           <button
             type="button"
-            className="rounded-lg px-4 py-2 text-sm text-[#0071e3]"
+            className="rounded-lg px-4 py-2 text-sm text-[var(--ecom-primary)]"
             disabled={busy}
             onClick={() => onOpenChange(false)}
           >

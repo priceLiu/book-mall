@@ -145,7 +145,7 @@ export function OutfitVideoBottomDockComposer({
       }
       composer={
         <div className="flex min-h-[2.25rem] flex-1 items-center gap-3">
-          <p className="min-w-0 flex-1 truncate text-sm text-[#86868b]">{hint}</p>
+          <p className="min-w-0 flex-1 truncate text-sm text-[var(--ecom-subtle)]">{hint}</p>
           {action}
         </div>
       }

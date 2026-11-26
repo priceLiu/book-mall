@@ -269,12 +269,12 @@ export const EcomCopyOverlayCanvas = forwardRef<
               }}
             />
           ) : (
-            <div className="flex h-full items-center justify-center px-4 text-center text-xs text-[#86868b]">
+            <div className="flex h-full items-center justify-center px-4 text-center text-xs text-[var(--ecom-subtle)]">
               {emptyHint}
             </div>
           )}
           {composedPreviewUrl ? (
-            <div className="absolute inset-0 z-20 bg-[#1d1d1f]">
+            <div className="absolute inset-0 z-20 bg-[var(--ecom-ink)]">
               <Image
                 src={composedPreviewUrl}
                 alt="合成预览"
@@ -338,7 +338,7 @@ export const EcomCopyOverlayCanvas = forwardRef<
                   else layerBoxMeasureRefs.current.delete(layer.id);
                 }}
                 className={`relative w-max max-w-full ${
-                  selected ? "outline outline-2 outline-[#0071e3] outline-offset-2" : ""
+                  selected ? "outline outline-2 outline-[var(--ecom-primary)] outline-offset-2" : ""
                 } ${isEmpty && !previewHidden ? "outline-dashed outline-white/50" : ""}`}
                 style={{
                   cursor: previewHidden ? "default" : "move",
@@ -400,8 +400,8 @@ export const EcomCopyOverlayCanvas = forwardRef<
                       title="拖动等比缩放"
                       className="absolute -bottom-px -right-px z-20 h-3 w-3 cursor-nwse-resize"
                       style={{
-                        borderRight: "2px solid #0071e3",
-                        borderBottom: "2px solid #0071e3",
+                        borderRight: "2px solid var(--ecom-primary)",
+                        borderBottom: "2px solid var(--ecom-primary)",
                       }}
                       onPointerDown={(e) => beginResize(e, layer, "corner")}
                     />

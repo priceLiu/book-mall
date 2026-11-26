@@ -28,13 +28,13 @@ import type {
 } from "@/lib/storyboard-types";
 
 function Dash() {
-  return <span className="text-sm text-[#86868b]">--</span>;
+  return <span className="text-sm text-[var(--ecom-subtle)]">--</span>;
 }
 
 function StepSection({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="rounded-xl border border-[#e8e8ed] bg-white p-5">
-      <h2 className="mb-4 text-lg font-semibold text-[#1d1d1f]">{title}</h2>
+    <section className="rounded-xl border border-[var(--ecom-divider)] bg-white p-5">
+      <h2 className="mb-4 text-lg font-semibold text-[var(--ecom-ink)]">{title}</h2>
       {children}
     </section>
   );
@@ -43,8 +43,8 @@ function StepSection({ title, children }: { title: string; children: ReactNode }
 function FieldRow({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="grid gap-1 border-b border-[#f0f0f2] py-2.5 sm:grid-cols-[7rem_1fr] sm:gap-4">
-      <span className="text-xs font-medium text-[#6e6e73]">{label}</span>
-      <div className="min-w-0 text-sm text-[#1d1d1f]">{value}</div>
+      <span className="text-xs font-medium text-[var(--ecom-muted)]">{label}</span>
+      <div className="min-w-0 text-sm text-[var(--ecom-ink)]">{value}</div>
     </div>
   );
 }
@@ -64,16 +64,16 @@ function RefImagesBlock({
 }) {
   return (
     <div>
-      <h3 className="mb-2 text-sm font-semibold text-[#6e6e73]">{title}</h3>
+      <h3 className="mb-2 text-sm font-semibold text-[var(--ecom-muted)]">{title}</h3>
       {skipped ? (
-        <p className="text-sm text-[#86868b]">{skipNote ?? "已跳过"}</p>
+        <p className="text-sm text-[var(--ecom-subtle)]">{skipNote ?? "已跳过"}</p>
       ) : refs.length > 0 ? (
         <div className="flex flex-wrap gap-3">
           {refs.map((r) => (
             <button
               key={r.id}
               type="button"
-              className="group relative h-24 w-24 overflow-hidden rounded-lg border border-[#e8e8ed] bg-[#f5f5f7]"
+              className="group relative h-24 w-24 overflow-hidden rounded-lg border border-[var(--ecom-divider)] bg-[var(--ecom-parchment)]"
               onClick={() => onPreview?.(r.ossUrl, r.label)}
             >
               <Image src={r.ossUrl} alt={r.label} fill className="object-cover" unoptimized />
@@ -183,18 +183,18 @@ export function StoryboardStepResults({
 
   const characterDisplay =
     characterRefs.length > 0 ? null : wf.characterPresetKey || wf.autoGenCharacter ? (
-      <span className="text-sm text-[#1d1d1f]">
+      <span className="text-sm text-[var(--ecom-ink)]">
         {characterPresetLabelFromKey(wf.characterPresetKey) ?? "自动生成角色"}（生图前将生成角色参考图）
       </span>
     ) : wf.skippedCharacter ? (
-      <span className="text-sm text-[#86868b]">已跳过</span>
+      <span className="text-sm text-[var(--ecom-subtle)]">已跳过</span>
     ) : null;
 
   return (
     <div className="space-y-6">
       <StepSection title="策划定稿">
         {awaitingSchemePick && allSchemes.length > 1 ? (
-          <p className="rounded-lg border border-[#e8e8ed] bg-[#f0f6ff] px-4 py-3 text-sm text-[#0071e3]">
+          <p className="rounded-lg border border-[var(--ecom-divider)] bg-[var(--ecom-content-selected-bg)] px-4 py-3 text-sm text-[var(--ecom-primary)]">
             共 {allSchemes.length} 套方案已生成，请在<strong className="font-semibold">左侧助手区</strong>
             点选一套后继续（无需在此重复选择）。
           </p>
@@ -203,7 +203,7 @@ export function StoryboardStepResults({
         {!awaitingSchemePick ? (
           <>
         {deliverable?.creativeBrief ? (
-          <div className="mb-6 border-b border-[#e8e8ed] pb-6">
+          <div className="mb-6 border-b border-[var(--ecom-divider)] pb-6">
             <StoryboardDeliverableSectionBlock title="创意简报">
               <StoryboardCreativeBrief brief={deliverable.creativeBrief} />
             </StoryboardDeliverableSectionBlock>
@@ -211,7 +211,7 @@ export function StoryboardStepResults({
         ) : null}
 
         {deliverable?.productSellingPoints?.length ? (
-          <div className="mb-6 border-b border-[#e8e8ed] pb-6">
+          <div className="mb-6 border-b border-[var(--ecom-divider)] pb-6">
             <StoryboardDeliverableSectionBlock title="产品卖点">
               <StoryboardSellingPointsList sellpoints={deliverable.productSellingPoints} />
             </StoryboardDeliverableSectionBlock>
@@ -219,27 +219,27 @@ export function StoryboardStepResults({
         ) : null}
 
         {analysis && isStructuredAnalysis(analysis) ? (
-          <div className="mb-6 border-b border-[#e8e8ed] pb-6">
+          <div className="mb-6 border-b border-[var(--ecom-divider)] pb-6">
             <StoryboardAnalysisTables analysis={analysis} />
           </div>
         ) : analysis && isLegacyAnalysisMarkdown(analysis) ? (
-          <div className="mb-6 space-y-5 border-b border-[#e8e8ed] pb-6">
+          <div className="mb-6 space-y-5 border-b border-[var(--ecom-divider)] pb-6">
             <div>
-              <h3 className="mb-2 text-sm font-semibold text-[#6e6e73]">表1 · 人群画像</h3>
+              <h3 className="mb-2 text-sm font-semibold text-[var(--ecom-muted)]">表1 · 人群画像</h3>
               <StoryboardMarkdownBlock markdown={analysis.audienceMarkdown} />
             </div>
             <div>
-              <h3 className="mb-2 text-sm font-semibold text-[#6e6e73]">表2 · 三层痛点</h3>
+              <h3 className="mb-2 text-sm font-semibold text-[var(--ecom-muted)]">表2 · 三层痛点</h3>
               <StoryboardMarkdownBlock markdown={analysis.painPointsMarkdown} />
             </div>
             <div>
-              <h3 className="mb-2 text-sm font-semibold text-[#6e6e73]">表3 · 爆款策略</h3>
+              <h3 className="mb-2 text-sm font-semibold text-[var(--ecom-muted)]">表3 · 爆款策略</h3>
               <StoryboardMarkdownBlock markdown={analysis.strategiesMarkdown} />
             </div>
           </div>
         ) : null}
 
-        <h3 className="mb-3 text-sm font-semibold text-[#6e6e73]">定稿方案</h3>
+        <h3 className="mb-3 text-sm font-semibold text-[var(--ecom-muted)]">定稿方案</h3>
         {hasFinalizedPlan ? (
           <div className="divide-y divide-[#f0f0f2]">
             <FieldRow label="产品名称" value={productName || <Dash />} />
@@ -250,7 +250,7 @@ export function StoryboardStepResults({
                   <ul className="space-y-1">
                     {paramEntries.map(([k, v]) => (
                       <li key={k}>
-                        <span className="text-[#6e6e73]">{k}：</span>
+                        <span className="text-[var(--ecom-muted)]">{k}：</span>
                         {v}
                       </li>
                     ))}
@@ -276,14 +276,14 @@ export function StoryboardStepResults({
             />
             {legacyMarkdown ? (
               <div className="pt-4">
-                <h4 className="mb-2 text-xs font-semibold text-[#6e6e73]">
+                <h4 className="mb-2 text-xs font-semibold text-[var(--ecom-muted)]">
                   历史交付原文（legacy）
                 </h4>
                 <StoryboardMarkdownBlock markdown={legacyMarkdown} />
               </div>
             ) : null}
             {!sheet && deliverable?.schemes?.length && !scheme ? (
-              <p className="pt-2 text-xs text-[#86868b]">
+              <p className="pt-2 text-xs text-[var(--ecom-subtle)]">
                 策划 JSON 已解析，请刷新或重新打开项目以同步定稿 sheet。
               </p>
             ) : null}
@@ -320,18 +320,18 @@ export function StoryboardStepResults({
       <StepSection title="场景图">
         {(wf.scenePreset || wf.scenePresetCustom) && otherRefs.length === 0 ? (
           <div>
-            <h3 className="mb-2 text-sm font-semibold text-[#6e6e73]">场景参考</h3>
+            <h3 className="mb-2 text-sm font-semibold text-[var(--ecom-muted)]">场景参考</h3>
             {wf.scenePreset === "custom" && wf.scenePresetCustom ? (
-              <p className="text-sm text-[#1d1d1f]">
+              <p className="text-sm text-[var(--ecom-ink)]">
                 自定义场景：{formatSceneCustomDisplay(wf.scenePresetCustom)}
               </p>
             ) : (
               <>
-                <p className="text-sm text-[#1d1d1f]">
+                <p className="text-sm text-[var(--ecom-ink)]">
                   预设场景：
                   {resolveScenePresetByKey(wf.scenePreset)?.label ?? wf.scenePreset}
                 </p>
-                <p className="mt-1 text-xs text-[#86868b]">
+                <p className="mt-1 text-xs text-[var(--ecom-subtle)]">
                   {resolveScenePresetByKey(wf.scenePreset)?.scriptHint}
                 </p>
               </>
@@ -349,7 +349,7 @@ export function StoryboardStepResults({
 
       <StepSection title="分镜脚本">
         {onEditScriptPanel && scriptPanels.length > 0 ? (
-          <p className="mb-3 text-xs text-[#86868b]">
+          <p className="mb-3 text-xs text-[var(--ecom-subtle)]">
             修改并保存后，生成全部分镜图将按最新脚本执行。
           </p>
         ) : null}

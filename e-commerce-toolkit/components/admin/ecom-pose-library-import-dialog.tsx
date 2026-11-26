@@ -77,13 +77,13 @@ export function EcomPoseLibraryImportDialog({
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/40 p-4">
       <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-[#e5e5ea] bg-white p-4 shadow-xl">
-        <h4 className="mb-3 text-sm font-semibold text-[#1d1d1f]">保存到姿势库</h4>
-        <div className="mb-3 overflow-hidden rounded-lg border border-[#e5e5ea] bg-[#f5f5f7]">
+        <h4 className="mb-3 text-sm font-semibold text-[var(--ecom-ink)]">保存到姿势库</h4>
+        <div className="mb-3 overflow-hidden rounded-lg border border-[#e5e5ea] bg-[var(--ecom-parchment)]">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={imageUrl} alt="" className="mx-auto max-h-48 object-contain" />
         </div>
         <fieldset className="mb-3 space-y-2 text-sm">
-          <legend className="mb-1 text-xs font-medium text-[#86868b]">
+          <legend className="mb-1 text-xs font-medium text-[var(--ecom-subtle)]">
             是否同时存入姿势提示词？
           </legend>
           <label className="flex items-center gap-2">
@@ -99,7 +99,7 @@ export function EcomPoseLibraryImportDialog({
           <label className="mb-3 block space-y-1 text-xs">
             <span className="font-medium text-[#424245]">姿势提示词</span>
             <textarea
-              className="min-h-[88px] w-full rounded-lg border border-[#d2d2d7] px-2 py-1"
+              className="min-h-[88px] w-full rounded-lg border border-[var(--ecom-border-soft)] px-2 py-1"
               value={promptText}
               onChange={(e) => setPromptText(e.target.value)}
             />
@@ -108,7 +108,7 @@ export function EcomPoseLibraryImportDialog({
         <label className="mb-3 block space-y-1 text-xs">
           <span className="font-medium text-[#424245]">动作分类 (A–M)</span>
           <select
-            className="w-full rounded-lg border border-[#d2d2d7] px-2 py-1"
+            className="w-full rounded-lg border border-[var(--ecom-border-soft)] px-2 py-1"
             value={category}
             onChange={(e) => setCategory(e.target.value)}
           >
@@ -156,7 +156,7 @@ export function EcomPoseLibraryImportDialog({
         <div className="flex justify-end gap-2">
           <button
             type="button"
-            className="rounded-lg border border-[#d2d2d7] px-3 py-1.5 text-sm"
+            className="rounded-lg border border-[var(--ecom-border-soft)] px-3 py-1.5 text-sm"
             onClick={onClose}
           >
             取消

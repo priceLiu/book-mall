@@ -64,7 +64,7 @@ const SimpleFusionComposeWorkbench = dynamic(
   {
     ssr: false,
     loading: () => (
-      <p className="text-[10px] text-[#86868b]">剪辑组件加载中…</p>
+      <p className="text-[10px] text-[var(--ecom-subtle)]">剪辑组件加载中…</p>
     ),
   },
 );
@@ -651,7 +651,7 @@ function SimpleFusionVideoStudioInner({
   if (loading || !project) {
     return (
       <EcomWorkspaceLayout>
-        <div className="flex flex-1 items-center justify-center p-8 text-sm text-[#6e6e73]">
+        <div className="flex flex-1 items-center justify-center p-8 text-sm text-[var(--ecom-muted)]">
           加载中…
         </div>
       </EcomWorkspaceLayout>
@@ -758,14 +758,14 @@ function SimpleFusionVideoStudioInner({
             <DialogTitle>
               {aiDialogRole === "model" ? "AI 生成模特参考" : "AI 场景描述"}
             </DialogTitle>
-            <DialogDescription className="text-xs text-[#6e6e73]">
+            <DialogDescription className="text-xs text-[var(--ecom-muted)]">
               {aiDialogRole === "model"
                 ? "纯文生图生成模特参考；与服装图在后续融合步骤合成。"
                 : "仅保存文字场景（可无场景参考图）；也可稍后在卡片中上传场景图覆盖。"}
             </DialogDescription>
           </DialogHeader>
           <textarea
-            className="min-h-[120px] w-full rounded-lg border border-[#d2d2d7] px-3 py-2 text-sm leading-relaxed"
+            className="min-h-[120px] w-full rounded-lg border border-[var(--ecom-border-soft)] px-3 py-2 text-sm leading-relaxed"
             value={aiDialogDraft}
             disabled={modelGenBusy}
             onChange={(e) => setAiDialogDraft(e.target.value)}
@@ -799,13 +799,13 @@ function SimpleFusionVideoStudioInner({
       </Dialog>
 
       <div className="flex h-full min-h-0 flex-col overflow-hidden bg-white">
-        <header className="z-20 shrink-0 border-b border-[#e8e8ed] bg-white px-5 py-3 shadow-[0_1px_0_0_rgba(0,0,0,0.04)]">
+        <header className="z-20 shrink-0 border-b border-[var(--ecom-divider)] bg-white px-5 py-3 shadow-[0_1px_0_0_rgba(0,0,0,0.04)]">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <EcomWorkspaceTitleHeading
               guideModuleId={moduleId}
               title={copy.title}
             >
-              <p className="text-[11px] text-[#6e6e73]">{copy.subtitle}</p>
+              <p className="text-[11px] text-[var(--ecom-muted)]">{copy.subtitle}</p>
             </EcomWorkspaceTitleHeading>
             <EcomIconToolbar>
               <EcomIconToolbarGroup label="项目">
@@ -867,10 +867,10 @@ function SimpleFusionVideoStudioInner({
           />
 
           {moduleId === "video-dance-swap" ? (
-            <section className="mb-4 space-y-2 rounded-xl border border-[#e8e8ed] bg-white p-4">
-              <span className="text-xs font-medium text-[#1d1d1f]">卡点 BGM</span>
+            <section className="mb-4 space-y-2 rounded-xl border border-[var(--ecom-divider)] bg-white p-4">
+              <span className="text-xs font-medium text-[var(--ecom-ink)]">卡点 BGM</span>
               <select
-                className="w-full rounded-lg border border-[#d2d2d7] px-3 py-2 text-xs"
+                className="w-full rounded-lg border border-[var(--ecom-border-soft)] px-3 py-2 text-xs"
                 value={project.settings.bgmPresetId ?? "beat-1"}
                 onChange={(e) =>
                   void patchSimpleFusionProject(project.id, {
@@ -884,23 +884,23 @@ function SimpleFusionVideoStudioInner({
                   </option>
                 ))}
               </select>
-              <p className="text-[10px] text-[#86868b]">
+              <p className="text-[10px] text-[var(--ecom-subtle)]">
                 成片为近似卡点，动作与 BGM 节拍无法 100% 对齐。
               </p>
             </section>
           ) : null}
 
-          <section className="mb-6 space-y-4 rounded-xl border border-[#e8e8ed] bg-[#fafafa] p-4">
+          <section className="mb-6 space-y-4 rounded-xl border border-[var(--ecom-divider)] bg-[#fafafa] p-4">
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div>
-                <h3 className="text-sm font-semibold text-[#1d1d1f]">① 静态融合</h3>
-                <p className="mt-1 text-[10px] leading-relaxed text-[#86868b]">
+                <h3 className="text-sm font-semibold text-[var(--ecom-ink)]">① 静态融合</h3>
+                <p className="mt-1 text-[10px] leading-relaxed text-[var(--ecom-subtle)]">
                   引用上方模特 / 服装 / 场景，分段 Prompt（对齐模特试衣）。生成成功后才会进入下一步。
                 </p>
               </div>
               <button
                 type="button"
-                className="text-[11px] text-[#0071e3] hover:underline"
+                className="text-[11px] text-[var(--ecom-primary)] hover:underline"
                 onClick={() => {
                   if (!project) return;
                   void patchSimpleFusionProject(project.id, {
@@ -916,13 +916,13 @@ function SimpleFusionVideoStudioInner({
               </button>
             </div>
             <div className="space-y-1">
-              <span className="text-xs font-medium text-[#6e6e73]">融合 Prompt</span>
+              <span className="text-xs font-medium text-[var(--ecom-muted)]">融合 Prompt</span>
               <ProductDesignPromptMentionTextarea
                 value={fusionDraft}
                 referenceImages={fusionMentionRefs}
                 disabled={busy}
                 minHeightClass="min-h-[5.5rem]"
-                className="rounded-lg border border-[#d2d2d7] bg-white px-3 py-2 text-xs leading-relaxed"
+                className="rounded-lg border border-[var(--ecom-border-soft)] bg-white px-3 py-2 text-xs leading-relaxed"
                 onChange={setFusionDraft}
                 onFocus={() => {
                   focusedPromptFieldRef.current = "fusion";
@@ -935,13 +935,13 @@ function SimpleFusionVideoStudioInner({
               />
             </div>
             <div className="space-y-1">
-              <span className="text-xs font-medium text-[#6e6e73]">负面 Prompt</span>
+              <span className="text-xs font-medium text-[var(--ecom-muted)]">负面 Prompt</span>
               <ProductDesignPromptMentionTextarea
                 value={negativeDraft}
                 referenceImages={[]}
                 disabled={busy}
                 minHeightClass="min-h-[3rem]"
-                className="rounded-lg border border-[#d2d2d7] bg-white px-3 py-2 text-xs leading-relaxed"
+                className="rounded-lg border border-[var(--ecom-border-soft)] bg-white px-3 py-2 text-xs leading-relaxed"
                 onChange={setNegativeDraft}
                 onFocus={() => {
                   focusedPromptFieldRef.current = "negative";
@@ -1035,7 +1035,7 @@ function SimpleFusionVideoStudioInner({
                             {slot.failReason?.trim() || "融合失败"}
                           </span>
                         ) : (
-                          <span className="flex size-full min-h-[8rem] items-center justify-center px-2 text-center text-[10px] text-[#86868b]">
+                          <span className="flex size-full min-h-[8rem] items-center justify-center px-2 text-center text-[10px] text-[var(--ecom-subtle)]">
                             待融合
                           </span>
                         )}
@@ -1050,24 +1050,24 @@ function SimpleFusionVideoStudioInner({
 
           <section
             className={cn(
-              "mb-6 space-y-4 rounded-xl border border-[#e8e8ed] p-4",
-              allFusionsReady ? "bg-white" : "bg-[#f5f5f7]/80",
+              "mb-6 space-y-4 rounded-xl border border-[var(--ecom-divider)] p-4",
+              allFusionsReady ? "bg-white" : "bg-[var(--ecom-parchment)]/80",
             )}
           >
             <div>
-              <h3 className="text-sm font-semibold text-[#1d1d1f]">② 图生视频</h3>
-              <p className="mt-1 text-[10px] leading-relaxed text-[#86868b]">
+              <h3 className="text-sm font-semibold text-[var(--ecom-ink)]">② 图生视频</h3>
+              <p className="mt-1 text-[10px] leading-relaxed text-[var(--ecom-subtle)]">
                 仅基于上一步融合图生成片段；Prompt 会自动 @融合1…（失败或未出图的不引用）。接口只传融合图 URL。
               </p>
             </div>
             <div className="space-y-1">
-              <span className="text-xs font-medium text-[#6e6e73]">视频 Prompt</span>
+              <span className="text-xs font-medium text-[var(--ecom-muted)]">视频 Prompt</span>
               <ProductDesignPromptMentionTextarea
                 value={videoDraft}
                 referenceImages={videoMentionRefs}
                 disabled={busy || videoMentionRefs.length === 0}
                 minHeightClass="min-h-[4.5rem]"
-                className="rounded-lg border border-[#d2d2d7] bg-white px-3 py-2 text-xs leading-relaxed disabled:bg-[#f5f5f7]"
+                className="rounded-lg border border-[var(--ecom-border-soft)] bg-white px-3 py-2 text-xs leading-relaxed disabled:bg-[var(--ecom-parchment)]"
                 onChange={setVideoDraft}
                 onFocus={() => {
                   focusedPromptFieldRef.current = "video";
@@ -1079,7 +1079,7 @@ function SimpleFusionVideoStudioInner({
                 {...PRODUCT_DESIGN_PROMPT_MENTION_FIELD_PROPS}
               />
               {videoMentionRefs.length === 0 ? (
-                <p className="text-[10px] text-[#86868b]">请先完成 ① 融合，成功出图后会自动填入 @融合 引用。</p>
+                <p className="text-[10px] text-[var(--ecom-subtle)]">请先完成 ① 融合，成功出图后会自动填入 @融合 引用。</p>
               ) : null}
             </div>
             <div className="flex flex-wrap items-center gap-2">

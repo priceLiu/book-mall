@@ -16,17 +16,17 @@ import {
 
 export function StoryboardCreativeBrief({ brief }: CreativeBriefProps) {
   return (
-    <div className="space-y-2 text-sm text-[#1d1d1f]">
+    <div className="space-y-2 text-sm text-[var(--ecom-ink)]">
       <p>
-        <span className="text-[#6e6e73]">人群钩子：</span>
+        <span className="text-[var(--ecom-muted)]">人群钩子：</span>
         {brief.audienceHook}
       </p>
       <p>
-        <span className="text-[#6e6e73]">爆款结构：</span>
+        <span className="text-[var(--ecom-muted)]">爆款结构：</span>
         {brief.viralStructure}
       </p>
       <p>
-        <span className="text-[#6e6e73]">情景扩展：</span>
+        <span className="text-[var(--ecom-muted)]">情景扩展：</span>
         {brief.scenarioExpansion}
       </p>
     </div>
@@ -37,15 +37,15 @@ export function StoryboardSellingPointsList({ sellpoints }: DeliverableSellingPo
   return (
     <ul className="space-y-1.5 text-sm">
       {sellpoints.map((sp) => (
-        <li key={sp.id} className="text-[#1d1d1f]">
+        <li key={sp.id} className="text-[var(--ecom-ink)]">
           <span className="font-medium">{sp.text}</span>
           {sp.source === "inferred" ? (
-            <span className="ml-2 rounded bg-[#f5f5f7] px-1.5 py-0.5 text-[10px] text-[#6e6e73]">
+            <span className="ml-2 rounded bg-[var(--ecom-parchment)] px-1.5 py-0.5 text-[10px] text-[var(--ecom-muted)]">
               AI 推导
             </span>
           ) : null}
           {sp.source === "painpoint" ? (
-            <span className="ml-2 rounded bg-[#f5f5f7] px-1.5 py-0.5 text-[10px] text-[#6e6e73]">
+            <span className="ml-2 rounded bg-[var(--ecom-parchment)] px-1.5 py-0.5 text-[10px] text-[var(--ecom-muted)]">
               痛点映射
             </span>
           ) : null}
@@ -59,21 +59,21 @@ export function StoryboardAnalysisTables({ analysis }: AnalysisTablesProps) {
   return (
     <div className="space-y-5">
       <div>
-        <h3 className="mb-2 text-sm font-semibold text-[#6e6e73]">表1 · 人群画像</h3>
+        <h3 className="mb-2 text-sm font-semibold text-[var(--ecom-muted)]">表1 · 人群画像</h3>
         <EcomDataTable
           headers={["人群类型", "画像描述"]}
           rows={analysis.audience.map((r) => [r.segment, r.description])}
         />
       </div>
       <div>
-        <h3 className="mb-2 text-sm font-semibold text-[#6e6e73]">表2 · 三层痛点</h3>
+        <h3 className="mb-2 text-sm font-semibold text-[var(--ecom-muted)]">表2 · 三层痛点</h3>
         <EcomDataTable
           headers={["痛点层级", "具体描述"]}
           rows={analysis.painPoints.map((r) => [r.level, r.description])}
         />
       </div>
       <div>
-        <h3 className="mb-2 text-sm font-semibold text-[#6e6e73]">表3 · 爆款策略</h3>
+        <h3 className="mb-2 text-sm font-semibold text-[var(--ecom-muted)]">表3 · 爆款策略</h3>
         <EcomDataTable
           headers={["策略", "3秒钩子", "中段承接", "结尾话术"]}
           rows={analysis.strategies.map((r) => [
@@ -95,14 +95,14 @@ export function StoryboardSchemePanelsTable({
   onEditPanel,
 }: SchemePanelsTableProps) {
   if (panels.length === 0) {
-    return <span className="text-sm text-[#86868b]">—</span>;
+    return <span className="text-sm text-[var(--ecom-subtle)]">—</span>;
   }
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-[#e8e8ed]">
+    <div className="overflow-x-auto rounded-lg border border-[var(--ecom-divider)]">
       <table className="w-full min-w-[900px] border-collapse text-left text-xs">
         <thead>
-          <tr className="bg-[#1d1d1f] text-white">
+          <tr className="bg-[var(--ecom-ink)] text-white">
             <th className="px-3 py-2 font-medium">镜号</th>
             <th className="px-3 py-2 font-medium">时间轴</th>
             <th className="px-3 py-2 font-medium">景别</th>
@@ -119,9 +119,9 @@ export function StoryboardSchemePanelsTable({
         </thead>
         <tbody>
           {panels.map((p, i) => (
-            <tr key={`panel-${p.index}-${i}`} className="border-t border-[#e8e8ed] align-top">
+            <tr key={`panel-${p.index}-${i}`} className="border-t border-[var(--ecom-divider)] align-top">
               <td className="px-3 py-2 font-medium">{p.index}</td>
-              <td className="px-3 py-2 text-[#6e6e73]">{formatPanelCellText(p.timeline)}</td>
+              <td className="px-3 py-2 text-[var(--ecom-muted)]">{formatPanelCellText(p.timeline)}</td>
               <td className="px-3 py-2">{formatPanelCellText(p.shotType)}</td>
               <td className="px-3 py-2">{formatPanelCellText(p.scene)}</td>
               <td className="px-3 py-2 max-w-[10rem]">{formatPanelCellText(p.scenePrompt)}</td>
@@ -139,7 +139,7 @@ export function StoryboardSchemePanelsTable({
                 <td className="px-3 py-2">
                   <button
                     type="button"
-                    className="inline-flex items-center gap-1 rounded-md border border-[#d2d2d7] px-2 py-1 text-[11px] text-[#1d1d1f] hover:border-[var(--ecom-outline-border)] hover:text-[#0071e3]"
+                    className="inline-flex items-center gap-1 rounded-md border border-[var(--ecom-border-soft)] px-2 py-1 text-[11px] text-[var(--ecom-ink)] hover:border-[var(--ecom-outline-border)] hover:text-[var(--ecom-primary)]"
                     onClick={() => onEditPanel?.(p.index)}
                   >
                     <Pencil className="h-3 w-3" />
@@ -164,7 +164,7 @@ export function StoryboardDeliverableSectionBlock({
 }) {
   return (
     <div className="mb-5">
-      <h3 className="mb-2 text-sm font-semibold text-[#6e6e73]">{title}</h3>
+      <h3 className="mb-2 text-sm font-semibold text-[var(--ecom-muted)]">{title}</h3>
       {children}
     </div>
   );

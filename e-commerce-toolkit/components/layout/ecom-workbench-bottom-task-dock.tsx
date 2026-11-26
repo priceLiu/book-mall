@@ -48,23 +48,23 @@ function EcomWorkbenchBottomTaskDockInner({
         className="flex w-full items-center gap-2 px-3 py-2.5 text-left"
         onClick={onToggleOpen}
       >
-        <Loader2 className="h-4 w-4 shrink-0 animate-spin text-[#0071e3]" aria-hidden />
+        <Loader2 className="h-4 w-4 shrink-0 animate-spin text-[var(--ecom-primary)]" aria-hidden />
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium text-[#0071e3]">{title}</p>
+          <p className="truncate text-sm font-medium text-[var(--ecom-primary)]">{title}</p>
           {!open && detail ? (
-            <p className="truncate text-[11px] text-[#86868b]">{detail}</p>
+            <p className="truncate text-[11px] text-[var(--ecom-subtle)]">{detail}</p>
           ) : null}
         </div>
         {open ? (
-          <ChevronDown className="h-4 w-4 shrink-0 text-[#86868b]" aria-hidden />
+          <ChevronDown className="h-4 w-4 shrink-0 text-[var(--ecom-subtle)]" aria-hidden />
         ) : (
-          <ChevronUp className="h-4 w-4 shrink-0 text-[#86868b]" aria-hidden />
+          <ChevronUp className="h-4 w-4 shrink-0 text-[var(--ecom-subtle)]" aria-hidden />
         )}
       </button>
       {open ? (
-        <div className="space-y-2 border-t border-[#e8e8ed] px-3 py-2.5">
+        <div className="space-y-2 border-t border-[var(--ecom-divider)] px-3 py-2.5">
           {detail ? (
-            <p className="text-xs leading-relaxed text-[#6e6e73]">{detail}</p>
+            <p className="text-xs leading-relaxed text-[var(--ecom-muted)]">{detail}</p>
           ) : null}
           <div
             className={cn(
@@ -75,7 +75,7 @@ function EcomWorkbenchBottomTaskDockInner({
             <span style={pct != null ? { width: `${pct}%` } : undefined} />
           </div>
           {pct != null ? (
-            <p className="text-[10px] font-medium text-[#0071e3]">{pct}%</p>
+            <p className="text-[10px] font-medium text-[var(--ecom-primary)]">{pct}%</p>
           ) : null}
         </div>
       ) : null}
@@ -102,7 +102,7 @@ export function EcomWorkbenchBottomTaskDock({
     <div
       className={cn(
         "shrink-0 px-5 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))]",
-        placement === "workspace" && "border-t border-[#e8e8ed] bg-white",
+        placement === "workspace" && "border-t border-[var(--ecom-divider)] bg-white",
       )}
       data-ecom-workbench-bottom-task-dock
       role="status"

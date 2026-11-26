@@ -33,12 +33,12 @@ export function EcomWorkspaceTitleHeading({
   return (
     <div className={cn("min-w-0", className)}>
       {eyebrow ? (
-        <div className="text-[11px] font-medium uppercase tracking-wide text-[#86868b]">
+        <div className="text-[11px] font-medium uppercase tracking-wide text-[var(--ecom-subtle)]">
           {eyebrow}
         </div>
       ) : null}
       <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
-        <H className={cn("text-sm font-semibold text-[#1d1d1f]", titleClassName)}>
+        <H className={cn("text-sm font-semibold text-[var(--ecom-ink)]", titleClassName)}>
           {title}
         </H>
         {guideHref ? (

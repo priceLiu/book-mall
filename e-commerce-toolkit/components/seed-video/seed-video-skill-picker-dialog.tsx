@@ -26,15 +26,15 @@ type Props = {
 
 function SkillIcon({ skillKey }: { skillKey: SeedVideoSkillKey }) {
   if (skillKey === "fashion-hit") {
-    return <Shirt className="h-5 w-5 text-[#0071e3]" />;
+    return <Shirt className="h-5 w-5 text-[var(--ecom-primary)]" />;
   }
   if (skillKey === "digital-product") {
-    return <Smartphone className="h-5 w-5 text-[#0071e3]" />;
+    return <Smartphone className="h-5 w-5 text-[var(--ecom-primary)]" />;
   }
   if (skillKey === "home-clothes-lounge-wear") {
-    return <Home className="h-5 w-5 text-[#0071e3]" />;
+    return <Home className="h-5 w-5 text-[var(--ecom-primary)]" />;
   }
-  return <Sparkles className="h-5 w-5 text-[#0071e3]" />;
+  return <Sparkles className="h-5 w-5 text-[var(--ecom-primary)]" />;
 }
 
 export function SeedVideoSkillPickerDialog({ open, onOpenChange, onConfirm }: Props) {
@@ -63,7 +63,7 @@ export function SeedVideoSkillPickerDialog({ open, onOpenChange, onConfirm }: Pr
       <DialogContent className="flex max-w-lg flex-col gap-0 overflow-hidden p-0">
         <DialogHeader className="border-b border-[#f0f0f2] px-5 py-4">
           <DialogTitle className="text-[15px]">选择创作类型</DialogTitle>
-          <p className="text-[12px] text-[#86868b]">
+          <p className="text-[12px] text-[var(--ecom-subtle)]">
             不同类型使用不同的策划 Skill；创建后不可切换，需新建项目更换。
           </p>
         </DialogHeader>
@@ -112,20 +112,20 @@ function SkillCard({
       onClick={onSelect}
       className={cn(
         "flex items-start gap-3 rounded-xl border-2 p-3 text-left transition-colors",
-        active ? "border-[var(--ecom-outline-border)] bg-[#f0f6ff]" : "border-[#e8e8ed] bg-white hover:border-[#d2d2d7]",
+        active ? "border-[var(--ecom-outline-border)] bg-[var(--ecom-content-selected-bg)]" : "border-[var(--ecom-divider)] bg-white hover:border-[var(--ecom-border-soft)]",
       )}
     >
       <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-white shadow-sm">
         <SkillIcon skillKey={skill.key} />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block text-[13px] font-semibold text-[#1d1d1f]">{skill.label}</span>
-        <span className="mt-0.5 block text-[12px] leading-relaxed text-[#86868b]">
+        <span className="block text-[13px] font-semibold text-[var(--ecom-ink)]">{skill.label}</span>
+        <span className="mt-0.5 block text-[12px] leading-relaxed text-[var(--ecom-subtle)]">
           {skill.description}
         </span>
       </span>
       {active ? (
-        <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-[#0071e3] text-white">
+        <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-[var(--ecom-primary)] text-white">
           <Check className="h-3 w-3" strokeWidth={3} />
         </span>
       ) : null}

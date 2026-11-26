@@ -52,12 +52,12 @@ export function ImageMultiUpload({
           <>
             <CloudUpload className="h-10 w-10 text-violet-500" />
             <p className="mt-3 font-medium">{emptyLabel}</p>
-            <p className="mt-1 text-xs text-[#6e6e73]">
+            <p className="mt-1 text-xs text-[var(--ecom-muted)]">
               JPG、PNG、WebP，最大 10MB，最多 {max} 张
             </p>
           </>
         ) : (
-          <p className="text-sm text-[#0071e3]">继续添加图片（{images.length}/{max}）</p>
+          <p className="text-sm text-[var(--ecom-primary)]">继续添加图片（{images.length}/{max}）</p>
         )}
       </button>
 
@@ -78,7 +78,7 @@ export function ImageMultiUpload({
               </button>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={src} alt={`参考图 ${idx + 1}`} className="h-40 w-full object-contain" />
-              <p className="border-t border-[#e5e5ea] px-2 py-1 text-center text-xs text-[#6e6e73]">
+              <p className="border-t border-[#e5e5ea] px-2 py-1 text-center text-xs text-[var(--ecom-muted)]">
                 图 {idx + 1}
               </p>
             </div>

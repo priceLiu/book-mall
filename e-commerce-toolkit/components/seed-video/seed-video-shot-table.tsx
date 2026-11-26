@@ -115,18 +115,18 @@ export function SeedVideoShotTable({
 
   function shotStatus(shot: SeedVideoShot): { label: string; className: string } {
     if (isShotGenerating(shot.index, shot)) {
-      return { label: "生成中", className: "text-[#0071e3]" };
+      return { label: "生成中", className: "text-[var(--ecom-primary)]" };
     }
     if (shot.videoUrl && shot.ttsUrl) {
       return { label: "就绪", className: "text-[#34c759]" };
     }
     if (shot.videoUrl) {
-      return { label: "视频 OK", className: "text-[#1d1d1f]" };
+      return { label: "视频 OK", className: "text-[var(--ecom-ink)]" };
     }
     if (shot.ttsUrl) {
-      return { label: "TTS OK", className: "text-[#6e6e73]" };
+      return { label: "TTS OK", className: "text-[var(--ecom-muted)]" };
     }
-    return { label: "待生成", className: "text-[#86868b]" };
+    return { label: "待生成", className: "text-[var(--ecom-subtle)]" };
   }
 
   const showRefColumn = !hideRefColumn;
@@ -149,9 +149,9 @@ export function SeedVideoShotTable({
   );
 
   return (
-    <div className="overflow-x-auto rounded-xl border border-[#e8e8ed]">
+    <div className="overflow-x-auto rounded-xl border border-[var(--ecom-divider)]">
       {showRefsGallery ? (
-        <div className="border-b border-[#e8e8ed] bg-[#fafafa] px-3 py-2.5">
+        <div className="border-b border-[var(--ecom-divider)] bg-[#fafafa] px-3 py-2.5">
           <EcomPromptMentionRefBar
             refs={resolvedMentionRefs}
             refsEmptyHint="尚未上传参考图；请在上方上传，并在视频 Prompt 中用 @ 插入代号。"
@@ -160,7 +160,7 @@ export function SeedVideoShotTable({
       ) : null}
       <table className="min-w-full text-left text-xs">
         <thead>
-          <tr className="bg-[#1d1d1f] text-white">
+          <tr className="bg-[var(--ecom-ink)] text-white">
             <th className="px-3 py-2 font-medium">镜号</th>
             <th className="px-3 py-2 font-medium">时间</th>
             {showRefColumn ? (
@@ -188,25 +188,25 @@ export function SeedVideoShotTable({
             const deletable = canDeleteShot ? canDeleteShot(shot) : !isGenerating && !shot.videoUrl?.trim();
             return (
               <Fragment key={shot.index}>
-              <tr className="border-t border-[#e8e8ed] align-top">
+              <tr className="border-t border-[var(--ecom-divider)] align-top">
                 <td className="px-3 py-2 whitespace-nowrap">
                   <div className="flex items-center gap-2">
                     {showGenerateActions ? (
                       <input
                         type="checkbox"
-                        className="size-3.5 shrink-0 rounded border-[#d2d2d7] text-[#0071e3] focus:ring-[#1d1d1f]/15 disabled:opacity-40"
+                        className="size-3.5 shrink-0 rounded border-[var(--ecom-border-soft)] text-[var(--ecom-primary)] focus:ring-[var(--ecom-ink)]/15 disabled:opacity-40"
                         checked={isSelected}
                         disabled={selectDisabled || isGenerating}
                         aria-label={`选择镜 ${shot.index}`}
                         onChange={(e) => onToggleShotSelected?.(shot.index, e.target.checked)}
                       />
                     ) : null}
-                    <span className="min-w-[1rem] text-center text-xs font-semibold text-[#1d1d1f]">
+                    <span className="min-w-[1rem] text-center text-xs font-semibold text-[var(--ecom-ink)]">
                       {shot.index}
                     </span>
                   </div>
                 </td>
-                <td className="px-3 py-2 text-[#6e6e73]">{shot.timeSlice}</td>
+                <td className="px-3 py-2 text-[var(--ecom-muted)]">{shot.timeSlice}</td>
                 {showRefColumn ? (
                 <td className="px-3 py-2">
                   {editableRefs && onUploadShotRef ? (
@@ -232,10 +232,10 @@ export function SeedVideoShotTable({
                     <img
                       src={thumb}
                       alt={shot.refImageLabel}
-                      className="h-12 w-12 rounded-lg border border-[#e8e8ed] object-cover"
+                      className="h-12 w-12 rounded-lg border border-[var(--ecom-divider)] object-cover"
                     />
                   ) : (
-                    <span className="text-[#86868b]">{shot.refImageLabel || "—"}</span>
+                    <span className="text-[var(--ecom-subtle)]">{shot.refImageLabel || "—"}</span>
                   )}
                 </td>
                 ) : null}
@@ -258,7 +258,7 @@ export function SeedVideoShotTable({
                 ) : null}
                 <td className="px-3 py-2">
                   <textarea
-                    className="ecom-scrollbar-thin w-full min-h-[4rem] resize-y rounded-lg border border-[#e8e8ed] bg-white px-2 py-1.5 text-[#1d1d1f] focus:border-[var(--ecom-outline-border)] focus:outline-none disabled:opacity-50"
+                    className="ecom-scrollbar-thin w-full min-h-[4rem] resize-y rounded-lg border border-[var(--ecom-divider)] bg-white px-2 py-1.5 text-[var(--ecom-ink)] focus:border-[var(--ecom-outline-border)] focus:outline-none disabled:opacity-50"
                     value={shot.sceneDescription}
                     disabled={disabled || isGenerating}
                     onChange={(e) => patchShot(shot.index, { sceneDescription: e.target.value })}
@@ -271,14 +271,14 @@ export function SeedVideoShotTable({
                       referenceImages={resolvedMentionRefs}
                       disabled={disabled || isGenerating}
                       minHeightClass="min-h-[4rem]"
-                      className="rounded-lg border border-[#e8e8ed] bg-white px-2 py-1.5 text-xs leading-relaxed"
+                      className="rounded-lg border border-[var(--ecom-divider)] bg-white px-2 py-1.5 text-xs leading-relaxed"
                       hideQuickInsert
                       showTopRefBar={false}
                       onChange={(next) => patchShot(shot.index, { videoPrompt: next })}
                     />
                   ) : (
                     <textarea
-                      className="ecom-scrollbar-thin w-full min-h-[4rem] resize-y rounded-lg border border-[#e8e8ed] bg-white px-2 py-1.5 text-[#1d1d1f] focus:border-[var(--ecom-outline-border)] focus:outline-none disabled:opacity-50"
+                      className="ecom-scrollbar-thin w-full min-h-[4rem] resize-y rounded-lg border border-[var(--ecom-divider)] bg-white px-2 py-1.5 text-[var(--ecom-ink)] focus:border-[var(--ecom-outline-border)] focus:outline-none disabled:opacity-50"
                       value={shot.videoPrompt}
                       disabled={disabled || isGenerating}
                       onChange={(e) => patchShot(shot.index, { videoPrompt: e.target.value })}
@@ -300,7 +300,7 @@ export function SeedVideoShotTable({
                       </EcomButtonSecondary>
                     ) : null}
                     <textarea
-                      className="ecom-scrollbar-thin w-full min-h-[4rem] resize-y rounded-lg border border-[#e8e8ed] bg-white px-2 py-1.5 text-[#1d1d1f] focus:border-[var(--ecom-outline-border)] focus:outline-none disabled:opacity-50"
+                      className="ecom-scrollbar-thin w-full min-h-[4rem] resize-y rounded-lg border border-[var(--ecom-divider)] bg-white px-2 py-1.5 text-[var(--ecom-ink)] focus:border-[var(--ecom-outline-border)] focus:outline-none disabled:opacity-50"
                       value={shot.voiceover ?? ""}
                       placeholder="可留空"
                       disabled={disabled || isGenerating}
@@ -315,7 +315,7 @@ export function SeedVideoShotTable({
                   <td className="px-3 py-2">
                     <button
                       type="button"
-                      className="flex size-8 items-center justify-center rounded-lg text-[#86868b] transition hover:bg-[#fff5f5] hover:text-[#ff3b30] disabled:cursor-not-allowed disabled:opacity-30"
+                      className="flex size-8 items-center justify-center rounded-lg text-[var(--ecom-subtle)] transition hover:bg-[#fff5f5] hover:text-[#ff3b30] disabled:cursor-not-allowed disabled:opacity-30"
                       disabled={disabled || !deletable || shots.length <= 1}
                       title={
                         !deletable
@@ -337,7 +337,7 @@ export function SeedVideoShotTable({
                   <td colSpan={columnCount} className="border-0 px-3 py-0">
                     <div className="flex justify-center pb-2 pt-0.5">
                       <div
-                        className="ecom-upload-progress ecom-upload-progress-indeterminate h-0.5 w-40 overflow-hidden rounded-full bg-[#e8e8ed]"
+                        className="ecom-upload-progress ecom-upload-progress-indeterminate h-0.5 w-40 overflow-hidden rounded-full bg-[var(--ecom-divider)]"
                         role="progressbar"
                         aria-label={`镜 ${shot.index} 生成中`}
                       >
@@ -353,7 +353,7 @@ export function SeedVideoShotTable({
         </tbody>
         {showGenerateActions || showRowActions || showVoiceoverDraftActions || onBatchTtsSelected || onBatchComposeSelected ? (
           <tfoot>
-            <tr className="border-t border-[#e8e8ed] bg-[#fafafa]">
+            <tr className="border-t border-[var(--ecom-divider)] bg-[#fafafa]">
               <td colSpan={columnCount} className="px-3 py-2.5">
                 <div className="flex flex-wrap items-center gap-2">
                   {showGenerateActions ? (

@@ -20,8 +20,8 @@ export function VtonImageQualityPicker({ value, onChange, disabled, className }:
       role="group"
       aria-label="生成质量"
     >
-      <span className="text-[10px] font-medium text-[#86868b]">质量</span>
-      <div className="inline-flex rounded-lg border border-[#e8e8ed] bg-[#f5f5f7] p-0.5">
+      <span className="text-[10px] font-medium text-[var(--ecom-subtle)]">质量</span>
+      <div className="inline-flex rounded-lg border border-[var(--ecom-divider)] bg-[var(--ecom-parchment)] p-0.5">
         {VTON_MODEL_IMAGE_QUALITY_OPTIONS.map((opt) => {
           const active = value === opt.value;
           return (
@@ -33,8 +33,8 @@ export function VtonImageQualityPicker({ value, onChange, disabled, className }:
               className={cn(
                 "min-w-[2.75rem] rounded-md px-2 py-1 text-[10px] font-medium transition-colors",
                 active
-                  ? "bg-white text-[#1d1d1f] shadow-sm"
-                  : "text-[#6e6e73] hover:text-[#1d1d1f]",
+                  ? "bg-white text-[var(--ecom-ink)] shadow-sm"
+                  : "text-[var(--ecom-muted)] hover:text-[var(--ecom-ink)]",
                 disabled && "cursor-not-allowed opacity-50",
               )}
               onClick={() => onChange(opt.value)}

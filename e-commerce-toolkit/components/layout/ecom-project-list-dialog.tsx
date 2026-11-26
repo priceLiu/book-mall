@@ -81,19 +81,19 @@ export function EcomProjectListDialog({
       <DialogContent className="flex max-h-[85vh] max-w-2xl flex-col gap-0 overflow-hidden p-0">
         <DialogHeader className="border-b border-[#f0f0f2] px-5 py-4">
           <DialogTitle className="text-[15px]">{title}</DialogTitle>
-          <p className="text-[12px] text-[#86868b]">{description}</p>
+          <p className="text-[12px] text-[var(--ecom-subtle)]">{description}</p>
         </DialogHeader>
 
         <div className="ecom-scrollbar-thin min-h-0 flex-1 overflow-y-auto px-5 py-4">
           {loading ? (
-            <div className="grid place-items-center gap-2 py-14 text-sm text-[#86868b]">
+            <div className="grid place-items-center gap-2 py-14 text-sm text-[var(--ecom-subtle)]">
               <Loader2 className="h-5 w-5 animate-spin" />
               正在加载项目…
             </div>
           ) : error ? (
             <p className="py-14 text-center text-sm text-[#c0392b]">{error}</p>
           ) : projects.length === 0 ? (
-            <p className="py-14 text-center text-sm text-[#86868b]">{emptyHint}</p>
+            <p className="py-14 text-center text-sm text-[var(--ecom-subtle)]">{emptyHint}</p>
           ) : (
             <div className="flex flex-col gap-2">
               {projects.map((p) => {
@@ -108,12 +108,12 @@ export function EcomProjectListDialog({
                     className={cn(
                       "flex items-center gap-3 rounded-xl border-2 p-2.5 text-left transition-colors",
                       active
-                        ? "border-[var(--ecom-outline-border)] bg-[#f0f6ff]"
-                        : "border-[#e8e8ed] bg-white hover:border-[#d2d2d7]",
+                        ? "border-[var(--ecom-outline-border)] bg-[var(--ecom-content-selected-bg)]"
+                        : "border-[var(--ecom-divider)] bg-white hover:border-[var(--ecom-border-soft)]",
                       openingId && !opening ? "opacity-60" : "",
                     )}
                   >
-                    <span className="relative grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-lg bg-[#f5f5f7]">
+                    <span className="relative grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-lg bg-[var(--ecom-parchment)]">
                       {p.thumbnailUrl ? (
                         <Image
                           src={p.thumbnailUrl}
@@ -127,21 +127,21 @@ export function EcomProjectListDialog({
                       )}
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[13px] font-medium text-[#1d1d1f]">
+                      <span className="block truncate text-[13px] font-medium text-[var(--ecom-ink)]">
                         {p.title}
                       </span>
-                      <span className="mt-0.5 block text-[11px] text-[#86868b]">
+                      <span className="mt-0.5 block text-[11px] text-[var(--ecom-subtle)]">
                         {p.subtitle ? `${p.subtitle} · ` : ""}
                         {formatEcomProjectUpdatedAt(p.updatedAt)}
                       </span>
                       {active ? (
-                        <span className="mt-0.5 block text-[11px] text-[#0071e3]">当前打开</span>
+                        <span className="mt-0.5 block text-[11px] text-[var(--ecom-primary)]">当前打开</span>
                       ) : null}
                     </span>
                     {opening ? (
-                      <Loader2 className="h-4 w-4 shrink-0 animate-spin text-[#0071e3]" />
+                      <Loader2 className="h-4 w-4 shrink-0 animate-spin text-[var(--ecom-primary)]" />
                     ) : active ? (
-                      <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-[#0071e3] text-white">
+                      <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-[var(--ecom-primary)] text-white">
                         <Check className="h-3 w-3" strokeWidth={3} />
                       </span>
                     ) : null}

@@ -45,12 +45,12 @@ export function EcomCopyOverlayLayersEditor({
         ? "border-[#0a84ff] bg-[#0a84ff]/20 text-white"
         : "border-white/15 bg-black/30 text-white/80 hover:bg-white/10"
       : active
-        ? "border-[var(--ecom-outline-border)] bg-[#f0f6ff] text-[#1d1d1f]"
-        : "border-[#e8e8ed] bg-white text-[#6e6e73] hover:bg-[#fafafa]";
+        ? "border-[var(--ecom-outline-border)] bg-[var(--ecom-content-selected-bg)] text-[var(--ecom-ink)]"
+        : "border-[var(--ecom-divider)] bg-white text-[var(--ecom-muted)] hover:bg-[#fafafa]";
 
   const actionBtn = isDark
     ? "rounded-lg border border-white/15 px-2.5 py-1 text-xs text-white/80 hover:bg-white/10 disabled:opacity-40"
-    : "rounded-lg border border-[#d2d2d7] px-2.5 py-1 text-xs text-[#424245] hover:bg-[#fafafa] disabled:opacity-40";
+    : "rounded-lg border border-[var(--ecom-border-soft)] px-2.5 py-1 text-xs text-[#424245] hover:bg-[#fafafa] disabled:opacity-40";
 
   const layerChip = (active: boolean) =>
     isDark
@@ -58,14 +58,14 @@ export function EcomCopyOverlayLayersEditor({
         ? "border-[#0a84ff] bg-[#0a84ff]/25 text-white"
         : "border-white/15 bg-black/20 text-white/75 hover:bg-white/10"
       : active
-        ? "border-[var(--ecom-outline-border)] bg-[#f0f6ff] text-[#0071e3]"
-        : "border-[#e8e8ed] bg-white text-[#6e6e73] hover:border-[#d2d2d7]";
+        ? "border-[var(--ecom-outline-border)] bg-[var(--ecom-content-selected-bg)] text-[var(--ecom-primary)]"
+        : "border-[var(--ecom-divider)] bg-white text-[var(--ecom-muted)] hover:border-[var(--ecom-border-soft)]";
 
   return (
     <div className="space-y-3">
       {layout === "stack" ? (
         <div className="flex flex-wrap items-center gap-2">
-          <span className={`text-xs font-medium ${isDark ? "text-white/60" : "text-[#6e6e73]"}`}>
+          <span className={`text-xs font-medium ${isDark ? "text-white/60" : "text-[var(--ecom-muted)]"}`}>
             文案块（点击选中 · 左侧拖拽定位）
           </span>
           <button
@@ -99,7 +99,7 @@ export function EcomCopyOverlayLayersEditor({
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
-            className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${isDark ? actionBtn : "border-[#d2d2d7] bg-white text-[#424245] hover:bg-[#fafafa] disabled:opacity-40"}`}
+            className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${isDark ? actionBtn : "border-[var(--ecom-border-soft)] bg-white text-[#424245] hover:bg-[#fafafa] disabled:opacity-40"}`}
             disabled={disabled}
             onClick={() => {
               const { overlay: next, layerId } = addOverlayTextLayer(overlay);
@@ -111,7 +111,7 @@ export function EcomCopyOverlayLayersEditor({
           </button>
           <button
             type="button"
-            className={`rounded-full border px-3 py-1 text-xs transition-colors ${isDark ? actionBtn : "border-[#e8e8ed] bg-[#fafafa] text-[#6e6e73] hover:bg-white disabled:opacity-40"}`}
+            className={`rounded-full border px-3 py-1 text-xs transition-colors ${isDark ? actionBtn : "border-[var(--ecom-divider)] bg-[#fafafa] text-[var(--ecom-muted)] hover:bg-white disabled:opacity-40"}`}
             disabled={disabled || overlay.layers.length <= 1 || !selectedId}
             onClick={() => {
               if (!selectedId) return;

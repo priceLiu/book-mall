@@ -38,19 +38,19 @@ export function IpMasterTemplateEditor({ template, onChange, disabled }: Props) 
   return (
     <div className="space-y-6">
       <section className="grid gap-3 sm:grid-cols-2">
-        <label className="block text-xs font-medium text-[#6e6e73]">
+        <label className="block text-xs font-medium text-[var(--ecom-muted)]">
           IP 名称
           <input
-            className="mt-1 w-full rounded-lg border border-[#d2d2d7] px-2.5 py-2 text-sm"
+            className="mt-1 w-full rounded-lg border border-[var(--ecom-border-soft)] px-2.5 py-2 text-sm"
             value={template.ipMeta.ipName}
             disabled={disabled}
             onChange={(e) => setMeta({ ipName: e.target.value })}
           />
         </label>
-        <label className="block text-xs font-medium text-[#6e6e73] sm:col-span-2">
+        <label className="block text-xs font-medium text-[var(--ecom-muted)] sm:col-span-2">
           风格一句话
           <input
-            className="mt-1 w-full rounded-lg border border-[#d2d2d7] px-2.5 py-2 text-sm"
+            className="mt-1 w-full rounded-lg border border-[var(--ecom-border-soft)] px-2.5 py-2 text-sm"
             value={template.ipMeta.styleSummary ?? ""}
             disabled={disabled}
             onChange={(e) => setMeta({ styleSummary: e.target.value })}
@@ -60,7 +60,7 @@ export function IpMasterTemplateEditor({ template, onChange, disabled }: Props) 
 
       <section>
         <div className="mb-2 flex items-center justify-between">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-[#6e6e73]">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--ecom-muted)]">
             刚性特征
           </h3>
           <EcomButtonSecondary
@@ -84,22 +84,22 @@ export function IpMasterTemplateEditor({ template, onChange, disabled }: Props) 
         </div>
         <ul className="space-y-2">
           {template.rigidFeatures.map((f, i) => (
-            <li key={i} className="rounded-lg border border-[#e8e8ed] p-2">
+            <li key={i} className="rounded-lg border border-[var(--ecom-divider)] p-2">
               <div className="mb-2 flex flex-wrap items-center gap-2">
                 <input
-                  className="w-28 rounded-lg border border-[#d2d2d7] px-2 py-1.5 text-sm"
+                  className="w-28 rounded-lg border border-[var(--ecom-border-soft)] px-2 py-1.5 text-sm"
                   value={f.featureName}
                   disabled={disabled}
                   onChange={(e) => updateRigid(i, { featureName: e.target.value })}
                 />
-                <label className="flex items-center gap-1 text-xs text-[#6e6e73]">
+                <label className="flex items-center gap-1 text-xs text-[var(--ecom-muted)]">
                   权重
                   <input
                     type="number"
                     min={0.5}
                     max={1}
                     step={0.05}
-                    className="w-16 rounded-lg border border-[#d2d2d7] px-2 py-1 text-sm"
+                    className="w-16 rounded-lg border border-[var(--ecom-border-soft)] px-2 py-1 text-sm"
                     value={f.weight}
                     disabled={disabled}
                     onChange={(e) =>
@@ -109,7 +109,7 @@ export function IpMasterTemplateEditor({ template, onChange, disabled }: Props) 
                 </label>
                 <button
                   type="button"
-                  className="ml-auto rounded-lg p-2 text-[#86868b] hover:bg-[#f5f5f7]"
+                  className="ml-auto rounded-lg p-2 text-[var(--ecom-subtle)] hover:bg-[var(--ecom-parchment)]"
                   disabled={disabled}
                   aria-label="删除"
                   onClick={() =>
@@ -123,7 +123,7 @@ export function IpMasterTemplateEditor({ template, onChange, disabled }: Props) 
                 </button>
               </div>
               <textarea
-                className="min-h-[72px] w-full rounded-lg border border-[#d2d2d7] px-2 py-1.5 text-sm"
+                className="min-h-[72px] w-full rounded-lg border border-[var(--ecom-border-soft)] px-2 py-1.5 text-sm"
                 placeholder="生图正向 prompt 描述"
                 value={f.description}
                 disabled={disabled}
@@ -135,10 +135,10 @@ export function IpMasterTemplateEditor({ template, onChange, disabled }: Props) 
       </section>
 
       <section>
-        <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-[#6e6e73]">
+        <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-[var(--ecom-muted)]">
           柔性特征（官方 6 项）
         </h3>
-        <p className="mb-3 text-[11px] leading-relaxed text-[#86868b]">
+        <p className="mb-3 text-[11px] leading-relaxed text-[var(--ecom-subtle)]">
           由大模型根据 Brief / 基准图自动填充具象内容（色值、变体、线条规范等）；可在此校对。
         </p>
         <ul className="space-y-3">
@@ -150,14 +150,14 @@ export function IpMasterTemplateEditor({ template, onChange, disabled }: Props) 
             return (
               <li
                 key={def.featureName}
-                className="rounded-xl border border-[#e8e8ed] bg-[#fafafa] p-3"
+                className="rounded-xl border border-[var(--ecom-divider)] bg-[#fafafa] p-3"
               >
-                <p className="text-sm font-medium text-[#1d1d1f]">{def.featureName}</p>
-                <p className="mt-1 text-[11px] leading-relaxed text-[#6e6e73]">
+                <p className="text-sm font-medium text-[var(--ecom-ink)]">{def.featureName}</p>
+                <p className="mt-1 text-[11px] leading-relaxed text-[var(--ecom-muted)]">
                   {def.fieldGuide}
                 </p>
                 <textarea
-                  className="mt-2 min-h-[88px] w-full rounded-lg border border-[#d2d2d7] bg-white px-2.5 py-2 text-sm leading-relaxed"
+                  className="mt-2 min-h-[88px] w-full rounded-lg border border-[var(--ecom-border-soft)] bg-white px-2.5 py-2 text-sm leading-relaxed"
                   placeholder={`填写示例：${def.fillExample.slice(0, 120)}…`}
                   value={row.description}
                   disabled={disabled}
@@ -169,28 +169,28 @@ export function IpMasterTemplateEditor({ template, onChange, disabled }: Props) 
         </ul>
       </section>
 
-      <label className="block text-xs font-medium text-[#6e6e73]">
+      <label className="block text-xs font-medium text-[var(--ecom-muted)]">
         柔性全局软约束
         <textarea
-          className="mt-1 min-h-[80px] w-full rounded-lg border border-[#d2d2d7] px-2.5 py-2 text-sm"
+          className="mt-1 min-h-[80px] w-full rounded-lg border border-[var(--ecom-border-soft)] px-2.5 py-2 text-sm"
           value={template.softConstraint}
           disabled={disabled}
           onChange={(e) => onChange({ ...template, softConstraint: e.target.value })}
         />
       </label>
-      <label className="block text-xs font-medium text-[#6e6e73]">
+      <label className="block text-xs font-medium text-[var(--ecom-muted)]">
         特例放行（可选）
         <textarea
-          className="mt-1 min-h-[60px] w-full rounded-lg border border-[#d2d2d7] px-2.5 py-2 text-sm"
+          className="mt-1 min-h-[60px] w-full rounded-lg border border-[var(--ecom-border-soft)] px-2.5 py-2 text-sm"
           value={template.exceptionRule ?? ""}
           disabled={disabled}
           onChange={(e) => onChange({ ...template, exceptionRule: e.target.value })}
         />
       </label>
-      <label className="block text-xs font-medium text-[#6e6e73]">
+      <label className="block text-xs font-medium text-[var(--ecom-muted)]">
         人设摘要（可选）
         <textarea
-          className="mt-1 min-h-[60px] w-full rounded-lg border border-[#d2d2d7] px-2.5 py-2 text-sm"
+          className="mt-1 min-h-[60px] w-full rounded-lg border border-[var(--ecom-border-soft)] px-2.5 py-2 text-sm"
           value={template.characterSummary ?? ""}
           disabled={disabled}
           onChange={(e) => onChange({ ...template, characterSummary: e.target.value })}

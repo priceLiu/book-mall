@@ -74,7 +74,7 @@ function Stepper({
       <button
         type="button"
         disabled={disabled || value <= min}
-        className="flex h-6 w-6 items-center justify-center rounded border border-[#e8e8ed] text-xs disabled:opacity-40"
+        className="flex h-6 w-6 items-center justify-center rounded border border-[var(--ecom-divider)] text-xs disabled:opacity-40"
         onClick={() => onChange(Math.max(min, value - 1))}
       >
         −
@@ -83,7 +83,7 @@ function Stepper({
       <button
         type="button"
         disabled={disabled || value >= max}
-        className="flex h-6 w-6 items-center justify-center rounded border border-[#e8e8ed] text-xs disabled:opacity-40"
+        className="flex h-6 w-6 items-center justify-center rounded border border-[var(--ecom-divider)] text-xs disabled:opacity-40"
         onClick={() => onChange(Math.min(max, value + 1))}
       >
         +
@@ -194,8 +194,8 @@ export function ProductImageSetConfigSidebar({
         data-ecom-no-assistant-collapse
       >
         <div className="shrink-0 border-b border-[var(--ecom-assistant-border)] px-4 py-3">
-          <h2 className="text-sm font-semibold text-[#1d1d1f]">配置侧栏</h2>
-          <p className="mt-0.5 text-[11px] text-[#86868b]">
+          <h2 className="text-sm font-semibold text-[var(--ecom-ink)]">配置侧栏</h2>
+          <p className="mt-0.5 text-[11px] text-[var(--ecom-subtle)]">
             左侧上传商品原图；在此配置平台与套图结构后一键生成。
           </p>
         </div>
@@ -217,10 +217,10 @@ export function ProductImageSetConfigSidebar({
               if (Object.keys(settings).length > 0) void persist({ settings });
             }}
           />
-          <section className="mb-3 rounded-xl border border-[#e8e8ed] bg-white px-3 py-3">
+          <section className="mb-3 rounded-xl border border-[var(--ecom-divider)] bg-white px-3 py-3">
             <p className="mb-2 text-xs font-semibold">出图比例</p>
             <select
-              className="w-full rounded-lg border border-[#e8e8ed] bg-[#fafafa] px-2 py-1.5 text-[11px]"
+              className="w-full rounded-lg border border-[var(--ecom-divider)] bg-[#fafafa] px-2 py-1.5 text-[11px]"
               value={project.settings.imageRatio ?? "1:1"}
               disabled={disabled || Boolean(busy)}
               onChange={(e) =>
@@ -241,7 +241,7 @@ export function ProductImageSetConfigSidebar({
 
           <section
             className={cn(
-              "mb-3 rounded-xl border border-[#e8e8ed] bg-white px-3 py-3",
+              "mb-3 rounded-xl border border-[var(--ecom-divider)] bg-white px-3 py-3",
               aiBriefBusy && "ecom-media-generating-sweep border-[var(--ecom-outline-border)]",
             )}
           >
@@ -280,7 +280,7 @@ export function ProductImageSetConfigSidebar({
             ) : null}
             <textarea
               className={cn(
-                "mt-2 min-h-[120px] w-full rounded-lg border border-[#e8e8ed] px-2 py-2 font-mono text-[11px]",
+                "mt-2 min-h-[120px] w-full rounded-lg border border-[var(--ecom-divider)] px-2 py-2 font-mono text-[11px]",
                 aiBriefBusy && "opacity-80",
               )}
               placeholder={ECOM_SELLPOINT_FIVE_PART_PLACEHOLDER}
@@ -293,7 +293,7 @@ export function ProductImageSetConfigSidebar({
             />
           </section>
 
-          <section className="mb-3 rounded-xl border border-[#e8e8ed] bg-white px-3 py-3">
+          <section className="mb-3 rounded-xl border border-[var(--ecom-divider)] bg-white px-3 py-3">
             <p className="mb-2 text-xs font-semibold">套图结构配置</p>
             {(
               [
@@ -305,7 +305,7 @@ export function ProductImageSetConfigSidebar({
             ).map(([key, label, min, max]) => (
               <div key={key} className="mb-2">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="flex items-center gap-1 text-[11px] text-[#6e6e73]">
+                  <span className="flex items-center gap-1 text-[11px] text-[var(--ecom-muted)]">
                     {label}
                     {key === "other" ? (
                       <span className="rounded bg-[#e8f0ff] px-1 text-[9px] text-[#007aff]">
@@ -338,27 +338,27 @@ export function ProductImageSetConfigSidebar({
                 {key === "sellpoint" && sellCount > 0 ? (
                   <button
                     type="button"
-                    className="mt-1.5 flex w-full items-center gap-2 rounded-lg border border-[#e8e8ed] px-2.5 py-2 text-left text-[11px] hover:bg-[#fafafa]"
+                    className="mt-1.5 flex w-full items-center gap-2 rounded-lg border border-[var(--ecom-divider)] px-2.5 py-2 text-left text-[11px] hover:bg-[#fafafa]"
                     onClick={() => setLayoutOpen(true)}
                   >
                     <LayoutGrid className="h-4 w-4 shrink-0 text-[#007aff]" />
                     <span className="flex-1">{layoutLabel}</span>
-                    <ChevronRight className="h-4 w-4 text-[#86868b]" />
+                    <ChevronRight className="h-4 w-4 text-[var(--ecom-subtle)]" />
                   </button>
                 ) : null}
               </div>
             ))}
           </section>
 
-          <section className="mb-3 rounded-xl border border-[#e8e8ed] bg-white px-3 py-3">
+          <section className="mb-3 rounded-xl border border-[var(--ecom-divider)] bg-white px-3 py-3">
             <p className="mb-2 text-xs font-semibold">生图模型</p>
-            <div className="flex items-center gap-2 rounded-lg border border-[#e8e8ed] bg-[#fafafa] px-2.5 py-2">
+            <div className="flex items-center gap-2 rounded-lg border border-[var(--ecom-divider)] bg-[#fafafa] px-2.5 py-2">
               <Cpu className="h-4 w-4 shrink-0 text-[#007aff]" />
               <div className="min-w-0 flex-1">
-                <p className="truncate text-[11px] font-medium text-[#1d1d1f]">
+                <p className="truncate text-[11px] font-medium text-[var(--ecom-ink)]">
                   {modelsLoading ? "加载模型…" : modelLabel}
                 </p>
-                <p className="truncate text-[10px] text-[#86868b]">{imageModelKey}</p>
+                <p className="truncate text-[10px] text-[var(--ecom-subtle)]">{imageModelKey}</p>
               </div>
               <EcomButtonSecondary
                 size="sm"
@@ -372,7 +372,7 @@ export function ProductImageSetConfigSidebar({
             </div>
           </section>
 
-          <section className="mb-3 rounded-xl border border-[#e8e8ed] bg-white px-3 py-3">
+          <section className="mb-3 rounded-xl border border-[var(--ecom-divider)] bg-white px-3 py-3">
             <div className="mb-2 flex items-center justify-between">
               <span className="text-xs font-semibold">附加功能</span>
             </div>
@@ -391,7 +391,7 @@ export function ProductImageSetConfigSidebar({
             </label>
             {project.settings.trendingStyleEnabled ? (
               <>
-                <p className="mb-2 text-[10px] text-[#86868b]">
+                <p className="mb-2 text-[10px] text-[var(--ecom-subtle)]">
                   选择 1 种爆款视觉调性，将写入本组套图 Prompt（规划与生图）。
                 </p>
                 <div className="mb-2 grid grid-cols-2 gap-2">
@@ -409,8 +409,8 @@ export function ProductImageSetConfigSidebar({
                         className={cn(
                           "rounded-lg border px-2 py-2 text-left text-[10px]",
                           selected
-                            ? "border-[#1d1d1f] bg-[#fafafa] ring-2 ring-[#1d1d1f]/15"
-                            : "border-[#e8e8ed]",
+                            ? "border-[var(--ecom-ink)] bg-[#fafafa] ring-2 ring-[var(--ecom-ink)]/15"
+                            : "border-[var(--ecom-divider)]",
                         )}
                         onClick={() => {
                           if (selected) return;
@@ -419,8 +419,8 @@ export function ProductImageSetConfigSidebar({
                           });
                         }}
                       >
-                        <p className="font-semibold text-[#1d1d1f]">{card.title}</p>
-                        <p className="mt-0.5 text-[#86868b]">{card.subtitle}</p>
+                        <p className="font-semibold text-[var(--ecom-ink)]">{card.title}</p>
+                        <p className="mt-0.5 text-[var(--ecom-subtle)]">{card.subtitle}</p>
                         <div className="mt-1 flex gap-1">
                           {(card.palette ?? []).slice(0, 3).map((c) => (
                             <span
@@ -446,7 +446,7 @@ export function ProductImageSetConfigSidebar({
                 </EcomButtonSecondary>
               </>
             ) : null}
-            <label className="mt-3 flex items-center justify-between border-t border-[#e8e8ed] pt-3 text-[11px]">
+            <label className="mt-3 flex items-center justify-between border-t border-[var(--ecom-divider)] pt-3 text-[11px]">
               <span>商品上架文案生成</span>
               <input
                 type="checkbox"
@@ -462,7 +462,7 @@ export function ProductImageSetConfigSidebar({
 
         <div className="shrink-0 border-t border-[var(--ecom-assistant-border)] p-4">
           {busy ? (
-            <p className="mb-2 flex items-center gap-2 text-[11px] text-[#6e6e73]">
+            <p className="mb-2 flex items-center gap-2 text-[11px] text-[var(--ecom-muted)]">
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
               {busy}
             </p>

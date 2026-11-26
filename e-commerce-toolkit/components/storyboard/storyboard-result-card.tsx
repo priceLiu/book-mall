@@ -50,7 +50,7 @@ export function StoryboardResultCard({
         <button
           type="button"
           disabled={disabled || busy}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-[#d2d2d7] bg-white px-3 py-1.5 text-xs font-medium text-[#1d1d1f] hover:bg-[#f5f5f7] disabled:opacity-50"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--ecom-border-soft)] bg-white px-3 py-1.5 text-xs font-medium text-[var(--ecom-ink)] hover:bg-[var(--ecom-parchment)] disabled:opacity-50"
           onClick={onPrimaryAction}
         >
           <Film className="h-3.5 w-3.5" />
@@ -61,7 +61,7 @@ export function StoryboardResultCard({
         <button
           type="button"
           disabled={disabled || mergeBusy || !canMerge}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-[#d2d2d7] bg-white px-3 py-1.5 text-xs font-medium text-[#1d1d1f] hover:bg-[#f5f5f7] disabled:opacity-50"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--ecom-border-soft)] bg-white px-3 py-1.5 text-xs font-medium text-[var(--ecom-ink)] hover:bg-[var(--ecom-parchment)] disabled:opacity-50"
           onClick={onSecondaryAction}
         >
           {mergeBusy ? (
@@ -77,7 +77,7 @@ export function StoryboardResultCard({
 
   return (
     <div className="isolate flex h-full min-w-0 flex-col">
-      <p className="mb-2 text-sm font-bold text-[#1d1d1f]">{label}</p>
+      <p className="mb-2 text-sm font-bold text-[var(--ecom-ink)]">{label}</p>
       <EcomDeliverableVideoPreview
         aspectRatio={aspectRatio}
         videoSrc={videoSrc}
@@ -91,7 +91,7 @@ export function StoryboardResultCard({
         <button
           type="button"
           disabled={mergeBusy || busy}
-          className="mt-2 inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-[#d2d2d7] bg-white px-3 py-1.5 text-xs font-medium text-[#1d1d1f] hover:bg-[#f5f5f7] disabled:opacity-50"
+          className="mt-2 inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-[var(--ecom-border-soft)] bg-white px-3 py-1.5 text-xs font-medium text-[var(--ecom-ink)] hover:bg-[var(--ecom-parchment)] disabled:opacity-50"
           onClick={onMergePanels}
         >
           {mergeBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Clapperboard className="h-3.5 w-3.5" />}

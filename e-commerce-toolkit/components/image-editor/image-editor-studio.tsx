@@ -1181,7 +1181,7 @@ export function ImageEditorStudio() {
       case "add":
         return (
           <ToolPanelCard title="添加素材">
-          <div className="space-y-3 text-[11px] text-[#6e6e73]">
+          <div className="space-y-3 text-[11px] text-[var(--ecom-muted)]">
             <p>上传本地图片，或从「我的资产」选取已有成片。</p>
             <EcomButtonPrimary type="button" className="w-full" onClick={() => fileInputRef.current?.click()}>
               本地上传

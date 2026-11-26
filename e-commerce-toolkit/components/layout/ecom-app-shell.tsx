@@ -174,7 +174,7 @@ export function EcomAppShell({
           className="relative z-[320] hidden h-full max-h-full md:flex"
         />
         <div
-          className="relative z-0 flex min-h-0 min-w-0 max-w-full flex-col overflow-clip rounded-xl bg-white"
+          className="relative z-0 flex min-h-0 min-w-0 max-w-full flex-col overflow-clip rounded-xl bg-[var(--ecom-workspace-bg)]"
           onPointerDown={isBrowseHub ? undefined : collapseNavOnWorkspaceClick}
         >
           <EcomMobileBar bookOrigin={bookOrigin} />

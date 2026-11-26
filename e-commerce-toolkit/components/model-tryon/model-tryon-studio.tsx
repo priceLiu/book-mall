@@ -680,7 +680,7 @@ export function ModelTryonStudio() {
     return (
       <EcomWorkspaceLayout fullWidth>
         <div className="flex h-full min-h-0 animate-pulse flex-col gap-4 p-5">
-          <div className="h-10 w-48 rounded-lg bg-[#e8e8ed]" />
+          <div className="h-10 w-48 rounded-lg bg-[var(--ecom-divider)]" />
           <div className="h-64 rounded-xl bg-[#f0f0f2]" />
         </div>
       </EcomWorkspaceLayout>
@@ -709,10 +709,10 @@ export function ModelTryonStudio() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <EcomWorkspaceTitleHeading
             heading="h1"
-            titleClassName="text-lg font-semibold text-[#1d1d1f]"
+            titleClassName="text-lg font-semibold text-[var(--ecom-ink)]"
             title="模特试衣"
           >
-            <p className="text-xs text-[#6e6e73]">
+            <p className="text-xs text-[var(--ecom-muted)]">
               {isTextToTryon
                 ? "文生试衣：参考图 + Prompt 引用，图片编辑模型生成时尚试衣大片。"
                 : "服装池 + 最多 9 套搭配批量试衣，锁定后可保存到资产库。"}

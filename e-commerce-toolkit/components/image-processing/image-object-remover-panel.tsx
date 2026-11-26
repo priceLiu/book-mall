@@ -92,27 +92,27 @@ export function ImageObjectRemoverPanel({
           onError={onError}
         />
 
-        <label className="mt-6 block text-sm font-medium text-[#1d1d1f]">
+        <label className="mt-6 block text-sm font-medium text-[var(--ecom-ink)]">
           应该移除哪些内容？
           <textarea
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
             rows={3}
             placeholder="例如，移除背景中的人物，擦掉电线，去除水印……"
-            className="mt-2 w-full resize-y rounded-xl border border-[#d2d2d7] px-4 py-3 text-sm"
+            className="mt-2 w-full resize-y rounded-xl border border-[var(--ecom-border-soft)] px-4 py-3 text-sm"
           />
         </label>
-        <p className="mt-1 text-xs text-[#6e6e73]">
+        <p className="mt-1 text-xs text-[var(--ecom-muted)]">
           描述不需要的物体。AI 将移除它并自然地填充该区域。
         </p>
 
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="text-sm font-medium text-[#1d1d1f]">移除模式</label>
+            <label className="text-sm font-medium text-[var(--ecom-ink)]">移除模式</label>
             <select
               value={removalMode}
               onChange={(e) => setRemovalMode(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-[#d2d2d7] bg-white px-3 py-2.5 text-sm"
+              className="mt-1 w-full rounded-lg border border-[var(--ecom-border-soft)] bg-white px-3 py-2.5 text-sm"
             >
               {OBJECT_REMOVE_MODE_OPTIONS.map((o) => (
                 <option key={o.id} value={o.id}>
@@ -122,11 +122,11 @@ export function ImageObjectRemoverPanel({
             </select>
           </div>
           <div>
-            <label className="text-sm font-medium text-[#1d1d1f]">输出格式</label>
+            <label className="text-sm font-medium text-[var(--ecom-ink)]">输出格式</label>
             <select
               value={outputFormat}
               onChange={(e) => setOutputFormat(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-[#d2d2d7] bg-white px-3 py-2.5 text-sm"
+              className="mt-1 w-full rounded-lg border border-[var(--ecom-border-soft)] bg-white px-3 py-2.5 text-sm"
             >
               {OBJECT_OUTPUT_FORMAT_OPTIONS.map((o) => (
                 <option key={o.id} value={o.id}>
@@ -137,7 +137,7 @@ export function ImageObjectRemoverPanel({
           </div>
         </div>
 
-        <div className="mt-3 rounded-lg border border-sky-100 bg-sky-50/60 px-3 py-2 text-xs text-[#6e6e73]">
+        <div className="mt-3 rounded-lg border border-sky-100 bg-sky-50/60 px-3 py-2 text-xs text-[var(--ecom-muted)]">
           经 Gateway 调用 Seedream 5.0 Lite 与百炼图像编辑完成物体移除与填充。
         </div>
 
@@ -171,7 +171,7 @@ export function ImageObjectRemoverPanel({
       </div>
 
       <section className="rounded-2xl border border-[#e5e5ea] bg-white p-4 sm:p-6">
-        <h3 className="text-lg font-semibold text-[#1d1d1f]">如何使用物体移除器</h3>
+        <h3 className="text-lg font-semibold text-[var(--ecom-ink)]">如何使用物体移除器</h3>
         <ol className="mt-4 grid gap-4 sm:grid-cols-3">
           {[
             { title: "上传并描述", desc: "上传图片，说明要移除的物体或瑕疵。" },
@@ -183,8 +183,8 @@ export function ImageObjectRemoverPanel({
                 {i + 1}
               </span>
               <div>
-                <p className="font-medium text-[#1d1d1f]">{s.title}</p>
-                <p className="mt-1 text-sm text-[#6e6e73]">{s.desc}</p>
+                <p className="font-medium text-[var(--ecom-ink)]">{s.title}</p>
+                <p className="mt-1 text-sm text-[var(--ecom-muted)]">{s.desc}</p>
               </div>
             </li>
           ))}

@@ -34,7 +34,7 @@ function renderInlineText(text: string, keyPrefix: string): React.ReactNode {
   return parts.map((part, i) => {
     if (part.startsWith("**") && part.endsWith("**")) {
       return (
-        <strong key={`${keyPrefix}-b-${i}`} className="font-semibold text-[#1d1d1f]">
+        <strong key={`${keyPrefix}-b-${i}`} className="font-semibold text-[var(--ecom-ink)]">
           {part.slice(2, -2)}
         </strong>
       );
@@ -189,7 +189,7 @@ export function StoryboardMarkdownBlock({ markdown }: { markdown: string }) {
     elements.push(
       <div key={key++} className="my-3">
         {titleRow ? (
-          <p className="mb-2 text-sm font-semibold text-[#1d1d1f]">{titleRow}</p>
+          <p className="mb-2 text-sm font-semibold text-[var(--ecom-ink)]">{titleRow}</p>
         ) : null}
         <div className={ecomDataTableWrapClass}>
           <table className={`w-full min-w-[480px] table-fixed ${ecomDataTableClass}`}>
@@ -249,32 +249,32 @@ export function StoryboardMarkdownBlock({ markdown }: { markdown: string }) {
     }
     if (t.startsWith("#### ")) {
       elements.push(
-        <h5 key={key++} className="mt-3 text-sm font-semibold text-[#1d1d1f]">
+        <h5 key={key++} className="mt-3 text-sm font-semibold text-[var(--ecom-ink)]">
           {renderInlineText(t.slice(5), `h5-${key}`)}
         </h5>,
       );
     } else if (t.startsWith("### ")) {
       elements.push(
-        <h4 key={key++} className="mt-4 text-sm font-semibold text-[#1d1d1f]">
+        <h4 key={key++} className="mt-4 text-sm font-semibold text-[var(--ecom-ink)]">
           {renderInlineText(t.slice(4), `h4-${key}`)}
         </h4>,
       );
     } else if (t.startsWith("## ")) {
       elements.push(
-        <h3 key={key++} className="mt-4 text-base font-semibold text-[#1d1d1f]">
+        <h3 key={key++} className="mt-4 text-base font-semibold text-[var(--ecom-ink)]">
           {renderInlineText(t.slice(3), `h3-${key}`)}
         </h3>,
       );
     } else if (t.startsWith("# ")) {
       elements.push(
-        <h2 key={key++} className="text-lg font-semibold text-[#1d1d1f]">
+        <h2 key={key++} className="text-lg font-semibold text-[var(--ecom-ink)]">
           {renderInlineText(t.slice(2), `h2-${key}`)}
         </h2>,
       );
     } else if (t.startsWith("- ") || t.startsWith("* ")) {
       elements.push(
         <p key={key++} className="text-sm leading-relaxed text-[#424245]">
-          <span className="mr-1 text-[#86868b]">·</span>
+          <span className="mr-1 text-[var(--ecom-subtle)]">·</span>
           {renderInlineText(t.slice(2), `li-${key}`)}
         </p>,
       );

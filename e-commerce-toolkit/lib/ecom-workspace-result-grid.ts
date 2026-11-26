@@ -8,7 +8,7 @@ export const ECOM_WORKSPACE_RESULT_GRID_CLASS =
   "grid grid-cols-2 items-start gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5";
 
 export const ECOM_WORKSPACE_RESULT_LABEL_CLASS =
-  "mt-0.5 h-4 shrink-0 truncate px-1 text-[10px] leading-4 text-[#6e6e73]";
+  "mt-0.5 h-4 shrink-0 truncate px-1 text-[10px] leading-4 text-[var(--ecom-muted)]";
 
 export const ECOM_WORKSPACE_RESULT_COLUMN_CLASS = "flex min-w-0 flex-col gap-2";
 
@@ -17,8 +17,8 @@ export function ecomWorkspaceResultShellClass(opts?: { running?: boolean; select
   return cn(
     "group/image relative overflow-hidden rounded-lg border bg-[#fafafa]",
     opts?.running && "ecom-media-generating-sweep border-[var(--ecom-outline-border)]",
-    opts?.selected && "border-[var(--ecom-outline-border)] ring-2 ring-[#1d1d1f]/15",
-    !opts?.running && !opts?.selected && "border-[#e8e8ed]",
+    opts?.selected && "border-[var(--ecom-outline-border)] ring-2 ring-[var(--ecom-ink)]/15",
+    !opts?.running && !opts?.selected && "border-[var(--ecom-divider)]",
   );
 }
 

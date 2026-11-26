@@ -382,10 +382,10 @@ function SimpleFusionComposeWorkbenchInner({
   return (
     <>
       {!fullscreenOpen ? (
-        <section className="mb-6 space-y-3 rounded-xl border border-[#e8e8ed] bg-white p-4">
+        <section className="mb-6 space-y-3 rounded-xl border border-[var(--ecom-divider)] bg-white p-4">
           <div>
-            <h3 className="text-sm font-semibold text-[#1d1d1f]">③ 卡点成片</h3>
-            <p className="mt-1 text-[10px] text-[#86868b]">
+            <h3 className="text-sm font-semibold text-[var(--ecom-ink)]">③ 卡点成片</h3>
+            <p className="mt-1 text-[10px] text-[var(--ecom-subtle)]">
               按当前片段顺序云端合成；需改顺序或精细裁剪请先「简易剪辑」。
             </p>
           </div>

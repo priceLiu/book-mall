@@ -165,13 +165,13 @@ export function ProductImageSetContentPanel({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-white">
-      <header className="shrink-0 border-b border-[#e8e8ed] bg-white px-4 py-3 shadow-[0_1px_0_0_rgba(0,0,0,0.04)]">
+      <header className="shrink-0 border-b border-[var(--ecom-divider)] bg-white px-4 py-3 shadow-[0_1px_0_0_rgba(0,0,0,0.04)]">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <EcomWorkspaceTitleHeading
             guideModuleId="product-image-set"
             title={project.title?.trim() || "AI 商品套图"}
           >
-            <p className="text-[11px] text-[#6e6e73]">
+            <p className="text-[11px] text-[var(--ecom-muted)]">
               结构 {structureTotal} 张
               {hasSlots ? ` · 占位 ${project.output.slots.length} · 已出 ${readyCount}` : ""}
               {project.references.length > 0 ? ` · 原图 ${project.references.length}` : ""}
@@ -244,11 +244,11 @@ export function ProductImageSetContentPanel({
         </div>
       </header>
 
-      <div className="border-b border-[#e8e8ed] px-4 py-3">
+      <div className="border-b border-[var(--ecom-divider)] px-4 py-3">
         <div className="flex items-center gap-1">
-          <h1 className="text-sm font-semibold text-[#1d1d1f]">商品原图</h1>
+          <h1 className="text-sm font-semibold text-[var(--ecom-ink)]">商品原图</h1>
           <span
-            className="text-[#86868b]"
+            className="text-[var(--ecom-subtle)]"
             title="最多 6 张，第一张为主参考；AI 帮写会分析全部产品图。"
           >
             <HelpCircle className="h-3.5 w-3.5" />
@@ -295,8 +295,8 @@ export function ProductImageSetContentPanel({
         ) : null}
         {showHero ? (
           <div className="mx-auto flex max-w-2xl flex-col items-center py-10 text-center">
-            <h2 className="text-3xl font-bold tracking-tight text-[#1d1d1f]">AI 商品套图</h2>
-            <p className="mt-3 max-w-md text-sm text-[#6e6e73]">
+            <h2 className="text-3xl font-bold tracking-tight text-[var(--ecom-ink)]">AI 商品套图</h2>
+            <p className="mt-3 max-w-md text-sm text-[var(--ecom-muted)]">
               上传商品实拍，在右侧配置套图结构，点击「生成套图占位」后在此选择槽位出图。
             </p>
           </div>
@@ -315,8 +315,8 @@ export function ProductImageSetContentPanel({
         ) : null}
 
         {project.output.listingCopy ? (
-          <section className="mt-6 rounded-xl border border-[#e8e8ed] bg-[#fafafa] p-4">
-            <h3 className="text-xs font-semibold text-[#1d1d1f]">上架文案</h3>
+          <section className="mt-6 rounded-xl border border-[var(--ecom-divider)] bg-[#fafafa] p-4">
+            <h3 className="text-xs font-semibold text-[var(--ecom-ink)]">上架文案</h3>
             <pre className="mt-2 whitespace-pre-wrap font-sans text-[11px] leading-relaxed text-[#424245]">
               {project.output.listingCopy}
             </pre>

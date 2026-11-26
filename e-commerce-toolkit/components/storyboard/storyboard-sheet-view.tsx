@@ -98,17 +98,17 @@ export function StoryboardSheetView({
     <div
       id={exportRootId}
       className={cn(
-        "w-full max-w-[1920px] bg-white p-8 text-[#1d1d1f]",
+        "w-full max-w-[1920px] bg-white p-8 text-[var(--ecom-ink)]",
         className,
       )}
     >
-      <header className="mb-6 border-b border-[#e8e8ed] pb-4">
+      <header className="mb-6 border-b border-[var(--ecom-divider)] pb-4">
         <h1 className="text-2xl font-semibold tracking-tight">
           {draft.overview.title}
         </h1>
-        <p className="mt-2 text-sm text-[#6e6e73]">{draft.overview.logline}</p>
+        <p className="mt-2 text-sm text-[var(--ecom-muted)]">{draft.overview.logline}</p>
         {draft.overview.productHighlight ? (
-          <div className="mt-4 rounded-lg border-l-4 border-[var(--ecom-outline-border)] bg-[#f5f5f7] px-4 py-3 text-sm">
+          <div className="mt-4 rounded-lg border-l-4 border-[var(--ecom-outline-border)] bg-[var(--ecom-parchment)] px-4 py-3 text-sm">
             <span className="font-medium">商品卖点：</span>
             {draft.overview.productHighlight}
           </div>
@@ -124,7 +124,7 @@ export function StoryboardSheetView({
               return (
                 <div
                   key={`${c.name}-${c.role}`}
-                  className="flex items-center gap-3 rounded-xl border border-[#e8e8ed] bg-[#fafafa] px-4 py-3"
+                  className="flex items-center gap-3 rounded-xl border border-[var(--ecom-divider)] bg-[#fafafa] px-4 py-3"
                 >
                   {ref ? (
                     <Image
@@ -136,13 +136,13 @@ export function StoryboardSheetView({
                       unoptimized
                     />
                   ) : (
-                    <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-[#e8e8ed] text-xs text-[#6e6e73]">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-[var(--ecom-divider)] text-xs text-[var(--ecom-muted)]">
                       无图
                     </div>
                   )}
                   <div>
                     <div className="text-sm font-medium">{c.name}</div>
-                    <div className="text-xs text-[#6e6e73]">{c.role}</div>
+                    <div className="text-xs text-[var(--ecom-muted)]">{c.role}</div>
                   </div>
                 </div>
               );
@@ -153,10 +153,10 @@ export function StoryboardSheetView({
 
       <section>
         <h2 className="mb-3 text-base font-semibold">分镜表</h2>
-        <div className="overflow-x-auto rounded-xl border border-[#e8e8ed]">
+        <div className="overflow-x-auto rounded-xl border border-[var(--ecom-divider)]">
           <table className="w-full min-w-[900px] border-collapse text-left text-sm">
             <thead>
-              <tr className="bg-[#1d1d1f] text-white">
+              <tr className="bg-[var(--ecom-ink)] text-white">
                 <th className="px-3 py-2.5 font-medium">镜头编号</th>
                 <th className="px-3 py-2.5 font-medium">时间轴</th>
                 <th className="px-3 py-2.5 font-medium">景别</th>
@@ -168,12 +168,12 @@ export function StoryboardSheetView({
             </thead>
             <tbody>
               {draft.panels.map((p) => (
-                <tr key={p.index} className="border-t border-[#e8e8ed]">
+                <tr key={p.index} className="border-t border-[var(--ecom-divider)]">
                   <td className="px-3 py-2.5 align-top font-medium">{p.index}</td>
-                  <td className="px-3 py-2.5 align-top text-[#6e6e73]">
+                  <td className="px-3 py-2.5 align-top text-[var(--ecom-muted)]">
                     {editable ? (
                       <input
-                        className="w-full min-w-[4rem] rounded border border-[#d2d2d7] bg-white px-2 py-1.5 text-sm outline-none focus:border-[var(--ecom-outline-border)] focus:ring-1 focus:ring-[#1d1d1f]/15"
+                        className="w-full min-w-[4rem] rounded border border-[var(--ecom-border-soft)] bg-white px-2 py-1.5 text-sm outline-none focus:border-[var(--ecom-outline-border)] focus:ring-1 focus:ring-[var(--ecom-ink)]/15"
                         value={p.timeline ?? ""}
                         onChange={(e) =>
                           updatePanel(p.index, { timeline: e.target.value })
@@ -186,7 +186,7 @@ export function StoryboardSheetView({
                   <td className="px-3 py-2.5 align-top">
                     {editable ? (
                       <input
-                        className="w-full min-w-[3rem] rounded border border-[#d2d2d7] bg-white px-2 py-1.5 text-sm outline-none focus:border-[var(--ecom-outline-border)] focus:ring-1 focus:ring-[#1d1d1f]/15"
+                        className="w-full min-w-[3rem] rounded border border-[var(--ecom-border-soft)] bg-white px-2 py-1.5 text-sm outline-none focus:border-[var(--ecom-outline-border)] focus:ring-1 focus:ring-[var(--ecom-ink)]/15"
                         value={p.shotType}
                         onChange={(e) =>
                           updatePanel(p.index, { shotType: e.target.value })
@@ -202,7 +202,7 @@ export function StoryboardSheetView({
                   <td className="px-3 py-2.5 align-top">
                     {editable ? (
                       <input
-                        className="w-full min-w-[3rem] rounded border border-[#d2d2d7] bg-white px-2 py-1.5 text-sm outline-none focus:border-[var(--ecom-outline-border)] focus:ring-1 focus:ring-[#1d1d1f]/15"
+                        className="w-full min-w-[3rem] rounded border border-[var(--ecom-border-soft)] bg-white px-2 py-1.5 text-sm outline-none focus:border-[var(--ecom-outline-border)] focus:ring-1 focus:ring-[var(--ecom-ink)]/15"
                         value={p.camera ?? ""}
                         onChange={(e) =>
                           updatePanel(p.index, { camera: e.target.value })
@@ -215,7 +215,7 @@ export function StoryboardSheetView({
                   <td className="px-3 py-2.5 align-top">
                     {editable ? (
                       <textarea
-                        className="w-full min-h-[72px] resize-y rounded border border-[#d2d2d7] bg-white px-2 py-1.5 text-sm leading-relaxed outline-none focus:border-[var(--ecom-outline-border)] focus:ring-1 focus:ring-[#1d1d1f]/15"
+                        className="w-full min-h-[72px] resize-y rounded border border-[var(--ecom-border-soft)] bg-white px-2 py-1.5 text-sm leading-relaxed outline-none focus:border-[var(--ecom-outline-border)] focus:ring-1 focus:ring-[var(--ecom-ink)]/15"
                         value={`${p.scene}\n${p.action}`.trim()}
                         onChange={(e) => {
                           const v = e.target.value;
@@ -229,14 +229,14 @@ export function StoryboardSheetView({
                     ) : (
                       <>
                         <div>{p.scene}</div>
-                        <div className="text-[#6e6e73]">{p.action}</div>
+                        <div className="text-[var(--ecom-muted)]">{p.action}</div>
                       </>
                     )}
                   </td>
                   <td className="px-3 py-2.5 align-top">
                     {editable ? (
                       <input
-                        className="w-full min-w-[4rem] rounded border border-[#d2d2d7] bg-white px-2 py-1.5 text-sm outline-none focus:border-[var(--ecom-outline-border)] focus:ring-1 focus:ring-[#1d1d1f]/15"
+                        className="w-full min-w-[4rem] rounded border border-[var(--ecom-border-soft)] bg-white px-2 py-1.5 text-sm outline-none focus:border-[var(--ecom-outline-border)] focus:ring-1 focus:ring-[var(--ecom-ink)]/15"
                         value={p.emotion ?? ""}
                         onChange={(e) =>
                           updatePanel(p.index, { emotion: e.target.value })
@@ -249,7 +249,7 @@ export function StoryboardSheetView({
                   <td className="px-3 py-2.5 align-top">
                     {editable ? (
                       <textarea
-                        className="w-full min-h-[72px] resize-y rounded border border-[#d2d2d7] bg-white px-2 py-1.5 text-sm leading-relaxed outline-none focus:border-[var(--ecom-outline-border)] focus:ring-1 focus:ring-[#1d1d1f]/15"
+                        className="w-full min-h-[72px] resize-y rounded border border-[var(--ecom-border-soft)] bg-white px-2 py-1.5 text-sm leading-relaxed outline-none focus:border-[var(--ecom-outline-border)] focus:ring-1 focus:ring-[var(--ecom-ink)]/15"
                         value={p.dialogue ?? ""}
                         onChange={(e) =>
                           updatePanel(p.index, { dialogue: e.target.value })
@@ -265,7 +265,7 @@ export function StoryboardSheetView({
           </table>
         </div>
         {draft.totalDurationHintSec ? (
-          <p className="mt-3 text-xs text-[#6e6e73]">
+          <p className="mt-3 text-xs text-[var(--ecom-muted)]">
             建议总时长约 {draft.totalDurationHintSec} 秒
           </p>
         ) : null}

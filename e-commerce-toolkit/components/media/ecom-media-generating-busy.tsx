@@ -61,7 +61,7 @@ export function EcomMediaGeneratingBusy({
               "flex items-center justify-center rounded-full border shadow-sm",
               light
                 ? "size-10 border-[var(--ecom-outline-border)] bg-white text-[var(--ecom-outline-text)]"
-                : "size-12 border-[var(--ecom-outline-border)] bg-black/55 text-[#2997ff] shadow-lg backdrop-blur-sm sm:size-[3.25rem]",
+                : "size-12 border-[var(--ecom-outline-border)] bg-black/55 text-[var(--ecom-primary)] shadow-lg backdrop-blur-sm sm:size-[3.25rem]",
             )}
           >
             <RefreshCw className={cn("animate-spin", light ? "h-4 w-4" : "h-5 w-5 sm:h-6 sm:w-6")} />
@@ -70,7 +70,7 @@ export function EcomMediaGeneratingBusy({
             <span
               className={cn(
                 "text-[11px] font-medium",
-                light ? "text-[#6e6e73]" : "text-white/90",
+                light ? "text-[var(--ecom-muted)]" : "text-white/90",
               )}
             >
               {label}
@@ -82,7 +82,7 @@ export function EcomMediaGeneratingBusy({
                 className={cn(
                   "ecom-upload-progress",
                   progress == null && "ecom-upload-progress-indeterminate",
-                  light ? "bg-[#e8e8ed]" : "bg-white/20 [&>span]:bg-white/90",
+                  light ? "bg-[var(--ecom-divider)]" : "bg-white/20 [&>span]:bg-white/90",
                 )}
               >
                 <span

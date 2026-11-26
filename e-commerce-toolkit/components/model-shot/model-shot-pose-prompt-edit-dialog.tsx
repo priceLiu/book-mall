@@ -87,37 +87,37 @@ export function ModelShotPosePromptEditDialog({
         <EcomDialogCloseButton disabled={busy} onClick={onClose} />
         <h3
           id="model-shot-pose-prompt-edit-title"
-          className="pr-10 text-lg font-semibold text-[#1d1d1f]"
+          className="pr-10 text-lg font-semibold text-[var(--ecom-ink)]"
         >
           {title} · Prompt 编辑
         </h3>
-        <p className="mt-1 text-xs text-[#86868b]">
+        <p className="mt-1 text-xs text-[var(--ecom-subtle)]">
           顶栏为本次生图会绑定的参考资产；Prompt 内输入 @ 可插入代号。保存后重生成将使用编辑后的 Prompt。
         </p>
 
         <div className="ecom-scrollbar-thin mt-4 min-h-0 flex-1 space-y-4 overflow-y-auto">
-          <section className="rounded-xl border border-[#e8e8ed] bg-[#fafafa] px-3 py-2.5">
-            <p className="mb-2 text-[10px] font-medium uppercase tracking-wide text-[#6e6e73]">
+          <section className="rounded-xl border border-[var(--ecom-divider)] bg-[#fafafa] px-3 py-2.5">
+            <p className="mb-2 text-[10px] font-medium uppercase tracking-wide text-[var(--ecom-muted)]">
               本姿势送入模型（{imageModelKey} · 最多 {genSlots.length} 张）
             </p>
             <ul className="space-y-1.5">
               {genSlots.map((slot, i) => (
                 <li key={`${slot.role}-${i}`} className="flex items-center gap-2 text-[11px]">
-                  <span className="w-14 shrink-0 font-mono text-[#0071e3]">@图片{i + 1}</span>
+                  <span className="w-14 shrink-0 font-mono text-[var(--ecom-primary)]">@图片{i + 1}</span>
                   {slot.url ? (
                     /* eslint-disable-next-line @next/next/no-img-element */
                     <img
                       src={buildEcomOssThumbUrl(slot.url)}
                       alt=""
-                      className="size-9 shrink-0 rounded border border-[#e8e8ed] object-cover"
+                      className="size-9 shrink-0 rounded border border-[var(--ecom-divider)] object-cover"
                       referrerPolicy="no-referrer"
                     />
                   ) : (
-                    <span className="flex size-9 shrink-0 items-center justify-center rounded border border-dashed border-[#d2d2d7] bg-white text-[9px] text-[#86868b]">
+                    <span className="flex size-9 shrink-0 items-center justify-center rounded border border-dashed border-[var(--ecom-border-soft)] bg-white text-[9px] text-[var(--ecom-subtle)]">
                       文
                     </span>
                   )}
-                  <span className="min-w-0 text-[#1d1d1f]">
+                  <span className="min-w-0 text-[var(--ecom-ink)]">
                     {SLOT_ROLE_HINT[slot.role]} · {slot.label}
                   </span>
                 </li>
@@ -144,7 +144,7 @@ export function ModelShotPosePromptEditDialog({
 
         </div>
 
-        <div className="mt-4 flex shrink-0 flex-wrap justify-end gap-2 border-t border-[#e8e8ed] pt-4">
+        <div className="mt-4 flex shrink-0 flex-wrap justify-end gap-2 border-t border-[var(--ecom-divider)] pt-4">
           <EcomButtonSecondary type="button" disabled={busy} onClick={onClose}>
             取消
           </EcomButtonSecondary>

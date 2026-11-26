@@ -69,7 +69,7 @@ export function EcomCatalogPickerDialog({
     >
       <div className="flex max-h-[85vh] w-full max-w-lg flex-col rounded-2xl border border-[#e5e5ea] bg-white shadow-xl">
         <div className="flex items-center justify-between border-b border-[#e5e5ea] px-4 py-3">
-          <h2 id="ecom-catalog-picker-title" className="text-sm font-semibold text-[#1d1d1f]">
+          <h2 id="ecom-catalog-picker-title" className="text-sm font-semibold text-[var(--ecom-ink)]">
             {title}
           </h2>
           <EcomDialogCloseButton onClick={() => onOpenChange(false)} />
@@ -78,7 +78,7 @@ export function EcomCatalogPickerDialog({
           {headerContent ? <div>{headerContent}</div> : null}
           {grouped.platform.length > 0 ? (
             <section>
-              <p className="mb-2 text-xs font-medium text-[#86868b]">系统推荐</p>
+              <p className="mb-2 text-xs font-medium text-[var(--ecom-subtle)]">系统推荐</p>
               <div className="space-y-1">
                 {grouped.platform.map((entry) => (
                   <CatalogPickerRow
@@ -101,7 +101,7 @@ export function EcomCatalogPickerDialog({
           ) : null}
           {grouped.user.length > 0 ? (
             <section>
-              <p className="mb-2 text-xs font-medium text-[#86868b]">我的库</p>
+              <p className="mb-2 text-xs font-medium text-[var(--ecom-subtle)]">我的库</p>
               <div className="space-y-1">
                 {grouped.user.map((entry) => (
                   <CatalogPickerRow
@@ -123,7 +123,7 @@ export function EcomCatalogPickerDialog({
             </section>
           ) : null}
           {entries.length === 0 ? (
-            <p className="text-center text-sm text-[#86868b]">暂无条目</p>
+            <p className="text-center text-sm text-[var(--ecom-subtle)]">暂无条目</p>
           ) : null}
         </div>
       </div>
@@ -147,7 +147,7 @@ function CatalogPickerRow({
       disabled={busy}
       onClick={() => void onPick()}
       className={cn(
-        "flex w-full gap-3 rounded-xl border border-[#e5e5ea] px-3 py-2 text-left transition hover:border-[var(--ecom-outline-border)] hover:bg-[#f0f6ff]",
+        "flex w-full gap-3 rounded-xl border border-[#e5e5ea] px-3 py-2 text-left transition hover:border-[var(--ecom-outline-border)] hover:bg-[var(--ecom-content-selected-bg)]",
         busy && "opacity-60",
       )}
     >
@@ -159,13 +159,13 @@ function CatalogPickerRow({
           className="size-14 shrink-0 rounded-lg object-cover"
         />
       ) : (
-        <div className="flex size-14 shrink-0 items-center justify-center rounded-lg bg-[#f5f5f7] text-[10px] text-[#86868b]">
+        <div className="flex size-14 shrink-0 items-center justify-center rounded-lg bg-[var(--ecom-parchment)] text-[10px] text-[var(--ecom-subtle)]">
           无图
         </div>
       )}
       <div className="min-w-0 flex-1">
-        <div className="text-sm font-medium text-[#1d1d1f]">{entry.name}</div>
-        <div className="mt-0.5 line-clamp-2 text-xs text-[#86868b]">{entry.subtitle}</div>
+        <div className="text-sm font-medium text-[var(--ecom-ink)]">{entry.name}</div>
+        <div className="mt-0.5 line-clamp-2 text-xs text-[var(--ecom-subtle)]">{entry.subtitle}</div>
       </div>
     </button>
   );

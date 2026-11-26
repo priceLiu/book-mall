@@ -188,19 +188,19 @@ function ParamFields({
     <div className="grid gap-3 sm:grid-cols-2">
       {fields.map((f) => (
         <label key={f.name} className="block text-sm">
-          <span className="mb-1 block text-[#1d1d1f]">{f.label}</span>
+          <span className="mb-1 block text-[var(--ecom-ink)]">{f.label}</span>
           {f.type === "boolean" ? (
             <input
               type="checkbox"
               checked={Boolean(values[f.name] ?? f.defaultValue)}
               onChange={(e) => onChange(f.name, e.target.checked)}
-              className="h-4 w-4 rounded border-[#d2d2d7]"
+              className="h-4 w-4 rounded border-[var(--ecom-border-soft)]"
             />
           ) : f.type === "select" ? (
             <select
               value={String(values[f.name] ?? f.defaultValue ?? "")}
               onChange={(e) => onChange(f.name, e.target.value)}
-              className="w-full rounded-lg border border-[#d2d2d7] bg-white px-3 py-2 text-sm"
+              className="w-full rounded-lg border border-[var(--ecom-border-soft)] bg-white px-3 py-2 text-sm"
             >
               {(f.options ?? []).map((o) => (
                 <option key={o.value} value={o.value}>
@@ -224,7 +224,7 @@ function ParamFields({
                 const v = e.target.value.trim();
                 onChange(f.name, v === "" ? undefined : Number(v));
               }}
-              className="w-full rounded-lg border border-[#d2d2d7] px-3 py-2 text-sm"
+              className="w-full rounded-lg border border-[var(--ecom-border-soft)] px-3 py-2 text-sm"
             />
           ) : (
             <input
@@ -232,11 +232,11 @@ function ParamFields({
               placeholder={f.hint ?? undefined}
               value={String(values[f.name] ?? f.defaultValue ?? "")}
               onChange={(e) => onChange(f.name, e.target.value)}
-              className="w-full rounded-lg border border-[#d2d2d7] px-3 py-2 text-sm"
+              className="w-full rounded-lg border border-[var(--ecom-border-soft)] px-3 py-2 text-sm"
             />
           )}
           {f.hint ? (
-            <span className="mt-0.5 block text-xs text-[#6e6e73]">{f.hint}</span>
+            <span className="mt-0.5 block text-xs text-[var(--ecom-muted)]">{f.hint}</span>
           ) : null}
         </label>
       ))}
@@ -263,7 +263,7 @@ function HowToUse({ variant }: { variant: "retouch" | "editor" }) {
         ];
   return (
     <section className="mt-8 rounded-2xl border border-[#e5e5ea] bg-white p-4 sm:p-6">
-      <h3 className="text-lg font-semibold text-[#1d1d1f]">
+      <h3 className="text-lg font-semibold text-[var(--ecom-ink)]">
         {variant === "retouch" ? "如何使用 AI 修图" : "如何编辑图片"}
       </h3>
       <ol className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -273,8 +273,8 @@ function HowToUse({ variant }: { variant: "retouch" | "editor" }) {
               {i + 1}
             </span>
             <div>
-              <p className="font-medium text-[#1d1d1f]">{s.title}</p>
-              <p className="mt-1 text-sm text-[#6e6e73]">{s.desc}</p>
+              <p className="font-medium text-[var(--ecom-ink)]">{s.title}</p>
+              <p className="mt-1 text-sm text-[var(--ecom-muted)]">{s.desc}</p>
             </div>
           </li>
         ))}
@@ -749,8 +749,8 @@ export function ImageProcessingStudio() {
                 className={cn(
                   "rounded-full border px-2.5 py-1 text-xs transition-colors sm:px-3 sm:py-1.5 sm:text-sm",
                   activeTag === tag.id
-                    ? "border-[#1d1d1f] bg-[#1d1d1f] text-white"
-                    : "border-[#d2d2d7] bg-white text-[#1d1d1f] hover:border-[#86868b]",
+                    ? "border-[var(--ecom-ink)] bg-[var(--ecom-ink)] text-white"
+                    : "border-[var(--ecom-border-soft)] bg-white text-[var(--ecom-ink)] hover:border-[var(--ecom-subtle)]",
                 )}
               >
                 {tag.label}
@@ -759,7 +759,7 @@ export function ImageProcessingStudio() {
             <button
               type="button"
               onClick={() => setTagsExpanded((v) => !v)}
-              className="inline-flex items-center gap-0.5 rounded-full border border-[#d2d2d7] bg-white px-2.5 py-1 text-xs text-[#0071e3] hover:bg-[#f5f5f7] sm:px-3 sm:py-1.5 sm:text-sm"
+              className="inline-flex items-center gap-0.5 rounded-full border border-[var(--ecom-border-soft)] bg-white px-2.5 py-1 text-xs text-[var(--ecom-primary)] hover:bg-[var(--ecom-parchment)] sm:px-3 sm:py-1.5 sm:text-sm"
             >
               {tagsExpanded ? "收起" : "更多"}
               <ChevronRight
@@ -778,8 +778,8 @@ export function ImageProcessingStudio() {
                   className={cn(
                     "rounded-lg border px-3 py-2 text-center text-sm",
                     activeTag === tag.id
-                      ? "border-[var(--ecom-outline-border)] bg-[#f0f6ff] text-[#0071e3]"
-                      : "border-[#e5e5ea] bg-white text-[#1d1d1f] hover:border-[#d2d2d7]",
+                      ? "border-[var(--ecom-outline-border)] bg-[var(--ecom-content-selected-bg)] text-[var(--ecom-primary)]"
+                      : "border-[#e5e5ea] bg-white text-[var(--ecom-ink)] hover:border-[var(--ecom-border-soft)]",
                   )}
                 >
                   {tag.label}
@@ -798,15 +798,15 @@ export function ImageProcessingStudio() {
           </div>
 
           {panel === "placeholder" ? (
-            <div className="mt-6 rounded-2xl border border-dashed border-[#d2d2d7] bg-white p-8 text-center sm:mt-8 sm:p-12">
-              <Wand2 className="mx-auto h-10 w-10 text-[#86868b]" />
-              <p className="mt-4 text-lg font-medium text-[#1d1d1f]">即将上线</p>
-              <p className="mt-2 text-sm text-[#6e6e73]">
+            <div className="mt-6 rounded-2xl border border-dashed border-[var(--ecom-border-soft)] bg-white p-8 text-center sm:mt-8 sm:p-12">
+              <Wand2 className="mx-auto h-10 w-10 text-[var(--ecom-subtle)]" />
+              <p className="mt-4 text-lg font-medium text-[var(--ecom-ink)]">即将上线</p>
+              <p className="mt-2 text-sm text-[var(--ecom-muted)]">
                 「{IMAGE_PROCESSING_TAGS.find((t) => t.id === activeTag)?.label}」功能开发中
               </p>
               <button
                 type="button"
-                className="mt-6 text-sm text-[#0071e3] hover:underline"
+                className="mt-6 text-sm text-[var(--ecom-primary)] hover:underline"
                 onClick={() => setActiveTag("ai-retouch")}
               >
                 返回 AI 修图
@@ -814,7 +814,7 @@ export function ImageProcessingStudio() {
             </div>
           ) : panel === "retouch" ? (
             <div className="mt-6 space-y-4 sm:mt-8 sm:space-y-6">
-              <div className="rounded-xl border border-sky-100 bg-sky-50/80 px-3 py-3 text-sm text-[#1d1d1f] sm:px-4">
+              <div className="rounded-xl border border-sky-100 bg-sky-50/80 px-3 py-3 text-sm text-[var(--ecom-ink)] sm:px-4">
                 <span className="mr-2 inline-flex align-middle text-sky-600">
                   <Pencil className="h-4 w-4" />
                 </span>
@@ -826,16 +826,16 @@ export function ImageProcessingStudio() {
                   <button
                     type="button"
                     onClick={() => retouchFileRef.current?.click()}
-                    className="flex w-full flex-col items-center justify-center rounded-xl border-2 border-dashed border-[#d2d2d7] px-4 py-12 text-center transition-colors hover:border-[var(--ecom-outline-border)] hover:bg-[#fafafa] sm:px-6 sm:py-16"
+                    className="flex w-full flex-col items-center justify-center rounded-xl border-2 border-dashed border-[var(--ecom-border-soft)] px-4 py-12 text-center transition-colors hover:border-[var(--ecom-outline-border)] hover:bg-[#fafafa] sm:px-6 sm:py-16"
                   >
-                    <Pencil className="h-8 w-8 text-[#86868b]" />
-                    <p className="mt-3 font-medium text-[#1d1d1f]">上传图片进行修图</p>
-                    <p className="mt-1 text-xs text-[#6e6e73]">JPG、PNG、WebP 格式，最大 10MB</p>
+                    <Pencil className="h-8 w-8 text-[var(--ecom-subtle)]" />
+                    <p className="mt-3 font-medium text-[var(--ecom-ink)]">上传图片进行修图</p>
+                    <p className="mt-1 text-xs text-[var(--ecom-muted)]">JPG、PNG、WebP 格式，最大 10MB</p>
                   </button>
                 ) : (
                   <>
                     {isWan27RetouchModel(retouchModel) ? (
-                      <div className="mb-3 rounded-lg border border-[#e5e5ea] bg-white px-3 py-2 text-xs text-[#6e6e73]">
+                      <div className="mb-3 rounded-lg border border-[#e5e5ea] bg-white px-3 py-2 text-xs text-[var(--ecom-muted)]">
                         万相 2.7 Pro 使用框选工具标记重绘区域
                       </div>
                     ) : (
@@ -868,23 +868,23 @@ export function ImageProcessingStudio() {
                   }}
                 />
 
-                <label className="mt-6 block text-sm font-medium text-[#1d1d1f]">
+                <label className="mt-6 block text-sm font-medium text-[var(--ecom-ink)]">
                   请描述一下应该用什么来替换涂漆区域。
                   <textarea
                     value={retouchPrompt}
                     onChange={(e) => setRetouchPrompt(e.target.value)}
                     rows={3}
                     placeholder="例如，去除皮肤纹理、移除标志、用草地代替汽车。"
-                    className="mt-2 w-full resize-y rounded-xl border border-[#d2d2d7] px-4 py-3 text-sm"
+                    className="mt-2 w-full resize-y rounded-xl border border-[var(--ecom-border-soft)] px-4 py-3 text-sm"
                   />
                 </label>
 
                 <div className="mt-4">
-                  <label className="text-sm font-medium text-[#1d1d1f]">模型</label>
+                  <label className="text-sm font-medium text-[var(--ecom-ink)]">模型</label>
                   <select
                     value={retouchModel}
                     onChange={(e) => onRetouchModelChange(e.target.value)}
-                    className="mt-1 w-full rounded-lg border border-[#d2d2d7] bg-white px-3 py-2.5 text-sm"
+                    className="mt-1 w-full rounded-lg border border-[var(--ecom-border-soft)] bg-white px-3 py-2.5 text-sm"
                   >
                     {retouchModels.map((m) => (
                       <option key={m.modelKey} value={m.modelKey}>
@@ -898,7 +898,7 @@ export function ImageProcessingStudio() {
                 <button
                   type="button"
                   onClick={() => setRetouchAdvancedOpen((v) => !v)}
-                  className="mt-3 inline-flex items-center gap-1 text-sm text-[#0071e3]"
+                  className="mt-3 inline-flex items-center gap-1 text-sm text-[var(--ecom-primary)]"
                 >
                   {retouchAdvancedOpen ? (
                     <ChevronDown className="h-4 w-4" />
@@ -939,7 +939,7 @@ export function ImageProcessingStudio() {
             </div>
           ) : panel === "enhancer" ? (
             <div className="mt-6 space-y-4 sm:mt-8 sm:space-y-6">
-              <div className="rounded-xl border border-sky-100 bg-sky-50/80 px-3 py-3 text-sm leading-relaxed text-[#1d1d1f] sm:px-4">
+              <div className="rounded-xl border border-sky-100 bg-sky-50/80 px-3 py-3 text-sm leading-relaxed text-[var(--ecom-ink)] sm:px-4">
                 <span className="mr-2 inline-flex align-middle text-sky-600">
                   <Sparkles className="h-4 w-4" />
                 </span>
@@ -968,7 +968,7 @@ export function ImageProcessingStudio() {
                     <>
                       <Sparkles className="h-10 w-10 text-violet-500" />
                       <p className="mt-3 font-medium">将图片拖放到此处 或点击浏览</p>
-                      <p className="mt-1 text-xs text-[#6e6e73]">JPG、PNG、WebP，最大 10MB</p>
+                      <p className="mt-1 text-xs text-[var(--ecom-muted)]">JPG、PNG、WebP，最大 10MB</p>
                     </>
                   )}
                 </button>
@@ -985,11 +985,11 @@ export function ImageProcessingStudio() {
                 />
 
                 <div className="mt-6">
-                  <label className="text-sm font-medium text-[#1d1d1f]">增强型模型</label>
+                  <label className="text-sm font-medium text-[var(--ecom-ink)]">增强型模型</label>
                   <select
                     value={enhancerStyle}
                     onChange={(e) => setEnhancerStyle(e.target.value)}
-                    className="mt-1 w-full rounded-lg border border-[#d2d2d7] bg-white px-3 py-2.5 text-sm"
+                    className="mt-1 w-full rounded-lg border border-[var(--ecom-border-soft)] bg-white px-3 py-2.5 text-sm"
                   >
                     {ENHANCER_STYLE_OPTIONS.map((o) => (
                       <option key={o.id} value={o.id}>
@@ -997,20 +997,20 @@ export function ImageProcessingStudio() {
                       </option>
                     ))}
                   </select>
-                  <p className="mt-1 text-xs text-[#6e6e73]">
+                  <p className="mt-1 text-xs text-[var(--ecom-muted)]">
                     标准模式经 Gateway 调用百炼 Qwen，保持原始分辨率进行质量提升。
                   </p>
                 </div>
 
                 <div className="mt-4">
-                  <label className="text-sm font-medium text-[#1d1d1f]">增强模型</label>
+                  <label className="text-sm font-medium text-[var(--ecom-ink)]">增强模型</label>
                   <select
                     value={enhancerModel}
                     onChange={(e) => {
                       setEnhancerModel(e.target.value);
                       setEnhancerParams({});
                     }}
-                    className="mt-1 w-full rounded-lg border border-[#d2d2d7] bg-white px-3 py-2.5 text-sm"
+                    className="mt-1 w-full rounded-lg border border-[var(--ecom-border-soft)] bg-white px-3 py-2.5 text-sm"
                   >
                     {(enhancerModels.length > 0
                       ? enhancerModels
@@ -1024,7 +1024,7 @@ export function ImageProcessingStudio() {
                       </option>
                     ))}
                   </select>
-                  <p className="mt-1 text-xs text-[#6e6e73]">
+                  <p className="mt-1 text-xs text-[var(--ecom-muted)]">
                     经 Gateway 调用百炼 Qwen 图像编辑，保持原始分辨率进行质量提升。
                   </p>
                 </div>
@@ -1032,7 +1032,7 @@ export function ImageProcessingStudio() {
                 <button
                   type="button"
                   onClick={() => setEnhancerAdvancedOpen((v) => !v)}
-                  className="mt-4 inline-flex items-center gap-1 text-sm text-[#0071e3]"
+                  className="mt-4 inline-flex items-center gap-1 text-sm text-[var(--ecom-primary)]"
                 >
                   {enhancerAdvancedOpen ? (
                     <ChevronDown className="h-4 w-4" />
@@ -1044,7 +1044,7 @@ export function ImageProcessingStudio() {
                 {enhancerAdvancedOpen ? (
                   <div className="mt-3 rounded-xl border border-[#e5e5ea] bg-[#fafafa] p-4">
                     <label className="block text-sm">
-                      <span className="mb-1 block text-[#1d1d1f]">
+                      <span className="mb-1 block text-[var(--ecom-ink)]">
                         负面提示（应避免的情况）
                       </span>
                       <input
@@ -1057,7 +1057,7 @@ export function ImageProcessingStudio() {
                             negative_prompt: e.target.value,
                           }))
                         }
-                        className="w-full rounded-lg border border-[#d2d2d7] px-3 py-2 text-sm"
+                        className="w-full rounded-lg border border-[var(--ecom-border-soft)] px-3 py-2 text-sm"
                       />
                     </label>
                     {enhancerParamFields.filter((f) => f.name !== "negative_prompt").length >
@@ -1097,7 +1097,7 @@ export function ImageProcessingStudio() {
             </div>
           ) : panel === "outpaint" ? (
             <div className="mt-6 space-y-4 sm:mt-8 sm:space-y-6">
-              <div className="rounded-xl border border-sky-100 bg-sky-50/80 px-3 py-3 text-sm leading-relaxed text-[#1d1d1f] sm:px-4">
+              <div className="rounded-xl border border-sky-100 bg-sky-50/80 px-3 py-3 text-sm leading-relaxed text-[var(--ecom-ink)] sm:px-4">
                 <span className="mr-2 inline-flex align-middle text-sky-600">
                   <Expand className="h-4 w-4" />
                 </span>
@@ -1126,7 +1126,7 @@ export function ImageProcessingStudio() {
                     <>
                       <Expand className="h-10 w-10 text-violet-500" />
                       <p className="mt-3 font-medium">将图片拖放到此处 或点击浏览</p>
-                      <p className="mt-1 text-xs text-[#6e6e73]">JPG、PNG、WebP，最大 10MB</p>
+                      <p className="mt-1 text-xs text-[var(--ecom-muted)]">JPG、PNG、WebP，最大 10MB</p>
                     </>
                   )}
                 </button>
@@ -1144,7 +1144,7 @@ export function ImageProcessingStudio() {
 
                 <div className="mt-6 grid gap-4 sm:grid-cols-2">
                   <div>
-                    <label className="text-sm font-medium text-[#1d1d1f]">扩图模型</label>
+                    <label className="text-sm font-medium text-[var(--ecom-ink)]">扩图模型</label>
                     <select
                       value={outpaintModel}
                       onChange={(e) => {
@@ -1156,7 +1156,7 @@ export function ImageProcessingStudio() {
                             : undefined,
                         }));
                       }}
-                      className="mt-1 w-full rounded-lg border border-[#d2d2d7] bg-white px-3 py-2.5 text-sm"
+                      className="mt-1 w-full rounded-lg border border-[var(--ecom-border-soft)] bg-white px-3 py-2.5 text-sm"
                     >
                       {(outpaintModels.length > 0
                         ? outpaintModels
@@ -1174,7 +1174,7 @@ export function ImageProcessingStudio() {
                   </div>
                   {isOutpaintBailianModel(outpaintModel) ? (
                     <div>
-                      <label className="text-sm font-medium text-[#1d1d1f]">扩图方式</label>
+                      <label className="text-sm font-medium text-[var(--ecom-ink)]">扩图方式</label>
                       <select
                         value={String(outpaintParams.expand_mode ?? "scale")}
                         onChange={(e) =>
@@ -1183,7 +1183,7 @@ export function ImageProcessingStudio() {
                             expand_mode: e.target.value,
                           }))
                         }
-                        className="mt-1 w-full rounded-lg border border-[#d2d2d7] bg-white px-3 py-2.5 text-sm"
+                        className="mt-1 w-full rounded-lg border border-[var(--ecom-border-soft)] bg-white px-3 py-2.5 text-sm"
                       >
                         <option value="scale">等比例扩展</option>
                         <option value="ratio">指定宽高比</option>
@@ -1193,13 +1193,13 @@ export function ImageProcessingStudio() {
                     </div>
                   ) : (
                     <div>
-                      <label className="text-sm font-medium text-[#1d1d1f]">扩图描述（可选）</label>
+                      <label className="text-sm font-medium text-[var(--ecom-ink)]">扩图描述（可选）</label>
                       <input
                         type="text"
                         value={outpaintPrompt}
                         onChange={(e) => setOutpaintPrompt(e.target.value)}
                         placeholder="描述希望扩展出的背景内容"
-                        className="mt-1 w-full rounded-lg border border-[#d2d2d7] px-3 py-2.5 text-sm"
+                        className="mt-1 w-full rounded-lg border border-[var(--ecom-border-soft)] px-3 py-2.5 text-sm"
                       />
                     </div>
                   )}
@@ -1208,7 +1208,7 @@ export function ImageProcessingStudio() {
                 <button
                   type="button"
                   onClick={() => setOutpaintAdvancedOpen((v) => !v)}
-                  className="mt-4 inline-flex items-center gap-1 text-sm text-[#0071e3]"
+                  className="mt-4 inline-flex items-center gap-1 text-sm text-[var(--ecom-primary)]"
                 >
                   {outpaintAdvancedOpen ? (
                     <ChevronDown className="h-4 w-4" />
@@ -1361,7 +1361,7 @@ export function ImageProcessingStudio() {
             />
           ) : (
             <div className="mt-6 space-y-4 sm:mt-8 sm:space-y-6">
-              <div className="rounded-xl border border-sky-100 bg-sky-50/80 px-3 py-3 text-sm leading-relaxed text-[#1d1d1f] sm:px-4">
+              <div className="rounded-xl border border-sky-100 bg-sky-50/80 px-3 py-3 text-sm leading-relaxed text-[var(--ecom-ink)] sm:px-4">
                 上传任意图片，并用简单的英语描述编辑需求——例如「把日落的天空变成橙色」、「把她的衬衫换成藏青色」、「在人物旁边加一只金毛犬」。
               </div>
 
@@ -1396,7 +1396,7 @@ export function ImageProcessingStudio() {
                         <>
                           <CloudUpload className="h-10 w-10 text-violet-500" />
                           <p className="mt-3 font-medium">将图片拖放到此处 或点击浏览</p>
-                          <p className="mt-1 text-xs text-[#6e6e73]">JPG、PNG、WebP，最大 10MB</p>
+                          <p className="mt-1 text-xs text-[var(--ecom-muted)]">JPG、PNG、WebP，最大 10MB</p>
                         </>
                       )}
                     </button>
@@ -1427,14 +1427,14 @@ export function ImageProcessingStudio() {
                   />
                 ) : null}
 
-                <label className="mt-6 block text-sm font-medium text-[#1d1d1f]">
+                <label className="mt-6 block text-sm font-medium text-[var(--ecom-ink)]">
                   请输入您想要进行的修改。
                   <textarea
                     value={editorPrompt}
                     onChange={(e) => setEditorPrompt(e.target.value)}
                     rows={4}
                     placeholder="比如，把她的衬衫换成藏青色。加上白色项链。背景要像，让它看起来像一幅油画……"
-                    className="mt-2 w-full resize-y rounded-xl border border-[#d2d2d7] px-4 py-3 text-sm placeholder:text-[#86868b]"
+                    className="mt-2 w-full resize-y rounded-xl border border-[var(--ecom-border-soft)] px-4 py-3 text-sm placeholder:text-[var(--ecom-subtle)]"
                   />
                 </label>
                 <div className="mt-3 flex flex-wrap gap-2">
@@ -1443,7 +1443,7 @@ export function ImageProcessingStudio() {
                       key={p}
                       type="button"
                       onClick={() => setEditorPrompt(p)}
-                      className="rounded-full border border-[#e5e5ea] bg-[#f5f5f7] px-3 py-1 text-xs text-[#1d1d1f] hover:border-[#d2d2d7]"
+                      className="rounded-full border border-[#e5e5ea] bg-[var(--ecom-parchment)] px-3 py-1 text-xs text-[var(--ecom-ink)] hover:border-[var(--ecom-border-soft)]"
                     >
                       {p}
                     </button>
@@ -1451,11 +1451,11 @@ export function ImageProcessingStudio() {
                 </div>
 
                 <div className="mt-4">
-                  <label className="text-sm font-medium text-[#1d1d1f]">模型</label>
+                  <label className="text-sm font-medium text-[var(--ecom-ink)]">模型</label>
                   <select
                     value={editorModel}
                     onChange={(e) => onEditorModelChange(e.target.value)}
-                    className="mt-1 w-full rounded-lg border border-[#d2d2d7] bg-white px-3 py-2.5 text-sm"
+                    className="mt-1 w-full rounded-lg border border-[var(--ecom-border-soft)] bg-white px-3 py-2.5 text-sm"
                   >
                     {editorModels.map((m) => (
                       <option key={m.modelKey} value={m.modelKey}>
@@ -1465,15 +1465,15 @@ export function ImageProcessingStudio() {
                     ))}
                   </select>
                   {isQwenEditMaxModel(editorModel) ? (
-                    <p className="mt-1 text-xs text-[#0071e3]">
+                    <p className="mt-1 text-xs text-[var(--ecom-primary)]">
                       Qwen 图像编辑 Max 支持最多上传 6 张参考图，可一次添加多张图片进行融合编辑。
                     </p>
                   ) : supportsQwenMultiImage(editorModel) ? (
-                    <p className="mt-1 text-xs text-[#0071e3]">
+                    <p className="mt-1 text-xs text-[var(--ecom-primary)]">
                       Qwen 图像编辑支持最多上传 3 张参考图，可一次添加多张图片进行融合编辑。
                     </p>
                   ) : supportsMultiImageEditor(editorModel) ? (
-                    <p className="mt-1 text-xs text-[#6e6e73]">
+                    <p className="mt-1 text-xs text-[var(--ecom-muted)]">
                       当前模型支持最多 3 张参考图上传。
                     </p>
                   ) : null}
@@ -1481,7 +1481,7 @@ export function ImageProcessingStudio() {
 
                 {isSeedreamEditModel(editorModel) ? (
                 <div className="mt-5">
-                  <p className="text-sm font-medium text-[#1d1d1f]">长宽比</p>
+                  <p className="text-sm font-medium text-[var(--ecom-ink)]">长宽比</p>
                   <div className="mt-2 flex flex-wrap gap-2">
                     {ASPECT_OPTIONS.map((a) => (
                       <button
@@ -1491,8 +1491,8 @@ export function ImageProcessingStudio() {
                         className={cn(
                           "rounded-lg border px-3 py-2 text-xs font-medium",
                           editorAspect === a
-                            ? "border-[var(--ecom-outline-border)] bg-[#f0f6ff] text-[#0071e3]"
-                            : "border-[#e5e5ea] text-[#1d1d1f]",
+                            ? "border-[var(--ecom-outline-border)] bg-[var(--ecom-content-selected-bg)] text-[var(--ecom-primary)]"
+                            : "border-[#e5e5ea] text-[var(--ecom-ink)]",
                         )}
                       >
                         {a}
@@ -1505,7 +1505,7 @@ export function ImageProcessingStudio() {
                 <button
                   type="button"
                   onClick={() => setEditorAdvancedOpen((v) => !v)}
-                  className="mt-4 inline-flex items-center gap-1 text-sm text-[#0071e3]"
+                  className="mt-4 inline-flex items-center gap-1 text-sm text-[var(--ecom-primary)]"
                 >
                   {editorAdvancedOpen ? (
                     <ChevronDown className="h-4 w-4" />
@@ -1549,7 +1549,7 @@ export function ImageProcessingStudio() {
 
           {results.length > 0 ? (
             <section className="mt-6 rounded-2xl border border-[#e5e5ea] bg-white p-4 sm:mt-8 sm:p-6">
-              <h3 className="text-lg font-semibold text-[#1d1d1f]">生成结果</h3>
+              <h3 className="text-lg font-semibold text-[var(--ecom-ink)]">生成结果</h3>
               <div className={cn("mt-4", ECOM_WORKSPACE_RESULT_GRID_CLASS)}>
                 {results.map((url) => (
                   <a

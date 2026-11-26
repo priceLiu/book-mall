@@ -101,18 +101,18 @@ export function OutfitRefSetupPanel({
         onRemoveSceneRef={onRemoveGlobalSceneRef}
       />
 
-      <section className="space-y-3 rounded-xl border border-[#e8e8ed] bg-white p-4">
+      <section className="space-y-3 rounded-xl border border-[var(--ecom-divider)] bg-white p-4">
         <div>
-          <h2 className="text-sm font-semibold text-[#1d1d1f]">卖点与服装识别</h2>
-          <p className="mt-1 text-xs text-[#6e6e73]">
+          <h2 className="text-sm font-semibold text-[var(--ecom-ink)]">卖点与服装识别</h2>
+          <p className="mt-1 text-xs text-[var(--ecom-muted)]">
             卖点选填；留空时 AI 将根据识别结果自动推导展示重点。识别完成后可一键生成下方「分镜制作表」。
           </p>
         </div>
 
         <label className="block space-y-1.5">
-          <span className="text-xs font-medium text-[#1d1d1f]">全局卖点（选填）</span>
+          <span className="text-xs font-medium text-[var(--ecom-ink)]">全局卖点（选填）</span>
           <textarea
-            className="ecom-scrollbar-overlay min-h-[4.5rem] w-full resize-y rounded-lg border border-[#d2d2d7] px-3 py-2 text-xs text-[#1d1d1f] placeholder:text-[#86868b] focus:border-[var(--ecom-outline-border)] focus:outline-none focus:ring-2 focus:ring-[#1d1d1f]/15 disabled:opacity-50"
+            className="ecom-scrollbar-overlay min-h-[4.5rem] w-full resize-y rounded-lg border border-[var(--ecom-border-soft)] px-3 py-2 text-xs text-[var(--ecom-ink)] placeholder:text-[var(--ecom-subtle)] focus:border-[var(--ecom-outline-border)] focus:outline-none focus:ring-2 focus:ring-[var(--ecom-ink)]/15 disabled:opacity-50"
             placeholder="例如：垂感面料、收腰显高、后背蝴蝶结设计…"
             value={sellDraft}
             disabled={busy}
@@ -156,16 +156,16 @@ export function OutfitRefSetupPanel({
         </div>
 
         {clothAnalyse?.status === "success" && clothAnalyse.structuredText ? (
-          <pre className="ecom-scrollbar-overlay max-h-40 overflow-auto whitespace-pre-wrap rounded-lg border border-[#e8e8ed] bg-[#fafafa] p-3 text-[11px] leading-relaxed text-[#1d1d1f]">
+          <pre className="ecom-scrollbar-overlay max-h-40 overflow-auto whitespace-pre-wrap rounded-lg border border-[var(--ecom-divider)] bg-[#fafafa] p-3 text-[11px] leading-relaxed text-[var(--ecom-ink)]">
             {clothAnalyse.structuredText}
           </pre>
         ) : null}
       </section>
 
-      <section className="space-y-3 rounded-xl border border-[#e8e8ed] bg-white p-4">
+      <section className="space-y-3 rounded-xl border border-[var(--ecom-divider)] bg-white p-4">
         <div>
-          <h2 className="text-sm font-semibold text-[#1d1d1f]">生成分镜制作表</h2>
-          <p className="mt-1 text-xs text-[#6e6e73]">
+          <h2 className="text-sm font-semibold text-[var(--ecom-ink)]">生成分镜制作表</h2>
+          <p className="mt-1 text-xs text-[var(--ecom-muted)]">
             将「拆解分镜表」+ 服装识别 + 卖点提交 AI，批量生成可编辑的分镜制作表；动作/场景/Prompt 支持 @图片N 引用上方参考资产。
           </p>
         </div>

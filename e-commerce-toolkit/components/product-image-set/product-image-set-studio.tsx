@@ -437,8 +437,8 @@ export function ProductImageSetStudio() {
     return (
       <EcomWorkspaceLayout fullWidth>
         <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4 px-6 py-16 text-center">
-          <h2 className="text-xl font-semibold text-[#1d1d1f]">AI 商品套图</h2>
-          <p className="max-w-md text-sm text-[#6e6e73]">
+          <h2 className="text-xl font-semibold text-[var(--ecom-ink)]">AI 商品套图</h2>
+          <p className="max-w-md text-sm text-[var(--ecom-muted)]">
             白底 / 卖点 / 场景套图。点击开始创作。
           </p>
           <EcomButtonSecondary type="button" onClick={() => void handleNewProject()} disabled={loading}>

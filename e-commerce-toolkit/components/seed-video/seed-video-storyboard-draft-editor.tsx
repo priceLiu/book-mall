@@ -18,10 +18,10 @@ export function SeedVideoStoryboardDraftEditor({ rows, onChange, disabled }: Pro
   }
 
   return (
-    <div className="overflow-x-auto rounded-xl border border-[#e8e8ed]">
+    <div className="overflow-x-auto rounded-xl border border-[var(--ecom-divider)]">
       <table className="min-w-full text-left text-xs">
         <thead>
-          <tr className="bg-[#1d1d1f] text-white">
+          <tr className="bg-[var(--ecom-ink)] text-white">
             {SEED_VIDEO_FORMAL_SCRIPT_TABLE_HEADERS.map((label) => (
               <th
                 key={label}
@@ -40,11 +40,11 @@ export function SeedVideoStoryboardDraftEditor({ rows, onChange, disabled }: Pro
         </thead>
         <tbody>
           {rows.map((row) => (
-            <tr key={row.index} className="border-t border-[#e8e8ed] align-top">
-              <td className="px-3 py-2 font-medium text-[#1d1d1f]">{row.index}</td>
+            <tr key={row.index} className="border-t border-[var(--ecom-divider)] align-top">
+              <td className="px-3 py-2 font-medium text-[var(--ecom-ink)]">{row.index}</td>
               <td className="px-3 py-2">
                 <input
-                  className="w-full min-w-[4.5rem] rounded-lg border border-[#e8e8ed] px-2 py-1.5 text-[#1d1d1f] focus:border-[var(--ecom-outline-border)] focus:outline-none disabled:opacity-50"
+                  className="w-full min-w-[4.5rem] rounded-lg border border-[var(--ecom-divider)] px-2 py-1.5 text-[var(--ecom-ink)] focus:border-[var(--ecom-outline-border)] focus:outline-none disabled:opacity-50"
                   value={row.duration}
                   disabled={disabled}
                   onChange={(e) => patchRow(row.index, { duration: e.target.value })}
@@ -52,7 +52,7 @@ export function SeedVideoStoryboardDraftEditor({ rows, onChange, disabled }: Pro
               </td>
               <td className="px-3 py-2">
                 <input
-                  className="w-full min-w-[5rem] rounded-lg border border-[#e8e8ed] px-2 py-1.5 text-[#1d1d1f] focus:border-[var(--ecom-outline-border)] focus:outline-none disabled:opacity-50"
+                  className="w-full min-w-[5rem] rounded-lg border border-[var(--ecom-divider)] px-2 py-1.5 text-[var(--ecom-ink)] focus:border-[var(--ecom-outline-border)] focus:outline-none disabled:opacity-50"
                   value={row.refLabel}
                   disabled={disabled}
                   onChange={(e) => patchRow(row.index, { refLabel: e.target.value })}
@@ -60,7 +60,7 @@ export function SeedVideoStoryboardDraftEditor({ rows, onChange, disabled }: Pro
               </td>
               <td className="px-3 py-2">
                 <textarea
-                  className="ecom-scrollbar-thin min-h-[3.5rem] w-full resize-y rounded-lg border border-[#e8e8ed] px-2 py-1.5 text-[#1d1d1f] focus:border-[var(--ecom-outline-border)] focus:outline-none disabled:opacity-50"
+                  className="ecom-scrollbar-thin min-h-[3.5rem] w-full resize-y rounded-lg border border-[var(--ecom-divider)] px-2 py-1.5 text-[var(--ecom-ink)] focus:border-[var(--ecom-outline-border)] focus:outline-none disabled:opacity-50"
                   value={row.cameraMove}
                   disabled={disabled}
                   placeholder="推镜、慢动作、特写…"
@@ -69,7 +69,7 @@ export function SeedVideoStoryboardDraftEditor({ rows, onChange, disabled }: Pro
               </td>
               <td className="px-3 py-2">
                 <textarea
-                  className="ecom-scrollbar-thin min-h-[3.5rem] w-full resize-y rounded-lg border border-[#e8e8ed] px-2 py-1.5 text-[#1d1d1f] focus:border-[var(--ecom-outline-border)] focus:outline-none disabled:opacity-50"
+                  className="ecom-scrollbar-thin min-h-[3.5rem] w-full resize-y rounded-lg border border-[var(--ecom-divider)] px-2 py-1.5 text-[var(--ecom-ink)] focus:border-[var(--ecom-outline-border)] focus:outline-none disabled:opacity-50"
                   value={row.sceneDescription}
                   disabled={disabled}
                   onChange={(e) => patchRow(row.index, { sceneDescription: e.target.value })}
@@ -77,7 +77,7 @@ export function SeedVideoStoryboardDraftEditor({ rows, onChange, disabled }: Pro
               </td>
               <td className="px-3 py-2">
                 <textarea
-                  className="ecom-scrollbar-thin min-h-[3.5rem] w-full resize-y rounded-lg border border-[#e8e8ed] px-2 py-1.5 text-[#1d1d1f] focus:border-[var(--ecom-outline-border)] focus:outline-none disabled:opacity-50"
+                  className="ecom-scrollbar-thin min-h-[3.5rem] w-full resize-y rounded-lg border border-[var(--ecom-divider)] px-2 py-1.5 text-[var(--ecom-ink)] focus:border-[var(--ecom-outline-border)] focus:outline-none disabled:opacity-50"
                   value={row.voiceover}
                   disabled={disabled}
                   onChange={(e) => patchRow(row.index, { voiceover: e.target.value })}
@@ -85,7 +85,7 @@ export function SeedVideoStoryboardDraftEditor({ rows, onChange, disabled }: Pro
               </td>
               <td className="px-3 py-2">
                 <textarea
-                  className="ecom-scrollbar-thin min-h-[4rem] w-full resize-y rounded-lg border border-[#e8e8ed] px-2 py-1.5 text-[#1d1d1f] focus:border-[var(--ecom-outline-border)] focus:outline-none disabled:opacity-50"
+                  className="ecom-scrollbar-thin min-h-[4rem] w-full resize-y rounded-lg border border-[var(--ecom-divider)] px-2 py-1.5 text-[var(--ecom-ink)] focus:border-[var(--ecom-outline-border)] focus:outline-none disabled:opacity-50"
                   value={row.aiPrompt}
                   disabled={disabled}
                   placeholder="留空则根据画面描述自动生成"

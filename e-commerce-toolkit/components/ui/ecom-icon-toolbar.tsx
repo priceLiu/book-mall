@@ -32,7 +32,7 @@ export function EcomIconToolbarGroup({ children, label, className }: GroupProps)
   return (
     <div
       className={cn(
-        "flex items-center gap-0.5 rounded-lg border border-[#e8e8ed] bg-[#fafafa] p-0.5",
+        "flex items-center gap-0.5 rounded-lg border border-[var(--ecom-divider)] bg-[#fafafa] p-0.5",
         className,
       )}
       role="group"

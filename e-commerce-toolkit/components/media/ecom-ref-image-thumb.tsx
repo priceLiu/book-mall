@@ -120,7 +120,7 @@ export function EcomRefImageThumb({
         {onPreview ? (
           <button
             type="button"
-            className="relative h-full w-full overflow-hidden rounded-md border border-[#d2d2d7] bg-white"
+            className="relative h-full w-full overflow-hidden rounded-md border border-[var(--ecom-border-soft)] bg-white"
             title={alt}
             onClick={onPreview}
           >
@@ -135,7 +135,7 @@ export function EcomRefImageThumb({
           </button>
         ) : (
           <div
-            className="relative h-full w-full overflow-hidden rounded-md border border-[#d2d2d7] bg-white"
+            className="relative h-full w-full overflow-hidden rounded-md border border-[var(--ecom-border-soft)] bg-white"
             title={alt}
           >
             <Image
@@ -168,7 +168,7 @@ export function EcomRefImageThumb({
         ? createPortal(
             <div
               // z-[400]：hover 浮层会在弹层内触发，必须高于弹层 z-[300]
-              className="pointer-events-none fixed z-[400] overflow-hidden rounded-xl border border-[#d2d2d7] bg-white p-1 shadow-xl ring-1 ring-black/5"
+              className="pointer-events-none fixed z-[400] overflow-hidden rounded-xl border border-[var(--ecom-border-soft)] bg-white p-1 shadow-xl ring-1 ring-black/5"
               style={{ top: pos.top, left: pos.left, width: previewW }}
               role="tooltip"
             >
@@ -179,7 +179,7 @@ export function EcomRefImageThumb({
                 className="w-full rounded-lg object-contain"
                 style={{ maxHeight: PREVIEW_MAX_H }}
               />
-              <p className="truncate px-1.5 py-1 text-[10px] text-[#6e6e73]">{alt}</p>
+              <p className="truncate px-1.5 py-1 text-[10px] text-[var(--ecom-muted)]">{alt}</p>
             </div>,
             document.body,
           )

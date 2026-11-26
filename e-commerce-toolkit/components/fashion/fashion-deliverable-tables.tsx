@@ -56,8 +56,8 @@ export function FashionParamsTable({
         <tbody>
           {rows.map(([label, value]) => (
             <tr key={label} className="border-b border-[#f0f0f2]">
-              <td className="py-2 pr-4 text-xs font-medium text-[#6e6e73]">{label}</td>
-              <td className="py-2 text-[#1d1d1f]">{value?.trim() || "—"}</td>
+              <td className="py-2 pr-4 text-xs font-medium text-[var(--ecom-muted)]">{label}</td>
+              <td className="py-2 text-[var(--ecom-ink)]">{value?.trim() || "—"}</td>
             </tr>
           ))}
         </tbody>
@@ -113,7 +113,7 @@ function FashionEditableTextCell({
     return (
       <div className="relative z-10 w-full min-w-0 max-w-full space-y-1">
         <textarea
-          className="box-border w-full max-w-full min-w-0 resize-y rounded-lg border border-[var(--ecom-outline-border)] bg-white px-2 py-1.5 text-sm text-[#1d1d1f] outline-none ring-2 ring-[#1d1d1f]/12"
+          className="box-border w-full max-w-full min-w-0 resize-y rounded-lg border border-[var(--ecom-outline-border)] bg-white px-2 py-1.5 text-sm text-[var(--ecom-ink)] outline-none ring-2 ring-[var(--ecom-ink)]/12"
           rows={rows}
           value={draft}
           disabled={saving}
@@ -163,7 +163,7 @@ function FashionEditableTextCell({
       <span className="min-w-0 flex-1 break-words">{value}</span>
       <button
         type="button"
-        className="shrink-0 rounded p-1 text-[#86868b] opacity-0 transition hover:bg-[#f0f0f2] hover:text-[#1d1d1f] group-hover:opacity-100"
+        className="shrink-0 rounded p-1 text-[var(--ecom-subtle)] opacity-0 transition hover:bg-[#f0f0f2] hover:text-[var(--ecom-ink)] group-hover:opacity-100"
         title={editTitle}
         disabled={saving}
         onClick={() => setEditing(true)}
@@ -185,7 +185,7 @@ export function FashionSellpointsTable({
   saving?: boolean;
   onSaveSellpoints?: (sellpoints: FashionSellpoint[]) => void | Promise<void>;
 }) {
-  if (!sellpoints.length && !editable) return <p className="text-sm text-[#86868b]">暂无卖点</p>;
+  if (!sellpoints.length && !editable) return <p className="text-sm text-[var(--ecom-subtle)]">暂无卖点</p>;
 
   function handleAddRow() {
     if (!onSaveSellpoints) return;
@@ -199,10 +199,10 @@ export function FashionSellpointsTable({
   if (!sellpoints.length && editable) {
     return (
       <div className="space-y-3">
-        <p className="text-sm text-[#86868b]">尚未添加卖点，请逐条填写您的核心卖点。</p>
+        <p className="text-sm text-[var(--ecom-subtle)]">尚未添加卖点，请逐条填写您的核心卖点。</p>
         <button
           type="button"
-          className="rounded-lg border border-[#d2d2d7] bg-white px-3 py-1.5 text-sm text-[#1d1d1f] hover:border-[var(--ecom-outline-border)]"
+          className="rounded-lg border border-[var(--ecom-border-soft)] bg-white px-3 py-1.5 text-sm text-[var(--ecom-ink)] hover:border-[var(--ecom-outline-border)]"
           disabled={saving}
           onClick={handleAddRow}
         >
@@ -253,7 +253,7 @@ export function FashionSellpointsTable({
                 <td className={ecomDataTableTdClass}>
                   {editable ? (
                     <select
-                      className="rounded-lg border border-[#d2d2d7] bg-white px-2 py-1 text-xs outline-none focus:border-[var(--ecom-outline-border)]"
+                      className="rounded-lg border border-[var(--ecom-border-soft)] bg-white px-2 py-1 text-xs outline-none focus:border-[var(--ecom-outline-border)]"
                       value={sp.layer}
                       disabled={saving}
                       onChange={(e) =>
@@ -312,8 +312,8 @@ export function FashionStoryboardResultBlock({
 }) {
   if (!panels.length) return null;
   return (
-    <div className="rounded-lg border border-[#e8e8ed] bg-white p-3">
-      <p className="mb-2 text-xs font-semibold text-[#6e6e73]">
+    <div className="rounded-lg border border-[var(--ecom-divider)] bg-white p-3">
+      <p className="mb-2 text-xs font-semibold text-[var(--ecom-muted)]">
         12.1 · 分镜脚本表（{versionKey}版{title ? ` · ${title}` : ""}
         {locked ? " · 已定稿" : ""}）
       </p>
@@ -341,7 +341,7 @@ export function FashionPanelsTable({
 }) {
   const spMap = new Map((sellpoints ?? []).map((sp) => [sp.id, sp.text]));
   const sellpointIdsFor = (p: StoryboardPanelRow) => p.sellpointIds ?? [];
-  if (!panels.length) return <p className="text-sm text-[#86868b]">暂无分镜</p>;
+  if (!panels.length) return <p className="text-sm text-[var(--ecom-subtle)]">暂无分镜</p>;
 
   function patchPanel(index: FashionPanelRow["index"], patch: Partial<FashionPanelRow>) {
     if (!onSavePanels) return;
@@ -658,13 +658,13 @@ export function FashionOpsPackBlock({
       !normalized.subtitleGuide &&
       !normalized.sfxNotes)
   ) {
-    return <p className="text-sm text-[#86868b]">运营包待生成</p>;
+    return <p className="text-sm text-[var(--ecom-subtle)]">运营包待生成</p>;
   }
   return (
-    <div className="space-y-4 text-sm text-[#1d1d1f]">
+    <div className="space-y-4 text-sm text-[var(--ecom-ink)]">
       {normalized.titles?.length ? (
         <div>
-          <h4 className="mb-1 text-xs font-semibold text-[#6e6e73]">爆款标题</h4>
+          <h4 className="mb-1 text-xs font-semibold text-[var(--ecom-muted)]">爆款标题</h4>
           <ul className="list-inside list-disc space-y-0.5">
             {normalized.titles.map((t, i) => (
               <li key={`${t}-${i}`}>{t}</li>
@@ -674,25 +674,25 @@ export function FashionOpsPackBlock({
       ) : null}
       {normalized.coverWords?.length ? (
         <div>
-          <h4 className="mb-1 text-xs font-semibold text-[#6e6e73]">封面词</h4>
+          <h4 className="mb-1 text-xs font-semibold text-[var(--ecom-muted)]">封面词</h4>
           <p>{normalized.coverWords.join(" · ")}</p>
         </div>
       ) : null}
       {normalized.tags?.length ? (
         <div>
-          <h4 className="mb-1 text-xs font-semibold text-[#6e6e73]">标签</h4>
+          <h4 className="mb-1 text-xs font-semibold text-[var(--ecom-muted)]">标签</h4>
           <p>{normalized.tags.join(" ")}</p>
         </div>
       ) : null}
       {normalized.xiaohongshuBody ? (
         <div>
-          <h4 className="mb-1 text-xs font-semibold text-[#6e6e73]">小红书正文</h4>
+          <h4 className="mb-1 text-xs font-semibold text-[var(--ecom-muted)]">小红书正文</h4>
           <p className="whitespace-pre-wrap">{normalized.xiaohongshuBody}</p>
         </div>
       ) : null}
       {normalized.detailBullets?.length ? (
         <div>
-          <h4 className="mb-1 text-xs font-semibold text-[#6e6e73]">详情要点</h4>
+          <h4 className="mb-1 text-xs font-semibold text-[var(--ecom-muted)]">详情要点</h4>
           <ul className="list-inside list-disc space-y-0.5">
             {normalized.detailBullets.map((t, i) => (
               <li key={`${t}-${i}`}>{t}</li>
@@ -702,19 +702,19 @@ export function FashionOpsPackBlock({
       ) : null}
       {normalized.bgmDirection ? (
         <div>
-          <h4 className="mb-1 text-xs font-semibold text-[#6e6e73]">BGM 方向</h4>
+          <h4 className="mb-1 text-xs font-semibold text-[var(--ecom-muted)]">BGM 方向</h4>
           <p>{normalized.bgmDirection}</p>
         </div>
       ) : null}
       {normalized.subtitleGuide ? (
         <div>
-          <h4 className="mb-1 text-xs font-semibold text-[#6e6e73]">字幕规范</h4>
+          <h4 className="mb-1 text-xs font-semibold text-[var(--ecom-muted)]">字幕规范</h4>
           <p>{normalized.subtitleGuide}</p>
         </div>
       ) : null}
       {normalized.sfxNotes ? (
         <div>
-          <h4 className="mb-1 text-xs font-semibold text-[#6e6e73]">音效建议</h4>
+          <h4 className="mb-1 text-xs font-semibold text-[var(--ecom-muted)]">音效建议</h4>
           <p>{normalized.sfxNotes}</p>
         </div>
       ) : null}

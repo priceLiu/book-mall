@@ -457,11 +457,11 @@ export function ProductDesignGenSlotWorkspace({
   return (
     <section
       id={target === "main" ? "pdt-gen-slots-main" : "pdt-gen-slots-detail"}
-      className="scroll-mt-20 rounded-xl border border-[#e8e8ed] bg-[#fafafa] px-4 py-4"
+      className="scroll-mt-20 rounded-xl border border-[var(--ecom-divider)] bg-[#fafafa] px-4 py-4"
     >
       <div className="mb-3">
-        <h3 className="text-sm font-semibold text-[#1d1d1f]">{title}</h3>
-        <p className="mt-0.5 text-[11px] text-[#6e6e73]">
+        <h3 className="text-sm font-semibold text-[var(--ecom-ink)]">{title}</h3>
+        <p className="mt-0.5 text-[11px] text-[var(--ecom-muted)]">
           勾选点位后点「生图」批量出图；格子内可编辑 Prompt，已出图悬停可预览、下载与重新生成。
           {rows.length > 0 ? (
             <span className="ml-1">
@@ -469,7 +469,7 @@ export function ProductDesignGenSlotWorkspace({
             </span>
           ) : null}
           {editedCount > 0 ? (
-            <span className="ml-1 text-[#1d1d1f]">
+            <span className="ml-1 text-[var(--ecom-ink)]">
               · 已手改 {editedCount} 条，重新分析时保留
             </span>
           ) : null}
@@ -480,7 +480,7 @@ export function ProductDesignGenSlotWorkspace({
 
       {rows.length === 0 && !busy ? (
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <p className="text-[11px] text-[#86868b]">
+          <p className="text-[11px] text-[var(--ecom-subtle)]">
             {mode === "decompose"
               ? "上传参考图并（可选）填写意图后，点击「分析」生成 Prompt 与占位。"
               : "完成 Step 文案后，点击「从文案生成草稿」。"}
@@ -504,10 +504,10 @@ export function ProductDesignGenSlotWorkspace({
       {rows.length > 0 ? (
         <>
           <div className="mb-2 flex flex-wrap items-center gap-2">
-            <label className="flex cursor-pointer items-center gap-1.5 text-[11px] text-[#6e6e73]">
+            <label className="flex cursor-pointer items-center gap-1.5 text-[11px] text-[var(--ecom-muted)]">
               <input
                 type="checkbox"
-                className="rounded border-[#d2d2d7]"
+                className="rounded border-[var(--ecom-border-soft)]"
                 checked={selected.size === rows.length && rows.length > 0}
                 onChange={toggleSelectAll}
                 disabled={workspaceDisabled}
@@ -536,7 +536,7 @@ export function ProductDesignGenSlotWorkspace({
               {`生图（${selectedImageGenCount}）`}
             </EcomButtonPrimary>
           </div>
-          <p className="mb-3 text-[11px] text-[#86868b]">
+          <p className="mb-3 text-[11px] text-[var(--ecom-subtle)]">
             已选 {selectedSlotCount}/{rows.length} 个点位 · 提示词 {promptReadyCount}/
             {rows.length}
             {selectedSlotCount > 0 && selectedImageGenCount < selectedSlotCount
@@ -553,21 +553,21 @@ export function ProductDesignGenSlotWorkspace({
           return (
             <article
               key={row.index}
-              className="flex min-w-0 flex-col overflow-hidden rounded-xl border border-[#e8e8ed] bg-white"
+              className="flex min-w-0 flex-col overflow-hidden rounded-xl border border-[var(--ecom-divider)] bg-white"
             >
               <div className="flex items-center gap-1.5 border-b border-[#f0f0f2] px-2.5 py-1.5">
                 <input
                   type="checkbox"
-                  className="rounded border-[#d2d2d7]"
+                  className="rounded border-[var(--ecom-border-soft)]"
                   checked={selected.has(row.index)}
                   onChange={() => toggleSelect(row.index)}
                   disabled={workspaceDisabled || rowLocked}
                 />
-                <span className="shrink-0 text-[10px] font-semibold text-[#86868b]">
+                <span className="shrink-0 text-[10px] font-semibold text-[var(--ecom-subtle)]">
                   #{row.index}
                 </span>
                 <input
-                  className="min-w-0 flex-1 rounded border border-[#e8e8ed] px-1.5 py-0.5 text-[11px] font-medium"
+                  className="min-w-0 flex-1 rounded border border-[var(--ecom-divider)] px-1.5 py-0.5 text-[11px] font-medium"
                   value={row.title}
                   disabled={workspaceDisabled || rowLocked}
                   onChange={(e) => updateRow(row.index, { title: e.target.value })}
@@ -576,7 +576,7 @@ export function ProductDesignGenSlotWorkspace({
                 {rows.length > 1 ? (
                   <button
                     type="button"
-                    className="shrink-0 rounded p-0.5 text-[#86868b] hover:bg-[#f5f5f7] hover:text-red-600"
+                    className="shrink-0 rounded p-0.5 text-[var(--ecom-subtle)] hover:bg-[var(--ecom-parchment)] hover:text-red-600"
                     disabled={workspaceDisabled || rowLocked}
                     onClick={() => void removeRow(row.index)}
                     aria-label="删除"
@@ -587,7 +587,7 @@ export function ProductDesignGenSlotWorkspace({
               </div>
 
               {row.purpose ? (
-                <p className="line-clamp-2 border-b border-[#f0f0f2] px-2.5 py-1 text-[10px] leading-snug text-[#86868b]">
+                <p className="line-clamp-2 border-b border-[#f0f0f2] px-2.5 py-1 text-[10px] leading-snug text-[var(--ecom-subtle)]">
                   {row.purpose}
                 </p>
               ) : null}
@@ -615,7 +615,7 @@ export function ProductDesignGenSlotWorkspace({
               />
 
               {row.promptEdited ? (
-                <p className="border-t border-[#f0f0f2] px-2.5 py-1 text-[10px] text-[#86868b]">
+                <p className="border-t border-[#f0f0f2] px-2.5 py-1 text-[10px] text-[var(--ecom-subtle)]">
                   已手改 Prompt
                 </p>
               ) : null}
@@ -625,7 +625,7 @@ export function ProductDesignGenSlotWorkspace({
 
         <button
           type="button"
-          className="col-span-full flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-[#d2d2d7] py-2.5 text-[11px] text-[#6e6e73] hover:border-[var(--ecom-chrome-accent)] hover:text-[#1d1d1f]"
+          className="col-span-full flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-[var(--ecom-border-soft)] py-2.5 text-[11px] text-[var(--ecom-muted)] hover:border-[var(--ecom-chrome-accent)] hover:text-[var(--ecom-ink)]"
           disabled={workspaceDisabled}
           onClick={async () => {
             const prev = rowsRef.current;
@@ -669,7 +669,7 @@ export function ProductDesignGenSlotWorkspace({
       </div>
 
       {busy ? (
-        <p className="mt-2 flex items-center gap-2 text-[11px] text-[#6e6e73]">
+        <p className="mt-2 flex items-center gap-2 text-[11px] text-[var(--ecom-muted)]">
           <Loader2 className="h-3.5 w-3.5 animate-spin" />
           {busy}
         </p>
@@ -818,7 +818,7 @@ function GenSlotPreview({
         <button
           type="button"
           disabled={actionDisabled}
-          className="absolute inset-0 flex flex-col items-center justify-center gap-1 text-[11px] text-[#86868b] transition-colors hover:bg-[#f0f0f2] hover:text-[#1d1d1f] disabled:pointer-events-none disabled:opacity-50"
+          className="absolute inset-0 flex flex-col items-center justify-center gap-1 text-[11px] text-[var(--ecom-subtle)] transition-colors hover:bg-[#f0f0f2] hover:text-[var(--ecom-ink)] disabled:pointer-events-none disabled:opacity-50"
           onClick={onEditPrompt}
         >
           <FileText className="h-5 w-5 opacity-60" />

@@ -248,12 +248,12 @@ export function ProductDesignPromptPlanWorkspace({
   return (
     <section
       id={target === "main" ? "pdt-prompt-plan-main" : "pdt-prompt-plan-detail"}
-      className="scroll-mt-20 rounded-xl border border-[#e8e8ed] bg-[#fafafa] px-4 py-4"
+      className="scroll-mt-20 rounded-xl border border-[var(--ecom-divider)] bg-[#fafafa] px-4 py-4"
     >
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h3 className="text-sm font-semibold text-[#1d1d1f]">{sectionTitle}</h3>
-          <p className="mt-0.5 text-[11px] text-[#6e6e73]">
+          <h3 className="text-sm font-semibold text-[var(--ecom-ink)]">{sectionTitle}</h3>
+          <p className="mt-0.5 text-[11px] text-[var(--ecom-muted)]">
             出图前须在此确认 N 条生图 Prompt（N = 列表长度，无需预先选张数）。
             {confirmed ? (
               <span className="ml-1 font-medium text-emerald-700">已确认</span>
@@ -266,7 +266,7 @@ export function ProductDesignPromptPlanWorkspace({
           {!confirmed ? (
             <>
               {plan && editedPromptCount > 0 ? (
-                <span className="text-[11px] text-[#86868b]">
+                <span className="text-[11px] text-[var(--ecom-subtle)]">
                   已手改的 {editedPromptCount} 条将保留
                 </span>
               ) : null}
@@ -305,7 +305,7 @@ export function ProductDesignPromptPlanWorkspace({
       </div>
 
       {!plan && !busy ? (
-        <p className="mb-3 text-[11px] text-[#86868b]">
+        <p className="mb-3 text-[11px] text-[var(--ecom-subtle)]">
           {mode === "decompose"
             ? "上传参考图并（可选）填写意图后，点击「分析」：先选视觉模型，再生成 Prompt 列表。"
             : "完成 Step 文案后，点击「从文案生成草稿」生成 Prompt 列表。"}
@@ -314,11 +314,11 @@ export function ProductDesignPromptPlanWorkspace({
 
       {plan || items.length > 0 ? (
         <div className="space-y-4">
-          <div className="rounded-lg border border-[#e8e8ed] bg-white p-3">
-            <p className="mb-2 text-[11px] font-semibold text-[#1d1d1f]">产品理解（可编辑）</p>
+          <div className="rounded-lg border border-[var(--ecom-divider)] bg-white p-3">
+            <p className="mb-2 text-[11px] font-semibold text-[var(--ecom-ink)]">产品理解（可编辑）</p>
             <div className="grid gap-2 sm:grid-cols-2">
               <input
-                className="rounded-lg border border-[#e8e8ed] px-2.5 py-1.5 text-[12px]"
+                className="rounded-lg border border-[var(--ecom-divider)] px-2.5 py-1.5 text-[12px]"
                 placeholder="产品名"
                 value={productContext.productName ?? ""}
                 disabled={confirmed || Boolean(disabled) || Boolean(busy)}
@@ -327,7 +327,7 @@ export function ProductDesignPromptPlanWorkspace({
                 }
               />
               <input
-                className="rounded-lg border border-[#e8e8ed] px-2.5 py-1.5 text-[12px]"
+                className="rounded-lg border border-[var(--ecom-divider)] px-2.5 py-1.5 text-[12px]"
                 placeholder="品类"
                 value={productContext.productCategory ?? ""}
                 disabled={confirmed || Boolean(disabled) || Boolean(busy)}
@@ -337,7 +337,7 @@ export function ProductDesignPromptPlanWorkspace({
               />
             </div>
             <textarea
-              className="mt-2 min-h-[3rem] w-full rounded-lg border border-[#e8e8ed] px-2.5 py-1.5 text-[12px]"
+              className="mt-2 min-h-[3rem] w-full rounded-lg border border-[var(--ecom-divider)] px-2.5 py-1.5 text-[12px]"
               placeholder="卖点（换行分隔）"
               value={(productContext.sellingPoints ?? []).join("\n")}
               disabled={confirmed || Boolean(disabled) || Boolean(busy)}
@@ -352,7 +352,7 @@ export function ProductDesignPromptPlanWorkspace({
               }
             />
             <textarea
-              className="mt-2 min-h-[2.5rem] w-full rounded-lg border border-[#e8e8ed] px-2.5 py-1.5 text-[12px]"
+              className="mt-2 min-h-[2.5rem] w-full rounded-lg border border-[var(--ecom-divider)] px-2.5 py-1.5 text-[12px]"
               placeholder="描述 / 视觉调性"
               value={[productContext.description, productContext.visualTone]
                 .filter(Boolean)
@@ -370,20 +370,20 @@ export function ProductDesignPromptPlanWorkspace({
           </div>
 
           <div className="space-y-3">
-            <p className="text-[11px] font-semibold text-[#1d1d1f]">
+            <p className="text-[11px] font-semibold text-[var(--ecom-ink)]">
               生图 Prompt（{items.length} 条）
             </p>
             {items.map((item) => (
               <div
                 key={item.index}
-                className="rounded-lg border border-[#e8e8ed] bg-white p-3"
+                className="rounded-lg border border-[var(--ecom-divider)] bg-white p-3"
               >
                 <div className="mb-2 flex items-center gap-2">
-                  <span className="text-[11px] font-semibold text-[#86868b]">
+                  <span className="text-[11px] font-semibold text-[var(--ecom-subtle)]">
                     #{item.index}
                   </span>
                   <input
-                    className="flex-1 rounded border border-[#e8e8ed] px-2 py-1 text-[12px] font-medium"
+                    className="flex-1 rounded border border-[var(--ecom-divider)] px-2 py-1 text-[12px] font-medium"
                     value={item.title}
                     disabled={confirmed || Boolean(disabled) || Boolean(busy)}
                     onChange={(e) => updateItem(item.index, { title: e.target.value })}
@@ -391,7 +391,7 @@ export function ProductDesignPromptPlanWorkspace({
                   {!confirmed && items.length > 1 ? (
                     <button
                       type="button"
-                      className="rounded p-1 text-[#86868b] hover:bg-[#f5f5f7] hover:text-red-600"
+                      className="rounded p-1 text-[var(--ecom-subtle)] hover:bg-[var(--ecom-parchment)] hover:text-red-600"
                       disabled={Boolean(disabled) || Boolean(busy)}
                       onClick={() => removeItem(item.index)}
                       aria-label="删除"
@@ -401,10 +401,10 @@ export function ProductDesignPromptPlanWorkspace({
                   ) : null}
                 </div>
                 {item.purpose ? (
-                  <p className="mb-1.5 text-[10px] text-[#86868b]">{item.purpose}</p>
+                  <p className="mb-1.5 text-[10px] text-[var(--ecom-subtle)]">{item.purpose}</p>
                 ) : null}
                 <ProductDesignPromptExpandableTextarea
-                  className={cn("text-[11px]", confirmed && "bg-[#f5f5f7]")}
+                  className={cn("text-[11px]", confirmed && "bg-[var(--ecom-parchment)]")}
                   value={item.prompt}
                   disabled={confirmed || Boolean(disabled) || Boolean(busy)}
                   title={`编辑 ${label} #${item.index} Prompt`}
@@ -416,7 +416,7 @@ export function ProductDesignPromptPlanWorkspace({
             {!confirmed ? (
               <button
                 type="button"
-                className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-[#d2d2d7] py-2 text-[11px] text-[#6e6e73] hover:border-[var(--ecom-chrome-accent)] hover:text-[#1d1d1f]"
+                className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-[var(--ecom-border-soft)] py-2 text-[11px] text-[var(--ecom-muted)] hover:border-[var(--ecom-chrome-accent)] hover:text-[var(--ecom-ink)]"
                 disabled={Boolean(disabled) || Boolean(busy)}
                 onClick={() => void addItem()}
               >
@@ -440,7 +440,7 @@ export function ProductDesignPromptPlanWorkspace({
       ) : null}
 
       {busy ? (
-        <p className="mt-2 flex items-center gap-2 text-[11px] text-[#6e6e73]">
+        <p className="mt-2 flex items-center gap-2 text-[11px] text-[var(--ecom-muted)]">
           <Loader2 className="h-3.5 w-3.5 animate-spin" />
           {busy}
         </p>

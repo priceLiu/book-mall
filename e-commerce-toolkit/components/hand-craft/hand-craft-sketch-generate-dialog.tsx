@@ -63,7 +63,7 @@ export function HandCraftSketchGenerateDialog({
 
   const textarea = (
     <textarea
-      className="min-h-[40vh] w-full flex-1 resize-y rounded-lg border border-[#e8e8ed] px-3 py-2.5 text-[13px] leading-relaxed text-[#1d1d1f] focus:border-[var(--ecom-outline-border)] focus:outline-none focus:ring-2 focus:ring-[#1d1d1f]/12 disabled:cursor-not-allowed disabled:bg-[#f5f5f7]"
+      className="min-h-[40vh] w-full flex-1 resize-y rounded-lg border border-[var(--ecom-divider)] px-3 py-2.5 text-[13px] leading-relaxed text-[var(--ecom-ink)] focus:border-[var(--ecom-outline-border)] focus:outline-none focus:ring-2 focus:ring-[var(--ecom-ink)]/12 disabled:cursor-not-allowed disabled:bg-[var(--ecom-parchment)]"
       value={draft}
       autoFocus
       disabled={busy}
@@ -113,11 +113,11 @@ export function HandCraftSketchGenerateDialog({
           <div className="space-y-1.5 pr-8">
             <h2
               id="hand-craft-sketch-gen-title"
-              className="text-lg font-semibold leading-none tracking-tight text-[#1d1d1f]"
+              className="text-lg font-semibold leading-none tracking-tight text-[var(--ecom-ink)]"
             >
               生成线稿
             </h2>
-            <p className="text-sm text-[#6e6e73]">{description}</p>
+            <p className="text-sm text-[var(--ecom-muted)]">{description}</p>
           </div>
           {textarea}
           {footer}

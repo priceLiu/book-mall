@@ -125,17 +125,17 @@ export default function ModelLibraryPage() {
     <>
       <EcomWorkspaceLayout fullWidth>
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          <div className="shrink-0 border-b border-[#e8e8ed] px-4 py-4 sm:px-6">
+          <div className="shrink-0 border-b border-[var(--ecom-divider)] px-4 py-4 sm:px-6">
             <div className="space-y-3">
               <div>
-                <h1 className="text-lg font-semibold text-[#1d1d1f]">模特库</h1>
-                <p className="mt-1 text-xs text-[#6e6e73]">
+                <h1 className="text-lg font-semibold text-[var(--ecom-ink)]">模特库</h1>
+                <p className="mt-1 text-xs text-[var(--ecom-muted)]">
                   平台内置模特参考图，可按性别与年龄筛选浏览。
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
                 <select
-                  className="h-9 min-w-[120px] rounded-lg border border-[#e8e8ed] bg-white px-3 text-sm text-[#1d1d1f]"
+                  className="h-9 min-w-[120px] rounded-lg border border-[var(--ecom-divider)] bg-white px-3 text-sm text-[var(--ecom-ink)]"
                   value={gender}
                   onChange={(e) => {
                     setGender(e.target.value as GenderFilter);
@@ -150,7 +150,7 @@ export default function ModelLibraryPage() {
                   ))}
                 </select>
                 <select
-                  className="h-9 min-w-[120px] rounded-lg border border-[#e8e8ed] bg-white px-3 text-sm text-[#1d1d1f]"
+                  className="h-9 min-w-[120px] rounded-lg border border-[var(--ecom-divider)] bg-white px-3 text-sm text-[var(--ecom-ink)]"
                   value={age}
                   onChange={(e) => {
                     setAge(e.target.value as AgeFilter);
@@ -165,7 +165,7 @@ export default function ModelLibraryPage() {
                   ))}
                 </select>
               </div>
-              <p className="text-xs text-[#6e6e73]">
+              <p className="text-xs text-[var(--ecom-muted)]">
                 {empty
                   ? "暂无模特数据，请先运行导入脚本。"
                   : hasMore
@@ -182,14 +182,14 @@ export default function ModelLibraryPage() {
             className="ecom-scrollbar-thin min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-6"
           >
             {empty ? (
-              <p className="text-sm text-[#6e6e73]">
+              <p className="text-sm text-[var(--ecom-muted)]">
                 目录为空。请在 book-mall 目录执行{" "}
-                <code className="rounded bg-[#f5f5f7] px-1 py-0.5 text-xs">
+                <code className="rounded bg-[var(--ecom-parchment)] px-1 py-0.5 text-xs">
                   pnpm ecom:import-model-library
                 </code>
               </p>
             ) : models.length === 0 ? (
-              <p className="text-sm text-[#6e6e73]">当前筛选条件下暂无模特。</p>
+              <p className="text-sm text-[var(--ecom-muted)]">当前筛选条件下暂无模特。</p>
             ) : (
               <>
                 <ul className={MODEL_LIBRARY_GRID_CLASS}>

@@ -4,7 +4,7 @@
 function AnalysisCell({ text }: { text: string }) {
   const value = text.trim() || "—";
   return (
-    <span className="block min-w-[9rem] max-w-[20rem] whitespace-pre-wrap break-words text-xs leading-relaxed text-[#1d1d1f]">
+    <span className="block min-w-[9rem] max-w-[20rem] whitespace-pre-wrap break-words text-xs leading-relaxed text-[var(--ecom-ink)]">
       {value}
     </span>
   );

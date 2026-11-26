@@ -95,8 +95,8 @@ export function StoryboardDeliverableSection({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#e8e8ed] bg-[#fafafa] px-4 py-3">
-        <p className="text-xs text-[#6e6e73]">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--ecom-divider)] bg-[#fafafa] px-4 py-3">
+        <p className="text-xs text-[var(--ecom-muted)]">
           {fullSheetOnly
             ? `一键成片 ${durationSec}s · 各镜分镜图与分镜脚本一并提交视频模型`
             : `整图成片 ${durationSec}s · 已生成 ${panelVideoCount} 镜单镜视频${canMergePanels ? " · 可合并" : ""}`}
@@ -219,9 +219,9 @@ export function StoryboardDeliverableSection({
       </div>
 
       {canMergePanels ? (
-        <div className="space-y-2 rounded-lg border border-[#e8e8ed] bg-white px-4 py-2.5">
+        <div className="space-y-2 rounded-lg border border-[var(--ecom-divider)] bg-white px-4 py-2.5">
           <div className="flex items-center justify-between gap-3">
-            <span className="text-xs text-[#6e6e73]">
+            <span className="text-xs text-[var(--ecom-muted)]">
               <Clapperboard className="mr-1 inline h-3.5 w-3.5" />
               已有 {panelVideoCount} 个镜头视频可拼接
             </span>
@@ -229,7 +229,7 @@ export function StoryboardDeliverableSection({
               {onMergeBurnInChange && onMergeSubtitleStyleChange && mergeSubtitleStyle ? (
                 <button
                   type="button"
-                  className="inline-flex items-center gap-1 text-xs text-[#0071e3] hover:underline"
+                  className="inline-flex items-center gap-1 text-xs text-[var(--ecom-primary)] hover:underline"
                   onClick={() => setMergeSettingsOpen((v) => !v)}
                 >
                   合并设置

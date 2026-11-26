@@ -71,7 +71,7 @@ export function EcomGenerationSettingsSection({
   const language = normalizeEcomLanguageValue(value.language);
 
   return (
-    <section className={cn("mb-3 rounded-xl border border-[#e8e8ed] bg-white", className)}>
+    <section className={cn("mb-3 rounded-xl border border-[var(--ecom-divider)] bg-white", className)}>
       <button
         type="button"
         className="flex w-full items-center justify-between px-3 py-2.5"
@@ -81,7 +81,7 @@ export function EcomGenerationSettingsSection({
         {open ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
       </button>
       {open ? (
-        <div className="space-y-2 border-t border-[#e8e8ed] px-3 py-3">
+        <div className="space-y-2 border-t border-[var(--ecom-divider)] px-3 py-3">
           <EcomGenerationSettingsTriplet
             platform={platform}
             country={country}

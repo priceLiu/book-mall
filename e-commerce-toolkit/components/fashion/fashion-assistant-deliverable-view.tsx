@@ -154,38 +154,38 @@ export function FashionAssistantDeliverableView({
   return (
     <div className="space-y-3">
       {showBriefText ? (
-        <p className="whitespace-pre-wrap text-sm text-[#1d1d1f]">{brief}</p>
+        <p className="whitespace-pre-wrap text-sm text-[var(--ecom-ink)]">{brief}</p>
       ) : null}
       {showStoryboardConfirmHint && confirmKey ? (
-        <div className="rounded-lg border border-[#e8e8ed] bg-[#f0f6ff] px-3 py-2 text-xs text-[#0071e3]">
+        <div className="rounded-lg border border-[var(--ecom-divider)] bg-[var(--ecom-content-selected-bg)] px-3 py-2 text-xs text-[var(--ecom-primary)]">
           已选定 {confirmKey}版{confirmVersion?.title ? `：${confirmVersion.title}` : ""}。左侧
           12.1 分镜表可编辑并保存，确认后点下方「确认分镜，生成运营包」。
         </div>
       ) : null}
       {showStoryTheaterConfirmHint && theaterConfirmKey ? (
-        <div className="rounded-lg border border-[#e8e8ed] bg-[#f0f6ff] px-3 py-2 text-xs text-[#0071e3]">
+        <div className="rounded-lg border border-[var(--ecom-divider)] bg-[var(--ecom-content-selected-bg)] px-3 py-2 text-xs text-[var(--ecom-primary)]">
           已选定 {storyTheaterVersionCardTitle(theaterConfirmKey, theaterConfirmVersion?.title)}。左侧
           故事剧场分镜表可编辑并保存，确认后点下方「确认故事版，开始成片」。
         </div>
       ) : null}
       {sellpointsLocked && showBrief && deliverable?.sellpoints?.length && !showSellpointsTable ? (
-        <p className="text-xs text-[#0071e3]">
+        <p className="text-xs text-[var(--ecom-primary)]">
           卖点已定稿，完整清单见中栏「定稿卖点清单」。
         </p>
       ) : null}
       {showSellpointsTable && sellpointsToShow ? (
-        <div className="rounded-lg border border-[#e8e8ed] bg-white p-3">
-          <p className="mb-2 text-xs font-semibold text-[#6e6e73]">{sellpointsTableCaption}</p>
+        <div className="rounded-lg border border-[var(--ecom-divider)] bg-white p-3">
+          <p className="mb-2 text-xs font-semibold text-[var(--ecom-muted)]">{sellpointsTableCaption}</p>
           <FashionSellpointsTable sellpoints={sellpointsToShow} />
         </div>
       ) : null}
       {awaitingTheaterPick ? (
-        <div className="rounded-lg border border-[#e8e8ed] bg-[#f0f6ff] px-3 py-2 text-xs text-[#0071e3]">
+        <div className="rounded-lg border border-[var(--ecom-divider)] bg-[var(--ecom-content-selected-bg)] px-3 py-2 text-xs text-[var(--ecom-primary)]">
           已生成 {theaterVersionCount} 套故事版方案，请在下方选择 T1–T5 继续。
         </div>
       ) : null}
       {awaitingPick ? (
-        <div className="rounded-lg border border-[#e8e8ed] bg-[#f0f6ff] px-3 py-2 text-xs text-[#0071e3]">
+        <div className="rounded-lg border border-[var(--ecom-divider)] bg-[var(--ecom-content-selected-bg)] px-3 py-2 text-xs text-[var(--ecom-primary)]">
           已生成 {versionCount} 套分镜方案
           {versionCount === 1 ? "（A 版）" : ""}，请在下方选择继续。
         </div>

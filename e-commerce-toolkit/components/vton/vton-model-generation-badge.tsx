@@ -6,8 +6,8 @@ import type { ModelGenerationBodyBadge } from "@/lib/vton-model-generation-body-
 const TONE_CLASS: Record<ModelGenerationBodyBadge["tone"], string> = {
   success: "bg-[#248a3d] text-white",
   warn: "bg-[#b45309] text-white",
-  muted: "bg-[#86868b] text-white",
-  pending: "bg-[#0071e3]/90 text-white",
+  muted: "bg-[var(--ecom-subtle)] text-white",
+  pending: "bg-[var(--ecom-primary)]/90 text-white",
 };
 
 export function VtonModelGenerationBadge({

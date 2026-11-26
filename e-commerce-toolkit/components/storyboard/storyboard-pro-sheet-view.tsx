@@ -158,7 +158,7 @@ export function StoryboardProSheetView({
         minWidth: isPreview ? 1200 : undefined,
         minHeight: isPreview ? undefined : 780,
         background: "#ffffff",
-        color: "#1d1d1f",
+        color: "var(--ecom-ink)",
         fontFamily: "system-ui, -apple-system, sans-serif",
         padding: isPreview ? 24 : 20,
         boxSizing: "border-box",
@@ -168,7 +168,7 @@ export function StoryboardProSheetView({
         style={{
           width: "100%",
           borderCollapse: "collapse",
-          border: "2px solid #1d1d1f",
+          border: "2px solid var(--ecom-ink)",
           fontSize: baseFontSize,
           marginBottom: 12,
         }}
@@ -178,7 +178,7 @@ export function StoryboardProSheetView({
             <td
               colSpan={4}
               style={{
-                border: "1px solid #1d1d1f",
+                border: "1px solid var(--ecom-ink)",
                 padding: "10px 14px",
                 fontWeight: 700,
                 fontSize: 18,
@@ -219,7 +219,7 @@ export function StoryboardProSheetView({
         style={{
           display: "flex",
           gap: 16,
-          border: "2px solid #1d1d1f",
+          border: "2px solid var(--ecom-ink)",
           padding: 12,
           marginBottom: 12,
           flexWrap: "wrap",
@@ -255,7 +255,7 @@ export function StoryboardProSheetView({
       <div
         style={{
           display: "flex",
-          border: "2px solid #1d1d1f",
+          border: "2px solid var(--ecom-ink)",
           overflowX: isPreview ? "auto" : undefined,
         }}
       >
@@ -276,7 +276,7 @@ export function StoryboardProSheetView({
               flex: isPreview ? "0 0 auto" : 1,
               minWidth: isPreview ? panelColumnWidth : 0,
               width: isPreview ? panelColumnWidth : undefined,
-              borderRight: i < sheet.panels.length - 1 ? "1px solid #1d1d1f" : undefined,
+              borderRight: i < sheet.panels.length - 1 ? "1px solid var(--ecom-ink)" : undefined,
               position: "relative",
               isolation: "isolate",
               overflow: "hidden",
@@ -284,12 +284,12 @@ export function StoryboardProSheetView({
           >
             <div
               style={{
-                borderBottom: "1px solid #1d1d1f",
+                borderBottom: "1px solid var(--ecom-ink)",
                 padding: "8px 6px",
                 textAlign: "center",
                 fontWeight: 700,
                 fontSize: 12,
-                background: selected ? "#e8f2ff" : "#f5f5f7",
+                background: selected ? "#e8f2ff" : "var(--ecom-parchment)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -314,8 +314,8 @@ export function StoryboardProSheetView({
               style={{
                 ...(panelImgHeight != null ? { height: panelImgHeight } : { aspectRatio: panelImageAspectCss }),
                 width: "100%",
-                borderBottom: "1px solid #1d1d1f",
-                background: generating ? "#000" : "#e8e8ed",
+                borderBottom: "1px solid var(--ecom-ink)",
+                background: generating ? "#000" : "var(--ecom-divider)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -376,13 +376,13 @@ export function StoryboardProSheetView({
                     background: "transparent",
                     cursor: "pointer",
                     fontSize: 11,
-                    color: "#0071e3",
+                    color: "var(--ecom-primary)",
                   }}
                 >
                   点击生成分镜图
                 </button>
               ) : !generating ? (
-                <span style={{ fontSize: 11, color: "#86868b" }}>待生成</span>
+                <span style={{ fontSize: 11, color: "var(--ecom-subtle)" }}>待生成</span>
               ) : null}
               {generating ? (
                 <EcomMediaGeneratingBusy
@@ -421,7 +421,7 @@ export function StoryboardProSheetView({
           display: "grid",
           gridTemplateColumns: "1fr 1fr 1fr",
           gap: 0,
-          border: "2px solid #1d1d1f",
+          border: "2px solid var(--ecom-ink)",
           borderTop: "none",
           fontSize: 11,
         }}
@@ -438,7 +438,7 @@ export function StoryboardProSheetView({
 }
 
 const cellStyle: React.CSSProperties = {
-  border: "1px solid #1d1d1f",
+  border: "1px solid var(--ecom-ink)",
   padding: "8px 12px",
   verticalAlign: "top",
 };
@@ -456,7 +456,7 @@ function FieldRow({
     <tr>
       <td
         style={{
-          borderBottom: "1px solid #d2d2d7",
+          borderBottom: "1px solid var(--ecom-border-soft)",
           padding: "4px 6px",
           fontWeight: 600,
           width: "28%",
@@ -468,7 +468,7 @@ function FieldRow({
       </td>
       <td
         style={{
-          borderBottom: "1px solid #d2d2d7",
+          borderBottom: "1px solid var(--ecom-border-soft)",
           padding: "4px 6px",
           verticalAlign: "top",
           minHeight: tall ? 48 : undefined,
@@ -514,9 +514,9 @@ function RefGroup({
                   width: 88,
                   height: 88,
                   overflow: "hidden",
-                  border: "1px solid #1d1d1f",
+                  border: "1px solid var(--ecom-ink)",
                   borderRadius: 4,
-                  background: "#e8e8ed",
+                  background: "var(--ecom-divider)",
                 }}
               >
                 <SheetImage
@@ -528,7 +528,7 @@ function RefGroup({
                   onPreview={onPreviewImage}
                 />
               </div>
-              <div style={{ fontSize: 10, marginTop: 4, color: "#6e6e73", maxWidth: 88 }}>
+              <div style={{ fontSize: 10, marginTop: 4, color: "var(--ecom-muted)", maxWidth: 88 }}>
                 {r.label}
               </div>
             </div>
@@ -540,17 +540,17 @@ function RefGroup({
                 width: 88,
                 height: 88,
                 overflow: "hidden",
-                border: "1px solid #1d1d1f",
+                border: "1px solid var(--ecom-ink)",
                 borderRadius: 4,
-                background: "#e8e8ed",
+                background: "var(--ecom-divider)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
               }}
             >
-              <span style={{ fontSize: 10, color: "#86868b" }}>待上传</span>
+              <span style={{ fontSize: 10, color: "var(--ecom-subtle)" }}>待上传</span>
             </div>
-            <div style={{ fontSize: 10, marginTop: 4, color: "#6e6e73" }}>{emptyLabel}</div>
+            <div style={{ fontSize: 10, marginTop: 4, color: "var(--ecom-muted)" }}>{emptyLabel}</div>
           </div>
         )}
       </div>
@@ -560,9 +560,9 @@ function RefGroup({
 
 function FooterBlock({ title, text }: { title: string; text: string }) {
   return (
-    <div style={{ borderRight: "1px solid #1d1d1f", padding: "10px 12px" }}>
+    <div style={{ borderRight: "1px solid var(--ecom-ink)", padding: "10px 12px" }}>
       <div style={{ fontWeight: 700, marginBottom: 4 }}>{title}</div>
-      <div style={{ color: "#6e6e73" }}>{text}</div>
+      <div style={{ color: "var(--ecom-muted)" }}>{text}</div>
     </div>
   );
 }

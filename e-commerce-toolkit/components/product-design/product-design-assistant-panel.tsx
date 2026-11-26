@@ -1040,7 +1040,7 @@ export function ProductDesignAssistantPanel({
             <div className="flex flex-col items-start">
               <div className={ECOM_ASSISTANT_CHOICE_SHELL_CLASS}>
                 <div className="space-y-2">
-                  <p className="text-[11px] text-[#6e6e73]">
+                  <p className="text-[11px] text-[var(--ecom-muted)]">
                     正在根据产品图推断{pendingBriefField?.label ?? "候选项"}…
                   </p>
                   <div
@@ -1050,7 +1050,7 @@ export function ProductDesignAssistantPanel({
                   >
                     <span />
                   </div>
-                  <p className="text-[10px] text-[#86868b]">
+                  <p className="text-[10px] text-[var(--ecom-subtle)]">
                     视觉模型分析中，通常需 10～30 秒；完成后会展示可点选候选项。
                   </p>
                 </div>
@@ -1060,18 +1060,18 @@ export function ProductDesignAssistantPanel({
           {showChoiceCards && choiceStep ? (
             <div className="flex flex-col items-start">
               <div className={ECOM_ASSISTANT_CHOICE_SHELL_CLASS}>
-                <div className="rounded-2xl border border-[var(--ecom-outline-border)] bg-[#f0f6ff] p-4 shadow-sm">
+                <div className="rounded-2xl border border-[var(--ecom-outline-border)] bg-[var(--ecom-content-selected-bg)] p-4 shadow-sm">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="text-sm font-semibold text-[#1d1d1f]">{choiceStep.title}</p>
-                      <p className="mt-1 text-xs leading-relaxed text-[#6e6e73]">
+                      <p className="text-sm font-semibold text-[var(--ecom-ink)]">{choiceStep.title}</p>
+                      <p className="mt-1 text-xs leading-relaxed text-[var(--ecom-muted)]">
                         {choiceStep.subtitle}
                       </p>
-                      <p className="mt-2 text-[11px] text-[#86868b]">
+                      <p className="mt-2 text-[11px] text-[var(--ecom-subtle)]">
                         请选择（无需输入）：点选后将写入会话并同步中栏。
                       </p>
                     </div>
-                    <span className="shrink-0 rounded-full bg-white px-2.5 py-0.5 text-[10px] font-medium text-[#0071e3]">
+                    <span className="shrink-0 rounded-full bg-white px-2.5 py-0.5 text-[10px] font-medium text-[var(--ecom-primary)]">
                       {choiceStep.progress}
                     </span>
                   </div>

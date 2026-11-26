@@ -543,7 +543,7 @@ export function SeedVideoStudio() {
 
   if (loading) {
     return (
-      <div className="flex h-full items-center justify-center text-sm text-[#6e6e73]">
+      <div className="flex h-full items-center justify-center text-sm text-[var(--ecom-muted)]">
         加载工作台…
       </div>
     );
@@ -553,8 +553,8 @@ export function SeedVideoStudio() {
     return (
       <>
         <div className="flex h-full flex-col items-center justify-center gap-4 px-6 text-center">
-          <h1 className="text-lg font-semibold text-[#1d1d1f]">服装种草视频</h1>
-          <p className="max-w-md text-sm text-[#6e6e73]">
+          <h1 className="text-lg font-semibold text-[var(--ecom-ink)]">服装种草视频</h1>
+          <p className="max-w-md text-sm text-[var(--ecom-muted)]">
             上传商品/穿搭素材，选择 Skill 策划脚本与镜头，支持方案①直接连贯成片或方案②逐镜 I2V + TTS +
             合成。
           </p>

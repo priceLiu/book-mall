@@ -110,7 +110,7 @@ function LibraryTabBar({
   counts: Record<LibraryTab, number>;
 }) {
   return (
-    <div className="sticky top-0 z-10 -mx-4 border-b border-[#e8e8ed] bg-white/95 px-4 pb-3 pt-1 backdrop-blur-sm sm:-mx-6 sm:px-6">
+    <div className="sticky top-0 z-10 -mx-4 border-b border-[var(--ecom-divider)] bg-white/95 px-4 pb-3 pt-1 backdrop-blur-sm sm:-mx-6 sm:px-6">
       <div className="flex flex-wrap gap-2">
         {LIBRARY_TABS.map((tab) => {
           const selected = active === tab.id;
@@ -121,8 +121,8 @@ function LibraryTabBar({
               type="button"
               className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition ${
                 selected
-                  ? "border-[#1d1d1f] bg-[#1d1d1f] text-white shadow-sm"
-                  : "border-[#e8e8ed] bg-white text-[#1d1d1f] hover:bg-[#f5f5f7]"
+                  ? "border-[var(--ecom-ink)] bg-[var(--ecom-ink)] text-white shadow-sm"
+                  : "border-[var(--ecom-divider)] bg-white text-[var(--ecom-ink)] hover:bg-[var(--ecom-parchment)]"
               }`}
               onClick={() => onChange(tab.id)}
             >
@@ -130,7 +130,7 @@ function LibraryTabBar({
               {count > 0 ? (
                 <span
                   className={`rounded-full px-1.5 py-0.5 text-[10px] ${
-                    selected ? "bg-white/20 text-white" : "bg-[#f5f5f7] text-[#6e6e73]"
+                    selected ? "bg-white/20 text-white" : "bg-[var(--ecom-parchment)] text-[var(--ecom-muted)]"
                   }`}
                 >
                   {count}
@@ -141,19 +141,19 @@ function LibraryTabBar({
         })}
       </div>
       {active === "workflows" ? (
-        <p className="mt-2 text-[11px] text-[#6e6e73]">
+        <p className="mt-2 text-[11px] text-[var(--ecom-muted)]">
           已保存的工作流可「复制打开」换参考图再生成。进行中的项目请至
-          <Link href="/workflows/drafts" className="mx-1 text-[#0071e3] hover:underline">
+          <Link href="/workflows/drafts" className="mx-1 text-[var(--ecom-primary)] hover:underline">
             我的工作流 · 暂存
           </Link>
           继续编辑。
         </p>
       ) : active === "ip-master-library" ? (
-        <p className="mt-2 text-[11px] text-[#6e6e73]">
+        <p className="mt-2 text-[11px] text-[var(--ecom-muted)]">
           在「IP 母版」审阅页保存的条目会出现在此；每条含基准图与结构化模板，可打开源项目继续编辑。
         </p>
       ) : (
-        <p className="mt-2 text-[11px] text-[#6e6e73]">
+        <p className="mt-2 text-[11px] text-[var(--ecom-muted)]">
           先点项目名展开，再查看该项目的成图、视频或交付内容。
         </p>
       )}
@@ -179,12 +179,12 @@ function LibraryBreadcrumb({
   projectName: string;
 }) {
   return (
-    <p className="mb-2 text-[11px] text-[#86868b]">
-      <span className="text-[#6e6e73]">{domain}</span>
-      <span className="mx-1.5 text-[#d2d2d7]">/</span>
+    <p className="mb-2 text-[11px] text-[var(--ecom-subtle)]">
+      <span className="text-[var(--ecom-muted)]">{domain}</span>
+      <span className="mx-1.5 text-[var(--ecom-border-soft)]">/</span>
       <span>{moduleTitle}</span>
-      <span className="mx-1.5 text-[#d2d2d7]">/</span>
-      <span className="font-medium text-[#1d1d1f]">{projectName}</span>
+      <span className="mx-1.5 text-[var(--ecom-border-soft)]">/</span>
+      <span className="font-medium text-[var(--ecom-ink)]">{projectName}</span>
     </p>
   );
 }
@@ -354,7 +354,7 @@ function LibraryProjectThumb({
 
   if (url) {
     return (
-      <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg border border-[#e8e8ed] bg-[#f5f5f7]">
+      <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg border border-[var(--ecom-divider)] bg-[var(--ecom-parchment)]">
         {treatAsVideo ? (
           <EcomVideoThumb src={url} className="absolute inset-0 size-full" />
         ) : (
@@ -374,8 +374,8 @@ function LibraryProjectThumb({
     );
   }
   return (
-    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg border border-[#e8e8ed] bg-[#f5f5f7]">
-      <Layers className="h-5 w-5 text-[#86868b] opacity-50" />
+    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg border border-[var(--ecom-divider)] bg-[var(--ecom-parchment)]">
+      <Layers className="h-5 w-5 text-[var(--ecom-subtle)] opacity-50" />
     </div>
   );
 }
@@ -697,11 +697,11 @@ export default function LibraryPage() {
     <>
       <EcomWorkspaceLayout fullWidth>
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          <header className="shrink-0 border-b border-[#e8e8ed] bg-white px-4 py-4 sm:px-6 sm:py-5">
+          <header className="shrink-0 border-b border-[var(--ecom-divider)] bg-white px-4 py-4 sm:px-6 sm:py-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <h1 className="text-lg font-semibold text-[#1d1d1f]">我的资产</h1>
-                <p className="mt-1 text-xs text-[#6e6e73]">
+                <h1 className="text-lg font-semibold text-[var(--ecom-ink)]">我的资产</h1>
+                <p className="mt-1 text-xs text-[var(--ecom-muted)]">
                   {loading
                     ? "加载中…"
                     : `共 ${totalAssets} 条媒体 · ${totalBundles} 套工作流/交付包`}
@@ -714,7 +714,7 @@ export default function LibraryPage() {
                 />
                 <Link
                   href="/workflows/drafts"
-                  className="text-xs text-[#0071e3] hover:underline"
+                  className="text-xs text-[var(--ecom-primary)] hover:underline"
                 >
                   我的工作流 →
                 </Link>
@@ -734,7 +734,7 @@ export default function LibraryPage() {
           ) : loadError ? (
             <p className="mt-6 text-sm text-red-600">{loadError}</p>
           ) : empty ? (
-            <p className="mt-6 text-sm text-[#6e6e73]">
+            <p className="mt-6 text-sm text-[var(--ecom-muted)]">
               {activeTab === "workflows"
                 ? "暂无已保存工作流。请在主图/详情页创作、种草视频或电商口播故事版工作台点「保存工作流」后，在此一键复用或复制打开。"
                 : activeTab === "ip-master-library"
@@ -745,7 +745,7 @@ export default function LibraryPage() {
             <div className="mt-6 space-y-10">
               {workflowSectionsByDomain.map(({ domain, sections: domainSections }) => (
                 <div key={domain} className="space-y-8">
-                  <h2 className="text-base font-semibold text-[#1d1d1f]">{domain}</h2>
+                  <h2 className="text-base font-semibold text-[var(--ecom-ink)]">{domain}</h2>
                   {domainSections.map(({ section, entries }) => (
                     <LibrarySectionBlock
                       key={section.moduleId}
@@ -779,7 +779,7 @@ export default function LibraryPage() {
               {filteredSectionsByDomain.map(({ domain, sections: domainSections }) => (
                 <div key={domain} className="space-y-8">
                   {activeTab !== "ip-master-library" ? (
-                    <h2 className="text-base font-semibold text-[#1d1d1f]">{domain}</h2>
+                    <h2 className="text-base font-semibold text-[var(--ecom-ink)]">{domain}</h2>
                   ) : null}
                   {domainSections.map((section) => {
                     const projectEntries = buildSectionProjectEntries(section);
@@ -899,7 +899,7 @@ function LibrarySectionBlock({
 
   return (
     <section className="space-y-3">
-      <h3 className="text-sm font-semibold text-[#1d1d1f]">{section.title}</h3>
+      <h3 className="text-sm font-semibold text-[var(--ecom-ink)]">{section.title}</h3>
       <ul className="space-y-2">
         {projectEntries.map((entry) => (
           <LibraryProjectListItem
@@ -1003,10 +1003,10 @@ function LibraryProjectListItem({
       : null;
 
   return (
-    <li className="overflow-hidden rounded-xl border border-[#e8e8ed] bg-white shadow-sm">
+    <li className="overflow-hidden rounded-xl border border-[var(--ecom-divider)] bg-white shadow-sm">
       <button
         type="button"
-        className="flex w-full items-center gap-3 px-3 py-2.5 text-left transition hover:bg-[#f5f5f7]"
+        className="flex w-full items-center gap-3 px-3 py-2.5 text-left transition hover:bg-[var(--ecom-parchment)]"
         onClick={onToggle}
         aria-expanded={expanded}
       >
@@ -1016,13 +1016,13 @@ function LibraryProjectListItem({
           isVideo={isVideoThumb}
         />
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium text-[#1d1d1f]">{entry.projectName}</p>
-          <p className="truncate text-[11px] text-[#6e6e73]">{entry.meta}</p>
+          <p className="truncate text-sm font-medium text-[var(--ecom-ink)]">{entry.projectName}</p>
+          <p className="truncate text-[11px] text-[var(--ecom-muted)]">{entry.meta}</p>
         </div>
         {quickOpenIpMaster ? (
           <button
             type="button"
-            className="inline-flex h-7 shrink-0 items-center gap-1 rounded-full border border-[#e8e8ed] bg-white px-2.5 text-[11px] font-medium text-[#1d1d1f] hover:bg-[#f5f5f7]"
+            className="inline-flex h-7 shrink-0 items-center gap-1 rounded-full border border-[var(--ecom-divider)] bg-white px-2.5 text-[11px] font-medium text-[var(--ecom-ink)] hover:bg-[var(--ecom-parchment)]"
             onClick={(e) => {
               e.stopPropagation();
               onOpenIpMasterProject(quickOpenIpMaster.projectId);
@@ -1035,7 +1035,7 @@ function LibraryProjectListItem({
         {quickOpenStoryboard ? (
           <button
             type="button"
-            className="inline-flex h-7 shrink-0 items-center gap-1 rounded-full border border-[#e8e8ed] bg-white px-2.5 text-[11px] font-medium text-[#1d1d1f] hover:bg-[#f5f5f7] disabled:opacity-50"
+            className="inline-flex h-7 shrink-0 items-center gap-1 rounded-full border border-[var(--ecom-divider)] bg-white px-2.5 text-[11px] font-medium text-[var(--ecom-ink)] hover:bg-[var(--ecom-parchment)] disabled:opacity-50"
             disabled={quickOpenStoryboard.busy}
             onClick={(e) => {
               e.stopPropagation();
@@ -1047,14 +1047,14 @@ function LibraryProjectListItem({
           </button>
         ) : null}
         {expanded ? (
-          <ChevronDown className="h-4 w-4 shrink-0 text-[#86868b]" />
+          <ChevronDown className="h-4 w-4 shrink-0 text-[var(--ecom-subtle)]" />
         ) : (
-          <ChevronRight className="h-4 w-4 shrink-0 text-[#86868b]" />
+          <ChevronRight className="h-4 w-4 shrink-0 text-[var(--ecom-subtle)]" />
         )}
       </button>
 
       {expanded ? (
-        <div className="border-t border-[#e8e8ed] bg-[#fafafa] px-3 py-3">
+        <div className="border-t border-[var(--ecom-divider)] bg-[#fafafa] px-3 py-3">
           <LibraryBreadcrumb
             domain={section.domainLabel}
             moduleTitle={section.title}
@@ -1132,7 +1132,7 @@ function LibraryProjectExpandedContent({
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              className="inline-flex h-8 items-center gap-1.5 rounded-full border border-[#e8e8ed] bg-white px-3 text-xs font-medium text-[#1d1d1f] shadow-sm hover:bg-[#f5f5f7] disabled:opacity-50"
+              className="inline-flex h-8 items-center gap-1.5 rounded-full border border-[var(--ecom-divider)] bg-white px-3 text-xs font-medium text-[var(--ecom-ink)] shadow-sm hover:bg-[var(--ecom-parchment)] disabled:opacity-50"
               disabled={continueBusy}
               onClick={() => onOpenSeedVideoProject(entry.projectId!)}
             >
@@ -1200,7 +1200,7 @@ function LibraryProjectExpandedContent({
         ) : null}
         <button
           type="button"
-          className="inline-flex h-8 items-center gap-1.5 rounded-full border border-[#1d1d1f] bg-[#1d1d1f] px-3 text-xs font-medium text-white hover:bg-black disabled:opacity-50"
+          className="inline-flex h-8 items-center gap-1.5 rounded-full border border-[var(--ecom-ink)] bg-[var(--ecom-ink)] px-3 text-xs font-medium text-white hover:bg-black disabled:opacity-50"
           disabled={busy}
           onClick={() => onReuseProductDesignBundle(pdBundle)}
         >
@@ -1215,7 +1215,7 @@ function LibraryProjectExpandedContent({
     const openBusy = reuseBusy === `sb-open:${entry.projectId}`;
     return (
       <div className="space-y-3">
-        <p className="text-xs text-[#6e6e73]">
+        <p className="text-xs text-[var(--ecom-muted)]">
           该项目已有成图/成片，但尚未点「保存工作流」。可直接打开继续编辑，或在工作室顶栏保存后再一键复用。
         </p>
         <StoryboardLibraryDeliverablePanel
@@ -1226,7 +1226,7 @@ function LibraryProjectExpandedContent({
         />
         <button
           type="button"
-          className="inline-flex h-8 items-center gap-1.5 rounded-full border border-[#1d1d1f] bg-[#1d1d1f] px-3 text-xs font-medium text-white hover:bg-black disabled:opacity-50"
+          className="inline-flex h-8 items-center gap-1.5 rounded-full border border-[var(--ecom-ink)] bg-[var(--ecom-ink)] px-3 text-xs font-medium text-white hover:bg-black disabled:opacity-50"
           disabled={openBusy}
           onClick={() => onOpenStoryboardProject(entry.projectId)}
         >
@@ -1255,7 +1255,7 @@ function LibraryProjectExpandedContent({
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
-            className="inline-flex h-8 items-center gap-1.5 rounded-full border border-[#1d1d1f] bg-[#1d1d1f] px-3 text-xs font-medium text-white hover:bg-black disabled:opacity-50"
+            className="inline-flex h-8 items-center gap-1.5 rounded-full border border-[var(--ecom-ink)] bg-[var(--ecom-ink)] px-3 text-xs font-medium text-white hover:bg-black disabled:opacity-50"
             disabled={openBusy}
             onClick={() => onOpenStoryboardProject(sbBundle.projectId)}
           >
@@ -1264,7 +1264,7 @@ function LibraryProjectExpandedContent({
           </button>
           <button
             type="button"
-            className="inline-flex h-8 items-center gap-1.5 rounded-full border border-[#e8e8ed] bg-white px-3 text-xs font-medium text-[#1d1d1f] hover:bg-[#f5f5f7] disabled:opacity-50"
+            className="inline-flex h-8 items-center gap-1.5 rounded-full border border-[var(--ecom-divider)] bg-white px-3 text-xs font-medium text-[var(--ecom-ink)] hover:bg-[var(--ecom-parchment)] disabled:opacity-50"
             disabled={copyBusy}
             onClick={() => onReuseStoryboardBundle(sbBundle)}
           >
@@ -1273,7 +1273,7 @@ function LibraryProjectExpandedContent({
           </button>
           <button
             type="button"
-            className="inline-flex h-8 items-center gap-1.5 rounded-full border border-[#e8e8ed] bg-white px-3 text-xs font-medium text-[#1d1d1f] hover:bg-[#f5f5f7]"
+            className="inline-flex h-8 items-center gap-1.5 rounded-full border border-[var(--ecom-divider)] bg-white px-3 text-xs font-medium text-[var(--ecom-ink)] hover:bg-[var(--ecom-parchment)]"
             onClick={() => onReviewStoryboardBundle(sbBundle)}
           >
             <Layers className="h-3.5 w-3.5" />
@@ -1281,7 +1281,7 @@ function LibraryProjectExpandedContent({
           </button>
           <button
             type="button"
-            className="inline-flex h-8 items-center gap-1.5 rounded-full border border-[#e8e8ed] bg-white px-3 text-xs font-medium text-[#1d1d1f] hover:bg-[#f5f5f7]"
+            className="inline-flex h-8 items-center gap-1.5 rounded-full border border-[var(--ecom-divider)] bg-white px-3 text-xs font-medium text-[var(--ecom-ink)] hover:bg-[var(--ecom-parchment)]"
             onClick={() => onShareStoryboardProject(sbBundle.projectId, title)}
           >
             <EcomWechatShareIcon className="h-3.5 w-3.5" />
@@ -1322,7 +1322,7 @@ function LibraryProjectExpandedContent({
         ) : null}
         <button
           type="button"
-          className="inline-flex h-8 items-center gap-1.5 rounded-full border border-[#1d1d1f] bg-[#1d1d1f] px-3 text-xs font-medium text-white hover:bg-black disabled:opacity-50"
+          className="inline-flex h-8 items-center gap-1.5 rounded-full border border-[var(--ecom-ink)] bg-[var(--ecom-ink)] px-3 text-xs font-medium text-white hover:bg-black disabled:opacity-50"
           disabled={busy}
           onClick={() => onReuseSeedVideoBundle(svBundle)}
         >
@@ -1354,12 +1354,12 @@ function LibraryProjectExpandedContent({
             />
           </div>
         ) : null}
-        <p className="text-[11px] text-[#6e6e73]">
+        <p className="text-[11px] text-[var(--ecom-muted)]">
           模板版本 {bundle.version} · 手办 / 品牌 VI 可通过「从母版库导入」选用本条目。
         </p>
         <button
           type="button"
-          className="inline-flex h-8 items-center gap-1.5 rounded-full border border-[#1d1d1f] bg-[#1d1d1f] px-3 text-xs font-medium text-white hover:bg-black"
+          className="inline-flex h-8 items-center gap-1.5 rounded-full border border-[var(--ecom-ink)] bg-[var(--ecom-ink)] px-3 text-xs font-medium text-white hover:bg-black"
           onClick={() => onOpenIpMasterProject(bundle.projectId)}
         >
           <ExternalLink className="h-3.5 w-3.5" />

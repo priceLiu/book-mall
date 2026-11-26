@@ -260,7 +260,7 @@ export function DialogProvider({ children }: { children: React.ReactNode }) {
                 保存使用
               </EcomDialogPrimaryButton>
               <EcomDialogCancelButton
-                className="border border-[var(--ecom-hairline)] bg-white text-[var(--ecom-ink)] hover:bg-[#f5f5f7]"
+                className="border border-[var(--ecom-hairline)] bg-white text-[var(--ecom-ink)] hover:bg-[var(--ecom-parchment)]"
                 onClick={() => closeUnsavedLayout("draft")}
               >
                 保存草稿

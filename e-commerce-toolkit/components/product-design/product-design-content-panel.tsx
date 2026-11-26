@@ -1448,7 +1448,7 @@ export function ProductDesignContentPanel({
         ref={scrollRootRef}
         className="ecom-scrollbar-overlay h-full min-h-0 w-full overflow-x-hidden overflow-y-auto overscroll-y-contain [overflow-anchor:none]"
       >
-      <header className="sticky top-0 z-20 border-b border-[#e8e8ed] bg-white px-5 py-3 shadow-[0_1px_0_0_rgba(0,0,0,0.04)]">
+      <header className="sticky top-0 z-20 border-b border-[var(--ecom-divider)] bg-white px-5 py-3 shadow-[0_1px_0_0_rgba(0,0,0,0.04)]">
         <div className="flex flex-wrap items-center justify-between gap-2">
         <EcomWorkspaceTitleHeading
           title={
@@ -1456,7 +1456,7 @@ export function ProductDesignContentPanel({
             (activeTrack === "detail" ? "详情长图分屏创作" : "电商产品主图创作")
           }
         >
-          <p className="text-[11px] text-[#6e6e73]">
+          <p className="text-[11px] text-[var(--ecom-muted)]">
             {spec
               ? `${spec.label} · ${activeTrack === "detail" ? "产品详情页" : "产品主图"}`
               : activeTrack === "detail"
@@ -1545,7 +1545,7 @@ export function ProductDesignContentPanel({
         </div>
       </header>
 
-      <section className="border-b border-[#e8e8ed] px-5 py-4">
+      <section className="border-b border-[var(--ecom-divider)] px-5 py-4">
         <ProductDesignRefUploader
           role="product"
           required
@@ -1612,10 +1612,10 @@ export function ProductDesignContentPanel({
           className="scroll-mt-20 px-5 py-8"
         >
           <Section title="主图 · 参考图 + Prompt">
-            <p className="mb-4 text-[11px] leading-relaxed text-[#6e6e73]">
+            <p className="mb-4 text-[11px] leading-relaxed text-[var(--ecom-muted)]">
               跳过 Step1–4：选择平台、填写 Prompt（参考图可选）后点击「分析」，确认 Prompt 计划再出图。
             </p>
-            <p className="mb-2 text-[11px] font-semibold text-[#1d1d1f]">1. 选择平台</p>
+            <p className="mb-2 text-[11px] font-semibold text-[var(--ecom-ink)]">1. 选择平台</p>
             <div className="mb-4 flex flex-wrap gap-2">
               {specs.map((s) => (
                 <button
@@ -1625,8 +1625,8 @@ export function ProductDesignContentPanel({
                   className={cn(
                     "rounded-lg border px-3 py-1.5 text-[11px] transition-colors",
                     project.platform === s.code
-                      ? "border-[var(--ecom-chrome-accent)] bg-[var(--ecom-content-selected-bg)] text-[#1d1d1f]"
-                      : "border-[#e8e8ed] bg-white text-[#6e6e73] hover:border-[var(--ecom-chrome-accent)]",
+                      ? "border-[var(--ecom-chrome-accent)] bg-[var(--ecom-content-selected-bg)] text-[var(--ecom-ink)]"
+                      : "border-[var(--ecom-divider)] bg-white text-[var(--ecom-muted)] hover:border-[var(--ecom-chrome-accent)]",
                   )}
                   onClick={() => void selectFastMainPlatform(s)}
                 >
@@ -1636,7 +1636,7 @@ export function ProductDesignContentPanel({
             </div>
             {fastMainSpec ? (
               <>
-                <p className="mb-2 text-[11px] font-semibold text-[#1d1d1f]">
+                <p className="mb-2 text-[11px] font-semibold text-[var(--ecom-ink)]">
                   2. Prompt（可 @ 参考图）
                 </p>
                 <ProductDesignPromptMentionTextarea
@@ -1700,7 +1700,7 @@ export function ProductDesignContentPanel({
             beforeSlots={
               isFastMainPromptPath(project) ? (
                 <div className="mb-4">
-                  <p className="mb-2 text-[11px] font-semibold text-[#1d1d1f]">
+                  <p className="mb-2 text-[11px] font-semibold text-[var(--ecom-ink)]">
                     意图 Prompt（可 @ 参考图）
                   </p>
                   <ProductDesignPromptMentionTextarea
@@ -1723,11 +1723,11 @@ export function ProductDesignContentPanel({
           className="scroll-mt-20 px-5 py-8"
         >
           <Section title="参考图快速出图 · 详情页">
-            <p className="mb-4 text-[11px] leading-relaxed text-[#6e6e73]">
+            <p className="mb-4 text-[11px] leading-relaxed text-[var(--ecom-muted)]">
               跳过 Step7–8：在页面顶部上传 detail-style 参考长图，填写意图 Prompt（可选），点击「分析」拆解为 N 屏
               Prompt 计划并确认后出图。
             </p>
-            <p className="mb-2 text-[11px] font-semibold text-[#1d1d1f]">
+            <p className="mb-2 text-[11px] font-semibold text-[var(--ecom-ink)]">
               意图 Prompt（可选，可 @ 参考图）
             </p>
             <ProductDesignPromptMentionTextarea
@@ -1782,7 +1782,7 @@ export function ProductDesignContentPanel({
               <>
                 {isFastDetailPromptPath(project) ? (
                   <div className="mb-4">
-                    <p className="mb-2 text-[11px] font-semibold text-[#1d1d1f]">
+                    <p className="mb-2 text-[11px] font-semibold text-[var(--ecom-ink)]">
                       意图 Prompt（可选，可 @ 参考图）
                     </p>
                     <ProductDesignPromptMentionTextarea
@@ -1807,7 +1807,7 @@ export function ProductDesignContentPanel({
       project.brief ? (
         <div className="px-5 pt-5">
           <Section id="pdt-step-brief" title="Step0 · 产品信息采集">
-            <p className="mb-3 text-[11px] leading-relaxed text-[#6e6e73]">
+            <p className="mb-3 text-[11px] leading-relaxed text-[var(--ecom-muted)]">
               {MIDDLE_WORKSPACE_EDIT_HINT} 采集点选在会话区完成。
             </p>
             <ProductDesignBriefSummaryPanel
@@ -1821,7 +1821,7 @@ export function ProductDesignContentPanel({
       {analysisDisplay ? (
         <div className="space-y-6 px-5 py-5">
           <Section id="pdt-step-analysis" title="Step1 · 平台合规与产品拆解">
-            <p className="mb-3 text-[11px] leading-relaxed text-[#6e6e73]">
+            <p className="mb-3 text-[11px] leading-relaxed text-[var(--ecom-muted)]">
               {MIDDLE_WORKSPACE_EDIT_HINT}
             </p>
             <div className="grid gap-3 md:grid-cols-2">
@@ -1911,7 +1911,7 @@ export function ProductDesignContentPanel({
                       仅解析到 {marketingPlansDisplay.length} 套，请在会话区重新生成或点「重新解析」
                     </span>
                   ) : (
-                    <span className="text-[10px] text-[#86868b]">
+                    <span className="text-[10px] text-[var(--ecom-subtle)]">
                       请在会话区点选「方案 1 / 2 / 3」
                     </span>
                   )
@@ -1923,12 +1923,12 @@ export function ProductDesignContentPanel({
               }
             >
               {design.selectedPlanNo == null ? (
-                <p className="text-[11px] leading-relaxed text-[#6e6e73]">
+                <p className="text-[11px] leading-relaxed text-[var(--ecom-muted)]">
                   三套方案已生成并同步。请仅在右侧会话区点选「方案 1 / 2 / 3」；选定后本区展示已选方案并可铅笔编辑。
                 </p>
               ) : (
                 <>
-                  <p className="mb-3 text-[11px] leading-relaxed text-[#6e6e73]">
+                  <p className="mb-3 text-[11px] leading-relaxed text-[var(--ecom-muted)]">
                     {MIDDLE_WORKSPACE_EDIT_HINT} 方案一经选定不可更换；方案名只读，其余字段可编辑。
                   </p>
                   {(() => {
@@ -1961,7 +1961,7 @@ export function ProductDesignContentPanel({
 
           {buyingReasonDisplay.hasContent && design.selectedPlanNo != null ? (
             <Section id="pdt-step-reasons" title="Step3 · 卖点转用户购买理由">
-              <p className="mb-3 text-[11px] leading-relaxed text-[#6e6e73]">
+              <p className="mb-3 text-[11px] leading-relaxed text-[var(--ecom-muted)]">
                 {MIDDLE_WORKSPACE_EDIT_HINT}
               </p>
               {buyingReasonDisplay.table ? (
@@ -1986,7 +1986,7 @@ export function ProductDesignContentPanel({
                   {buyingReasonDisplay.reasons.map((reason, i) => (
                     <li
                       key={i}
-                      className="rounded-lg border border-[#e8e8ed] bg-white px-3 py-2 text-sm text-[#424245]"
+                      className="rounded-lg border border-[var(--ecom-divider)] bg-white px-3 py-2 text-sm text-[#424245]"
                     >
                       {reason}
                     </li>
@@ -1998,7 +1998,7 @@ export function ProductDesignContentPanel({
 
           {mainTrack && mainImagesDisplay.length > 0 && !isReferenceImagePath(project) ? (
             <Section id="pdt-step-main-copy" title="Step4 · 主图分层定稿文案">
-              <p className="mb-3 text-[11px] leading-relaxed text-[#6e6e73]">
+              <p className="mb-3 text-[11px] leading-relaxed text-[var(--ecom-muted)]">
                 {MIDDLE_WORKSPACE_EDIT_HINT}
               </p>
               <ProductDesignMainCopyPanel
@@ -2013,16 +2013,16 @@ export function ProductDesignContentPanel({
               id="pdt-step-main"
               title={`Step5 · 主图出图（${design.mainImages.filter((m) => m.imageUrl).length}/${design.mainImages.length}）`}
             >
-              <div className="mb-3 rounded-xl border border-[#e8e8ed] bg-[#fafafa] p-3">
-                <p className="mb-2 text-[11px] font-semibold text-[#1d1d1f]">主图出图模式</p>
+              <div className="mb-3 rounded-xl border border-[var(--ecom-divider)] bg-[#fafafa] p-3">
+                <p className="mb-2 text-[11px] font-semibold text-[var(--ecom-ink)]">主图出图模式</p>
                 <div className="mb-2 flex flex-wrap gap-2">
                   <button
                     type="button"
                     className={cn(
                       "rounded-lg border px-2.5 py-1 text-[11px]",
                       mainGenMode === "copy"
-                        ? "border-[var(--ecom-chrome-accent)] bg-[var(--ecom-content-selected-bg)] text-[#1d1d1f]"
-                        : "border-[#e8e8ed] bg-white text-[#6e6e73]",
+                        ? "border-[var(--ecom-chrome-accent)] bg-[var(--ecom-content-selected-bg)] text-[var(--ecom-ink)]"
+                        : "border-[var(--ecom-divider)] bg-white text-[var(--ecom-muted)]",
                     )}
                     onClick={() => {
                       setMainGenMode("copy");
@@ -2036,8 +2036,8 @@ export function ProductDesignContentPanel({
                     className={cn(
                       "rounded-lg border px-2.5 py-1 text-[11px]",
                       mainGenMode === "reference-prompt"
-                        ? "border-[var(--ecom-chrome-accent)] bg-[var(--ecom-content-selected-bg)] text-[#1d1d1f]"
-                        : "border-[#e8e8ed] bg-white text-[#6e6e73]",
+                        ? "border-[var(--ecom-chrome-accent)] bg-[var(--ecom-content-selected-bg)] text-[var(--ecom-ink)]"
+                        : "border-[var(--ecom-divider)] bg-white text-[var(--ecom-muted)]",
                     )}
                     onClick={() => {
                       setMainGenMode("reference-prompt");
@@ -2104,11 +2104,11 @@ export function ProductDesignContentPanel({
           ) : null}
 
           {mainTrack && onContinueToDetailPages && mainImagesAllGenerated ? (
-            <section className="mx-5 mb-4 rounded-xl border border-[#e8e8ed] bg-[#f9f9fb] p-4">
-              <h3 className="text-[13px] font-semibold text-[#1d1d1f]">
+            <section className="mx-5 mb-4 rounded-xl border border-[var(--ecom-divider)] bg-[#f9f9fb] p-4">
+              <h3 className="text-[13px] font-semibold text-[var(--ecom-ink)]">
                 主图已出齐，继续做详情页？
               </h3>
-              <p className="mt-1 text-[11px] leading-relaxed text-[#6e6e73]">
+              <p className="mt-1 text-[11px] leading-relaxed text-[var(--ecom-muted)]">
                 会新建一个详情页项目，并把 Step0–3 的策略层、产品图与主图成品一起带过去，
                 不需要重新填一遍。带过去的内容之后仍可修改。
               </p>
@@ -2126,7 +2126,7 @@ export function ProductDesignContentPanel({
 
           {detailTrack && detailOutlineDisplay.length > 0 ? (
             <Section id="pdt-step-detail-outline" title="Step7 · 详情页架构">
-              <p className="mb-3 text-[11px] leading-relaxed text-[#6e6e73]">
+              <p className="mb-3 text-[11px] leading-relaxed text-[var(--ecom-muted)]">
                 {MIDDLE_WORKSPACE_EDIT_HINT}
               </p>
               <ProductDesignDetailOutlineTable
@@ -2248,9 +2248,9 @@ export function ProductDesignContentPanel({
           </DialogHeader>
           <div className="ecom-scrollbar-thin flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto text-sm">
             <div className="flex min-h-[5rem] shrink-0 flex-col">
-              <p className="mb-1 text-xs font-medium text-[#6e6e73]">分析摘要</p>
+              <p className="mb-1 text-xs font-medium text-[var(--ecom-muted)]">分析摘要</p>
               <textarea
-                className="min-h-[5rem] w-full flex-1 rounded-lg border border-[#e8e8ed] px-3 py-2 text-[13px] leading-relaxed"
+                className="min-h-[5rem] w-full flex-1 rounded-lg border border-[var(--ecom-divider)] px-3 py-2 text-[13px] leading-relaxed"
                 value={genPipeline?.draftSummary ?? ""}
                 onChange={(e) =>
                   setGenPipeline((p) =>
@@ -2260,11 +2260,11 @@ export function ProductDesignContentPanel({
               />
             </div>
             <div className="flex min-h-0 flex-1 flex-col">
-              <p className="mb-1 shrink-0 text-xs font-medium text-[#6e6e73]">
+              <p className="mb-1 shrink-0 text-xs font-medium text-[var(--ecom-muted)]">
                 生图 Prompt（可编辑后出图）
               </p>
               <textarea
-                className="min-h-0 w-full flex-1 rounded-lg border border-[#e8e8ed] px-3 py-2 text-[13px] leading-relaxed"
+                className="min-h-0 w-full flex-1 rounded-lg border border-[var(--ecom-divider)] px-3 py-2 text-[13px] leading-relaxed"
                 value={genPipeline?.draftPrompt ?? ""}
                 onChange={(e) =>
                   setGenPipeline((p) =>
@@ -2360,7 +2360,7 @@ export function ProductDesignContentPanel({
           </DialogHeader>
           <textarea
             readOnly
-            className="ecom-scrollbar-thin min-h-0 w-full flex-1 resize-none rounded-lg border border-[#e8e8ed] bg-[#f5f5f7] px-3 py-2 text-[12px] leading-relaxed text-[#1d1d1f]"
+            className="ecom-scrollbar-thin min-h-0 w-full flex-1 resize-none rounded-lg border border-[var(--ecom-divider)] bg-[var(--ecom-parchment)] px-3 py-2 text-[12px] leading-relaxed text-[var(--ecom-ink)]"
             value={promptPreview?.prompt ?? ""}
           />
         </DialogContent>
@@ -2383,7 +2383,7 @@ function Section({
   return (
     <section id={id} className={cn(id && "scroll-mt-20")}>
       <header className="mb-2.5 flex items-center justify-between gap-2">
-        <h3 className="text-[13px] font-semibold text-[#1d1d1f]">{title}</h3>
+        <h3 className="text-[13px] font-semibold text-[var(--ecom-ink)]">{title}</h3>
         {action}
       </header>
       {children}
@@ -2401,7 +2401,7 @@ function EditableFactList({
   onSave: (items: string[]) => void | Promise<void>;
 }) {
   return (
-    <div className="rounded-xl border border-[#e8e8ed] bg-white p-3">
+    <div className="rounded-xl border border-[var(--ecom-divider)] bg-white p-3">
       <ProductDesignEditableField
         label={title}
         value={items.join("\n")}
@@ -2423,9 +2423,9 @@ function EditableFactList({
 function FactList({ title, items }: { title: string; items: string[] }) {
   if (items.length === 0) return null;
   return (
-    <div className="rounded-xl border border-[#e8e8ed] bg-white p-3">
-      <p className="mb-1.5 text-[11px] font-semibold text-[#1d1d1f]">{title}</p>
-      <ul className="space-y-1 text-[11px] leading-relaxed text-[#6e6e73]">
+    <div className="rounded-xl border border-[var(--ecom-divider)] bg-white p-3">
+      <p className="mb-1.5 text-[11px] font-semibold text-[var(--ecom-ink)]">{title}</p>
+      <ul className="space-y-1 text-[11px] leading-relaxed text-[var(--ecom-muted)]">
         {items.map((item, i) => (
           <li key={i}>· {item}</li>
         ))}
@@ -2519,7 +2519,7 @@ function ProductDesignCardImage({
           unoptimized
         />
       ) : (
-        <div className="absolute inset-0 grid place-items-center px-3 text-center text-[11px] text-[#86868b]">
+        <div className="absolute inset-0 grid place-items-center px-3 text-center text-[11px] text-[var(--ecom-subtle)]">
           {emptyLabel}
         </div>
       )}
@@ -2556,7 +2556,7 @@ function MainImageCard({
   onViewPrompt: () => void;
 }) {
   return (
-    <article className="flex min-w-0 flex-col overflow-hidden rounded-xl border border-[#e8e8ed] bg-white">
+    <article className="flex min-w-0 flex-col overflow-hidden rounded-xl border border-[var(--ecom-divider)] bg-white">
       <ProductDesignCardImage
         ratio={ratio}
         src={item.imageUrl}
@@ -2633,7 +2633,7 @@ function DetailPageCard({
   onPatchBody: (body: string[]) => void | Promise<void>;
 }) {
   return (
-    <article className="flex h-full min-w-0 flex-col overflow-hidden rounded-xl border border-[#e8e8ed] bg-white">
+    <article className="flex h-full min-w-0 flex-col overflow-hidden rounded-xl border border-[var(--ecom-divider)] bg-white">
       <ProductDesignCardImage
         ratio={ratio}
         src={item.imageUrl}

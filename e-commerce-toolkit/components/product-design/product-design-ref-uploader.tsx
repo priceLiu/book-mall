@@ -115,15 +115,15 @@ export function ProductDesignRefUploader({
   return (
     <div className={className ?? "space-y-2"}>
       <div className="flex items-center justify-between gap-2">
-        <span className="text-xs font-medium uppercase tracking-wide text-[#6e6e73]">
+        <span className="text-xs font-medium uppercase tracking-wide text-[var(--ecom-muted)]">
           {copy.title}
           {required ? (
             <span className="ml-1 font-normal normal-case text-[#ff3b30]">（必传）</span>
           ) : (
-            <span className="ml-1 font-normal normal-case text-[#86868b]">（可选）</span>
+            <span className="ml-1 font-normal normal-case text-[var(--ecom-subtle)]">（可选）</span>
           )}
         </span>
-        <span className="text-[10px] text-[#86868b]">
+        <span className="text-[10px] text-[var(--ecom-subtle)]">
           {items.length}/{maxCount} · {sizeHint} · {IMAGE_UPLOAD_DROP_HINT}
         </span>
       </div>

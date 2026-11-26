@@ -89,7 +89,7 @@ export function BackgroundReplacePanel({
         {subjectHint ??
           "火山 Seedream：可在侧栏切换 5.0 Pro / 5.5；右侧框选再换，或只写场景；上传参考图则按图 1 + 图 2 编辑。"}
       </p>
-      <p className="rounded-lg bg-[#f0f6ff] px-2.5 py-1.5 text-[11px] leading-5 text-[#374151]">
+      <p className="rounded-lg bg-[var(--ecom-content-selected-bg)] px-2.5 py-1.5 text-[11px] leading-5 text-[#374151]">
         {bboxHint({ hasSubjectBbox, hasRefBbox })}
       </p>
 
@@ -135,7 +135,7 @@ export function BackgroundReplacePanel({
         </div>
         <label
           className={cn(
-            "flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-[#d2d2d7] px-3 py-2 text-xs text-[#6b7280]",
+            "flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-[var(--ecom-border-soft)] px-3 py-2 text-xs text-[#6b7280]",
             busy && "pointer-events-none opacity-60",
           )}
         >

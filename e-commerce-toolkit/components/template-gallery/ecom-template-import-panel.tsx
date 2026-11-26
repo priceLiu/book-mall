@@ -103,7 +103,7 @@ export function EcomTemplateImportPanel() {
     return createPortal(
       <button
         type="button"
-        className="fixed bottom-4 right-4 z-[90] rounded-full border border-[#e8e8ed] bg-white px-4 py-2 text-xs font-medium text-[#1d1d1f] shadow-lg"
+        className="fixed bottom-4 right-4 z-[90] rounded-full border border-[var(--ecom-divider)] bg-white px-4 py-2 text-xs font-medium text-[var(--ecom-ink)] shadow-lg"
         onClick={() => setPanelOpen(true)}
       >
         模板导入 {stats.success + stats.skipped}/{stats.total}
@@ -115,12 +115,12 @@ export function EcomTemplateImportPanel() {
 
   return createPortal(
     <div
-      className="fixed bottom-4 right-4 z-[90] w-[min(100vw-2rem,380px)] overflow-hidden rounded-xl border border-[#e8e8ed] bg-white shadow-lg"
+      className="fixed bottom-4 right-4 z-[90] w-[min(100vw-2rem,380px)] overflow-hidden rounded-xl border border-[var(--ecom-divider)] bg-white shadow-lg"
     >
-      <div className="flex items-center justify-between border-b border-[#e8e8ed] bg-[#f5f5f7] px-3 py-2">
+      <div className="flex items-center justify-between border-b border-[var(--ecom-divider)] bg-[var(--ecom-parchment)] px-3 py-2">
         <div>
-          <p className="text-xs font-semibold text-[#1d1d1f]">模板导入</p>
-          <p className="text-[10px] text-[#6e6e73]">
+          <p className="text-xs font-semibold text-[var(--ecom-ink)]">模板导入</p>
+          <p className="text-[10px] text-[var(--ecom-muted)]">
             成功 {stats.success} · 已存在 {stats.skipped} · 失败 {stats.failed}
             {stats.cancelled > 0 ? ` · 已停止 ${stats.cancelled}` : ""} /{" "}
             {stats.total}
@@ -138,7 +138,7 @@ export function EcomTemplateImportPanel() {
         <div className="flex items-center gap-1">
           <button
             type="button"
-            className="rounded p-1 text-[#6e6e73] hover:bg-white"
+            className="rounded p-1 text-[var(--ecom-muted)] hover:bg-white"
             aria-label={collapsed ? "展开" : "折叠"}
             onClick={() => setCollapsed((v) => !v)}
           >
@@ -150,7 +150,7 @@ export function EcomTemplateImportPanel() {
           </button>
           <button
             type="button"
-            className="rounded p-1 text-[#6e6e73] hover:bg-white"
+            className="rounded p-1 text-[var(--ecom-muted)] hover:bg-white"
             aria-label="关闭面板"
             onClick={() => setPanelOpen(false)}
           >
@@ -162,7 +162,7 @@ export function EcomTemplateImportPanel() {
       {!collapsed ? (
         <ul className="max-h-64 overflow-y-auto p-2">
           {visibleItems.length === 0 ? (
-            <li className="rounded-lg border border-dashed border-[#e8e8ed] px-3 py-6 text-center text-xs text-[#6e6e73]">
+            <li className="rounded-lg border border-dashed border-[var(--ecom-divider)] px-3 py-6 text-center text-xs text-[var(--ecom-muted)]">
               暂无条目
             </li>
           ) : (
@@ -171,10 +171,10 @@ export function EcomTemplateImportPanel() {
               return (
             <li
               key={item.id}
-              className="mb-2 rounded-lg border border-[#e8e8ed] p-2 last:mb-0"
+              className="mb-2 rounded-lg border border-[var(--ecom-divider)] p-2 last:mb-0"
             >
               <div className="flex gap-2">
-                <div className="h-10 w-8 shrink-0 overflow-hidden rounded bg-[#f5f5f7]">
+                <div className="h-10 w-8 shrink-0 overflow-hidden rounded bg-[var(--ecom-parchment)]">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={item.thumbPreview}
@@ -183,10 +183,10 @@ export function EcomTemplateImportPanel() {
                   />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-[11px] font-medium text-[#1d1d1f]">
+                  <p className="truncate text-[11px] font-medium text-[var(--ecom-ink)]">
                     {item.title}
                   </p>
-                  <p className="truncate text-[10px] text-[#6e6e73]">{item.id}</p>
+                  <p className="truncate text-[10px] text-[var(--ecom-muted)]">{item.id}</p>
                   <div className="mt-1 flex items-center justify-between gap-2">
                     <span
                       className={cn(
@@ -194,10 +194,10 @@ export function EcomTemplateImportPanel() {
                         item.status === "failed"
                           ? "text-[#ff3b30]"
                           : item.status === "success"
-                            ? "text-[#0071e3]"
+                            ? "text-[var(--ecom-primary)]"
                             : item.status === "skipped"
-                              ? "text-[#86868b]"
-                              : "text-[#6e6e73]",
+                              ? "text-[var(--ecom-subtle)]"
+                              : "text-[var(--ecom-muted)]",
                       )}
                     >
                       {statusLabel(
@@ -207,13 +207,13 @@ export function EcomTemplateImportPanel() {
                         item.uploadStartedAt,
                       )}
                     </span>
-                    <span className="text-[10px] text-[#86868b]">
+                    <span className="text-[10px] text-[var(--ecom-subtle)]">
                       {displayProgress}%
                     </span>
                   </div>
                   <div className="ecom-upload-progress mt-1 h-1">
                     <div
-                      className="ecom-upload-progress-bar h-full bg-[#0071e3]"
+                      className="ecom-upload-progress-bar h-full bg-[var(--ecom-primary)]"
                       style={{ width: `${displayProgress}%` }}
                     />
                   </div>
@@ -231,7 +231,7 @@ export function EcomTemplateImportPanel() {
         </ul>
       ) : null}
 
-      <div className="flex gap-2 border-t border-[#e8e8ed] px-2 py-2">
+      <div className="flex gap-2 border-t border-[var(--ecom-divider)] px-2 py-2">
         {stoppable ? (
           <button
             type="button"
@@ -244,7 +244,7 @@ export function EcomTemplateImportPanel() {
         {resumable ? (
           <button
             type="button"
-            className="flex-1 rounded-lg border border-[var(--ecom-outline-border)] px-2 py-1.5 text-xs text-[#0071e3]"
+            className="flex-1 rounded-lg border border-[var(--ecom-outline-border)] px-2 py-1.5 text-xs text-[var(--ecom-primary)]"
             onClick={() => resumeJob(activeJob.id)}
           >
             {activeJob.cancelled
@@ -257,7 +257,7 @@ export function EcomTemplateImportPanel() {
         {activeJob.done && !resumable ? (
           <button
             type="button"
-            className="flex-1 rounded-lg border border-[#e8e8ed] px-2 py-1.5 text-xs text-[#6e6e73]"
+            className="flex-1 rounded-lg border border-[var(--ecom-divider)] px-2 py-1.5 text-xs text-[var(--ecom-muted)]"
             onClick={clearFinishedJobs}
           >
             清除记录

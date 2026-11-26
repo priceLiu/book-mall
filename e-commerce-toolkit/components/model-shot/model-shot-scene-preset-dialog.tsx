@@ -62,16 +62,16 @@ export function ModelShotScenePresetDialog({
       >
         <EcomDialogCloseButton disabled={busy} onClick={onClose} />
         <div className="border-b border-[#e5e5ea] px-5 py-4 pr-14">
-          <h3 id="model-shot-scene-preset-title" className="text-base font-semibold text-[#1d1d1f]">
+          <h3 id="model-shot-scene-preset-title" className="text-base font-semibold text-[var(--ecom-ink)]">
             场景词库
           </h3>
-          <p className="mt-1 text-xs text-[#86868b]">
+          <p className="mt-1 text-xs text-[var(--ecom-subtle)]">
             选中后作为项目级场景描述（无参考图时写入采集信息）。
           </p>
         </div>
         <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-5">
           <input
-            className="w-full rounded-lg border border-[#e8e8ed] px-3 py-2 text-sm"
+            className="w-full rounded-lg border border-[var(--ecom-divider)] px-3 py-2 text-sm"
             placeholder="搜索场景"
             value={query}
             disabled={busy}
@@ -86,18 +86,18 @@ export function ModelShotScenePresetDialog({
                 className={cn(
                   "w-full rounded-lg border px-3 py-2 text-left text-[11px] transition",
                   activeId === s.id
-                    ? "border-[var(--ecom-outline-border)] bg-[#f0f6ff]"
-                    : "border-[#e8e8ed] hover:bg-[#fafafa]",
+                    ? "border-[var(--ecom-outline-border)] bg-[var(--ecom-content-selected-bg)]"
+                    : "border-[var(--ecom-divider)] hover:bg-[#fafafa]",
                 )}
                 onClick={() => setPicked(s)}
               >
-                <p className="font-medium text-[#1d1d1f]">{s.name}</p>
-                <p className="mt-0.5 line-clamp-2 text-[10px] text-[#86868b]">{s.visualPrompt}</p>
+                <p className="font-medium text-[var(--ecom-ink)]">{s.name}</p>
+                <p className="mt-0.5 line-clamp-2 text-[10px] text-[var(--ecom-subtle)]">{s.visualPrompt}</p>
               </button>
             ))}
           </div>
         </div>
-        <div className="border-t border-[#e8e8ed] p-4">
+        <div className="border-t border-[var(--ecom-divider)] p-4">
           <EcomButtonPrimary
             type="button"
             size="sm"

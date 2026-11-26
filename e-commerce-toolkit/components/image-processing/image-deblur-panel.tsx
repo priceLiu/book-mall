@@ -131,11 +131,11 @@ export function ImageDeblurPanel({
 
         <div className="mt-6 grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="text-sm font-medium text-[#1d1d1f]">模糊类型</label>
+            <label className="text-sm font-medium text-[var(--ecom-ink)]">模糊类型</label>
             <select
               value={blurType}
               onChange={(e) => setBlurType(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-[#d2d2d7] bg-white px-3 py-2.5 text-sm"
+              className="mt-1 w-full rounded-lg border border-[var(--ecom-border-soft)] bg-white px-3 py-2.5 text-sm"
             >
               {DEBLUR_BLUR_TYPE_OPTIONS.map((o) => (
                 <option key={o.id} value={o.id}>
@@ -145,11 +145,11 @@ export function ImageDeblurPanel({
             </select>
           </div>
           <div>
-            <label className="text-sm font-medium text-[#1d1d1f]">磨利强度</label>
+            <label className="text-sm font-medium text-[var(--ecom-ink)]">磨利强度</label>
             <select
               value={sharpenStrength}
               onChange={(e) => setSharpenStrength(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-[#d2d2d7] bg-white px-3 py-2.5 text-sm"
+              className="mt-1 w-full rounded-lg border border-[var(--ecom-border-soft)] bg-white px-3 py-2.5 text-sm"
             >
               {DEBLUR_STRENGTH_OPTIONS.map((o) => (
                 <option key={o.id} value={o.id}>
@@ -191,23 +191,23 @@ export function ImageDeblurPanel({
       </div>
 
       <section className="rounded-2xl border border-[#e5e5ea] bg-white p-4 sm:p-6">
-        <h3 className="text-lg font-semibold text-[#1d1d1f]">关于 AI Unblur</h3>
-        <p className="mt-2 text-sm leading-relaxed text-[#6e6e73]">
+        <h3 className="text-lg font-semibold text-[var(--ecom-ink)]">关于 AI Unblur</h3>
+        <p className="mt-2 text-sm leading-relaxed text-[var(--ecom-muted)]">
           经 Gateway 调用百炼 Qwen 图像编辑与 Seedream 模型，对运动模糊、失焦、低分辨率与噪点等问题进行智能锐化，无需额外注册。
         </p>
         <div className="mt-4 grid gap-4 sm:grid-cols-3">
           {features.map((f) => (
             <div key={f.title} className="rounded-xl border border-[#e5e5ea] bg-[#fafafa] p-4">
               <f.icon className="mb-2 h-5 w-5 text-emerald-600" />
-              <p className="font-medium text-[#1d1d1f]">{f.title}</p>
-              <p className="mt-1 text-sm text-[#6e6e73]">{f.desc}</p>
+              <p className="font-medium text-[var(--ecom-ink)]">{f.title}</p>
+              <p className="mt-1 text-sm text-[var(--ecom-muted)]">{f.desc}</p>
             </div>
           ))}
         </div>
       </section>
 
       <section className="rounded-2xl border border-[#e5e5ea] bg-white p-4 sm:p-6">
-        <h3 className="text-lg font-semibold text-[#1d1d1f]">如何使用 AI 图像去模糊功能</h3>
+        <h3 className="text-lg font-semibold text-[var(--ecom-ink)]">如何使用 AI 图像去模糊功能</h3>
         <ol className="mt-4 grid gap-4 sm:grid-cols-3">
           {steps.map((s, i) => (
             <li key={s.title} className="flex gap-3">
@@ -215,8 +215,8 @@ export function ImageDeblurPanel({
                 {i + 1}
               </span>
               <div>
-                <p className="font-medium text-[#1d1d1f]">{s.title}</p>
-                <p className="mt-1 text-sm text-[#6e6e73]">{s.desc}</p>
+                <p className="font-medium text-[var(--ecom-ink)]">{s.title}</p>
+                <p className="mt-1 text-sm text-[var(--ecom-muted)]">{s.desc}</p>
               </div>
             </li>
           ))}

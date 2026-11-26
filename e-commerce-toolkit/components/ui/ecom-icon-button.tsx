@@ -29,7 +29,7 @@ function variantClass(variant: Variant): string {
     case "accent":
       return "border-[var(--ecom-outline-border)] bg-[var(--ecom-outline-hover-bg)] text-[var(--ecom-outline-text)]";
     default:
-      return "border-[#d2d2d7] text-[var(--ecom-outline-text)] hover:border-[var(--ecom-outline-border)] hover:bg-[var(--ecom-outline-hover-bg)]";
+      return "border-[var(--ecom-border-soft)] text-[var(--ecom-outline-text)] hover:border-[var(--ecom-outline-border)] hover:bg-[var(--ecom-outline-hover-bg)]";
   }
 }
 

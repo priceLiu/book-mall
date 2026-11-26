@@ -58,7 +58,7 @@ function PieceSlot({
 
   return (
     <div className="flex min-w-0 flex-1 flex-col items-center gap-1">
-      <span className="max-w-full truncate text-[10px] font-medium text-[#6e6e73]">{label}</span>
+      <span className="max-w-full truncate text-[10px] font-medium text-[var(--ecom-muted)]">{label}</span>
       {url ? (
         <div className="relative">
           <EcomRefImageThumb
@@ -82,8 +82,8 @@ function PieceSlot({
         <div
           {...(canUpload ? dropZoneProps : {})}
           className={cn(
-            "rounded-md outline-none focus-visible:ring-2 focus-visible:ring-[#1d1d1f]/15",
-            dragOver && "ring-1 ring-[#1d1d1f]/15",
+            "rounded-md outline-none focus-visible:ring-2 focus-visible:ring-[var(--ecom-ink)]/15",
+            dragOver && "ring-1 ring-[var(--ecom-ink)]/15",
           )}
         >
           <button
@@ -94,7 +94,7 @@ function PieceSlot({
               onPickFile();
             }}
             className={cn(
-              "flex flex-col items-center justify-center rounded-md border border-dashed bg-white text-[#86868b] transition hover:border-[var(--ecom-outline-border)]/50 hover:text-[#0071e3] disabled:opacity-50",
+              "flex flex-col items-center justify-center rounded-md border border-dashed bg-white text-[var(--ecom-subtle)] transition hover:border-[var(--ecom-outline-border)]/50 hover:text-[var(--ecom-primary)] disabled:opacity-50",
               dragOver ? "border-[var(--ecom-outline-border)] bg-white" : "border-[#c7c7cc]",
             )}
             style={{ width: size, height: size }}
@@ -108,7 +108,7 @@ function PieceSlot({
         {onOpenAssets ? (
           <button
             type="button"
-            className="text-[9px] text-[#0071e3] hover:underline disabled:opacity-50"
+            className="text-[9px] text-[var(--ecom-primary)] hover:underline disabled:opacity-50"
             disabled={busy || disabled || parsing}
             onClick={() => {
               if (canUpload) focusZone();
@@ -164,11 +164,11 @@ export function VtonCompositeFullSetCard({
   const parsing = Boolean(garment.ossUrl?.trim() && !ready);
 
   return (
-    <div className="rounded-lg border border-[#e8e8ed] bg-white p-2.5">
+    <div className="rounded-lg border border-[var(--ecom-divider)] bg-white p-2.5">
       <div className="mb-2 flex items-center justify-between gap-2">
         <div className="min-w-0">
-          <p className="truncate text-[11px] font-medium text-[#1d1d1f]">{label}</p>
-          <p className="text-[9px] text-[#86868b]">
+          <p className="truncate text-[11px] font-medium text-[var(--ecom-ink)]">{label}</p>
+          <p className="text-[9px] text-[var(--ecom-subtle)]">
             {ready
               ? "已自动分割 · 可试衣"
               : parsing
@@ -178,7 +178,7 @@ export function VtonCompositeFullSetCard({
         </div>
         <button
           type="button"
-          className="shrink-0 rounded p-0.5 text-[#86868b] hover:bg-[#f5f5f7] hover:text-[#ff3b30] disabled:opacity-40"
+          className="shrink-0 rounded p-0.5 text-[var(--ecom-subtle)] hover:bg-[var(--ecom-parchment)] hover:text-[#ff3b30] disabled:opacity-40"
           disabled={busy || disabled}
           aria-label={`删除${label}`}
           onClick={onRemove}
@@ -284,21 +284,21 @@ export function VtonManualDualSlotRow({
     <div
       {...rowDropZoneProps}
       className={cn(
-        "rounded-lg border bg-white p-2.5 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[#1d1d1f]/15",
-        rowDragOver ? "border-[var(--ecom-outline-border)] ring-1 ring-[#1d1d1f]/15" : "border-[#e8e8ed]",
+        "rounded-lg border bg-white p-2.5 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[var(--ecom-ink)]/15",
+        rowDragOver ? "border-[var(--ecom-outline-border)] ring-1 ring-[var(--ecom-ink)]/15" : "border-[var(--ecom-divider)]",
       )}
     >
       {garment && onRemove ? (
         <div className="mb-2 flex items-center justify-between gap-2">
           <div className="min-w-0">
-            <p className="truncate text-[11px] font-medium text-[#1d1d1f]">{label}</p>
-            <p className="text-[9px] text-[#86868b]">
+            <p className="truncate text-[11px] font-medium text-[var(--ecom-ink)]">{label}</p>
+            <p className="text-[9px] text-[var(--ecom-subtle)]">
               {ready ? "上下装已齐 · 可试衣" : "请分别上传上装与下装"}
             </p>
           </div>
           <button
             type="button"
-            className="shrink-0 rounded p-0.5 text-[#86868b] hover:bg-[#f5f5f7] hover:text-[#ff3b30] disabled:opacity-40"
+            className="shrink-0 rounded p-0.5 text-[var(--ecom-subtle)] hover:bg-[var(--ecom-parchment)] hover:text-[#ff3b30] disabled:opacity-40"
             disabled={busy || disabled}
             aria-label={`删除${label}`}
             onClick={onRemove}

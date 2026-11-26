@@ -50,7 +50,7 @@ export function MainImageHitReplicaAssistantFooter({
   })();
 
   return (
-    <div className="space-y-2 border-t border-[#e8e8ed] px-4 py-3">
+    <div className="space-y-2 border-t border-[var(--ecom-divider)] px-4 py-3">
       <EcomButtonSecondary
         size="sm"
         type="button"
@@ -61,7 +61,7 @@ export function MainImageHitReplicaAssistantFooter({
         <Cpu className="h-3.5 w-3.5 shrink-0" />
         <span className="min-w-0 flex-1 truncate">
           拆解模型
-          <span className="ml-1 font-normal text-[#86868b]">{visionLabel}</span>
+          <span className="ml-1 font-normal text-[var(--ecom-subtle)]">{visionLabel}</span>
         </span>
       </EcomButtonSecondary>
       <EcomButtonSecondary
@@ -74,7 +74,7 @@ export function MainImageHitReplicaAssistantFooter({
         <Cpu className="h-3.5 w-3.5 shrink-0" />
         <span className="min-w-0 flex-1 truncate">
           生图模型
-          <span className="ml-1 font-normal text-[#86868b]">{imageLabel}</span>
+          <span className="ml-1 font-normal text-[var(--ecom-subtle)]">{imageLabel}</span>
         </span>
       </EcomButtonSecondary>
       <EcomButtonPrimary
@@ -86,7 +86,7 @@ export function MainImageHitReplicaAssistantFooter({
         {busy ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : null}
         {primaryLabel}
       </EcomButtonPrimary>
-      <p className="text-center text-[10px] leading-relaxed text-[#86868b]">
+      <p className="text-center text-[10px] leading-relaxed text-[var(--ecom-subtle)]">
         拆解模型用于理解参考图并撰写生图 Prompt；每次点击按当前参考图张数生成并追加到底部。
       </p>
     </div>

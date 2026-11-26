@@ -17,7 +17,7 @@ export function ModelShotPoseGrid({ items, onPreview }: Props) {
   const ready = items.filter((i) => i.imageUrl);
   if (ready.length === 0) {
     return (
-      <section className="rounded-2xl border border-dashed border-[#d2d2d7] p-6 text-center text-sm text-[#86868b]">
+      <section className="rounded-2xl border border-dashed border-[var(--ecom-border-soft)] p-6 text-center text-sm text-[var(--ecom-subtle)]">
         确认计划并出图后，成图将显示在这里。
       </section>
     );
@@ -25,7 +25,7 @@ export function ModelShotPoseGrid({ items, onPreview }: Props) {
 
   return (
     <section className="space-y-3">
-      <h3 className="text-sm font-semibold text-[#1d1d1f]">出图结果</h3>
+      <h3 className="text-sm font-semibold text-[var(--ecom-ink)]">出图结果</h3>
       <div className={ECOM_WORKSPACE_RESULT_GRID_CLASS}>
         {ready.map((item) => (
           <button

@@ -135,10 +135,10 @@ export function EcomVideoSlot({
     <div
       className={cn(
         "group/video relative overflow-hidden bg-black",
-        isWorkspaceFill && "w-full shrink rounded-lg border border-[#e8e8ed]",
+        isWorkspaceFill && "w-full shrink rounded-lg border border-[var(--ecom-divider)]",
         errorMessage?.trim() && !generating && !src?.trim() && "border-[#ff3b30]/40",
         resolvedLayout === "gallery" || resolvedLayout === "gallery-workspace"
-          ? "rounded-lg border border-[#e8e8ed] bg-[#f5f5f7]"
+          ? "rounded-lg border border-[var(--ecom-divider)] bg-[var(--ecom-parchment)]"
           : undefined,
         className,
       )}
@@ -207,7 +207,7 @@ export function EcomVideoSlot({
           {errorMessage}
         </div>
       ) : (
-        <div className="flex size-full items-center justify-center px-2 text-center text-[10px] text-[#86868b]">
+        <div className="flex size-full items-center justify-center px-2 text-center text-[10px] text-[var(--ecom-subtle)]">
           {emptyLabel}
         </div>
       )}

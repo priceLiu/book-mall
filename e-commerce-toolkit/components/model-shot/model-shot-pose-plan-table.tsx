@@ -177,8 +177,8 @@ export function ModelShotPosePlanTable({
 
   if (plan.items.length === 0) {
     return (
-      <section className="space-y-3 rounded-2xl border border-dashed border-[#d2d2d7] p-6 text-center">
-        <p className="text-sm text-[#6e6e73]">完成助手采集后，可在此生成并编辑姿势方案。</p>
+      <section className="space-y-3 rounded-2xl border border-dashed border-[var(--ecom-border-soft)] p-6 text-center">
+        <p className="text-sm text-[var(--ecom-muted)]">完成助手采集后，可在此生成并编辑姿势方案。</p>
         {canGeneratePoses ? (
           <EcomButtonSecondary type="button" disabled={busy} onClick={() => void onGeneratePoses()}>
             生成姿势方案
@@ -191,13 +191,13 @@ export function ModelShotPosePlanTable({
   const firstIndex = plan.items[0]?.index ?? 1;
 
   return (
-    <section className="space-y-4 rounded-xl border border-[#e8e8ed] bg-white p-5">
+    <section className="space-y-4 rounded-xl border border-[var(--ecom-divider)] bg-white p-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h3 className="text-sm font-semibold text-[#1d1d1f]">
+          <h3 className="text-sm font-semibold text-[var(--ecom-ink)]">
             {confirmed ? "姿势脚本" : "姿势计划"}
           </h3>
-          <p className="text-xs text-[#86868b]">
+          <p className="text-xs text-[var(--ecom-subtle)]">
             共 {plan.items.length} 条 · 状态：
             {plan.status === "confirmed" ? "已确认，可逐张出图" : "待确认"}
           </p>
@@ -207,7 +207,7 @@ export function ModelShotPosePlanTable({
             </p>
           ) : null}
           {confirmed ? (
-            <p className="mt-1 text-[11px] text-[#86868b]">
+            <p className="mt-1 text-[11px] text-[var(--ecom-subtle)]">
               修改并保存后，下方生成模特图将按最新脚本执行。
             </p>
           ) : null}
@@ -240,7 +240,7 @@ export function ModelShotPosePlanTable({
       <div className="overflow-x-auto rounded-2xl border border-[#e5e5ea]">
         <table className="min-w-[880px] w-full text-left text-xs">
           <thead>
-            <tr className="bg-[#1d1d1f] text-white">
+            <tr className="bg-[var(--ecom-ink)] text-white">
               <th className="w-10 px-3 py-2 font-medium">#</th>
               <th className="w-12 px-3 py-2 font-medium">分类</th>
               <th className="min-w-[88px] px-3 py-2 font-medium">标题</th>
@@ -253,7 +253,7 @@ export function ModelShotPosePlanTable({
           <tbody>
             {plan.items.map((item) => (
               <tr key={item.index} className="border-t border-[#e5e5ea]">
-                <td className="px-3 py-3 align-top text-[#1d1d1f]">{item.index}</td>
+                <td className="px-3 py-3 align-top text-[var(--ecom-ink)]">{item.index}</td>
                 <td className="px-3 py-3 align-top text-[#424245]">{item.category ?? "—"}</td>
                 <td className="px-3 py-3 align-top text-[#424245]">{item.title ?? "—"}</td>
                 {editIndex === item.index ? (
@@ -261,9 +261,9 @@ export function ModelShotPosePlanTable({
                     <td className="px-3 py-3 align-top" colSpan={3}>
                       <div className="grid gap-3 sm:grid-cols-3">
                         <label className="block space-y-1">
-                          <span className="text-[10px] font-medium text-[#86868b]">姿势</span>
+                          <span className="text-[10px] font-medium text-[var(--ecom-subtle)]">姿势</span>
                           <textarea
-                            className="min-h-[88px] w-full rounded-lg border border-[#d2d2d7] p-2 text-xs leading-relaxed"
+                            className="min-h-[88px] w-full rounded-lg border border-[var(--ecom-border-soft)] p-2 text-xs leading-relaxed"
                             value={draft.poseDescription}
                             disabled={busy}
                             onChange={(e) =>
@@ -272,7 +272,7 @@ export function ModelShotPosePlanTable({
                           />
                           <button
                             type="button"
-                            className="inline-flex items-center gap-1 text-[10px] text-[#0071e3]"
+                            className="inline-flex items-center gap-1 text-[10px] text-[var(--ecom-primary)]"
                             disabled={busy}
                             onClick={() => void openPicker("pose", item.index, false)}
                           >
@@ -281,9 +281,9 @@ export function ModelShotPosePlanTable({
                           </button>
                         </label>
                         <label className="block space-y-1">
-                          <span className="text-[10px] font-medium text-[#86868b]">场景</span>
+                          <span className="text-[10px] font-medium text-[var(--ecom-subtle)]">场景</span>
                           <textarea
-                            className="min-h-[88px] w-full rounded-lg border border-[#d2d2d7] p-2 text-xs leading-relaxed"
+                            className="min-h-[88px] w-full rounded-lg border border-[var(--ecom-border-soft)] p-2 text-xs leading-relaxed"
                             value={draft.sceneText}
                             disabled={busy}
                             onChange={(e) =>
@@ -292,7 +292,7 @@ export function ModelShotPosePlanTable({
                           />
                           <button
                             type="button"
-                            className="inline-flex items-center gap-1 text-[10px] text-[#0071e3]"
+                            className="inline-flex items-center gap-1 text-[10px] text-[var(--ecom-primary)]"
                             disabled={busy}
                             onClick={() => void openPicker("scene", item.index, false)}
                           >
@@ -301,9 +301,9 @@ export function ModelShotPosePlanTable({
                           </button>
                         </label>
                         <label className="block space-y-1">
-                          <span className="text-[10px] font-medium text-[#86868b]">道具</span>
+                          <span className="text-[10px] font-medium text-[var(--ecom-subtle)]">道具</span>
                           <textarea
-                            className="min-h-[88px] w-full rounded-lg border border-[#d2d2d7] p-2 text-xs leading-relaxed"
+                            className="min-h-[88px] w-full rounded-lg border border-[var(--ecom-border-soft)] p-2 text-xs leading-relaxed"
                             value={draft.propText}
                             disabled={busy}
                             placeholder="留空表示无道具"
@@ -313,7 +313,7 @@ export function ModelShotPosePlanTable({
                           />
                           <button
                             type="button"
-                            className="inline-flex items-center gap-1 text-[10px] text-[#0071e3]"
+                            className="inline-flex items-center gap-1 text-[10px] text-[var(--ecom-primary)]"
                             disabled={busy}
                             onClick={() => void openPicker("prop", item.index, false)}
                           >
@@ -327,7 +327,7 @@ export function ModelShotPosePlanTable({
                       <div className="flex flex-col gap-1">
                         <button
                           type="button"
-                          className="text-[11px] text-[#0071e3]"
+                          className="text-[11px] text-[var(--ecom-primary)]"
                           disabled={busy || !draft.poseDescription.trim()}
                           onClick={async () => {
                             await onPatchItem(item.index, draft);
@@ -338,7 +338,7 @@ export function ModelShotPosePlanTable({
                         </button>
                         <button
                           type="button"
-                          className="text-[11px] text-[#86868b]"
+                          className="text-[11px] text-[var(--ecom-subtle)]"
                           onClick={() => setEditIndex(null)}
                         >
                           取消
@@ -354,7 +354,7 @@ export function ModelShotPosePlanTable({
                       </p>
                       <button
                         type="button"
-                        className="mt-1 inline-flex items-center gap-1 text-[10px] text-[#0071e3]"
+                        className="mt-1 inline-flex items-center gap-1 text-[10px] text-[var(--ecom-primary)]"
                         disabled={busy}
                         onClick={() => void openPicker("pose", item.index, false)}
                       >
@@ -368,7 +368,7 @@ export function ModelShotPosePlanTable({
                       </p>
                       <button
                         type="button"
-                        className="mt-1 inline-flex items-center gap-1 text-[10px] text-[#0071e3]"
+                        className="mt-1 inline-flex items-center gap-1 text-[10px] text-[var(--ecom-primary)]"
                         disabled={busy}
                         onClick={() => void openPicker("scene", item.index, false)}
                       >
@@ -382,7 +382,7 @@ export function ModelShotPosePlanTable({
                       </p>
                       <button
                         type="button"
-                        className="mt-1 inline-flex items-center gap-1 text-[10px] text-[#0071e3]"
+                        className="mt-1 inline-flex items-center gap-1 text-[10px] text-[var(--ecom-primary)]"
                         disabled={busy}
                         onClick={() => void openPicker("prop", item.index, false)}
                       >
@@ -393,7 +393,7 @@ export function ModelShotPosePlanTable({
                     <td className="px-3 py-3 align-top">
                       <button
                         type="button"
-                        className="text-[#86868b] hover:text-[#1d1d1f]"
+                        className="text-[var(--ecom-subtle)] hover:text-[var(--ecom-ink)]"
                         disabled={busy}
                         onClick={() => {
                           setEditIndex(item.index);

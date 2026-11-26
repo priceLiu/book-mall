@@ -1453,15 +1453,15 @@ export function FashionAssistantPanel({
               >
                 {!historical && choiceMeta ? (
                   <div className="mb-1 max-w-[95%] text-right">
-                    <p className="text-[11px] font-semibold text-[#1d1d1f]">{choiceMeta.label}</p>
-                    <p className="text-[10px] text-[#86868b]">{choiceMeta.detail}</p>
+                    <p className="text-[11px] font-semibold text-[var(--ecom-ink)]">{choiceMeta.label}</p>
+                    <p className="text-[10px] text-[var(--ecom-subtle)]">{choiceMeta.detail}</p>
                   </div>
                 ) : !historical && dimMeta ? (
                   <div className="mb-1 max-w-[95%] text-right">
                     {canReviseDimensions ? (
                       <button
                         type="button"
-                        className="text-[11px] font-medium text-[#0071e3] underline decoration-[#0071e3]/45 underline-offset-2 hover:decoration-[#0071e3] disabled:opacity-50"
+                        className="text-[11px] font-medium text-[var(--ecom-primary)] underline decoration-[var(--ecom-primary)]/45 underline-offset-2 hover:decoration-[var(--ecom-primary)] disabled:opacity-50"
                         disabled={isBusy}
                         onClick={() =>
                           void handleChoice(fashionReviseDimensionChoiceLabel(dimMeta.stepIndex))
@@ -1470,7 +1470,7 @@ export function FashionAssistantPanel({
                         {dimMeta.label}
                       </button>
                     ) : (
-                      <span className="text-[11px] font-medium text-[#0071e3]">{dimMeta.label}</span>
+                      <span className="text-[11px] font-medium text-[var(--ecom-primary)]">{dimMeta.label}</span>
                     )}
                   </div>
                 ) : null}
@@ -1497,7 +1497,7 @@ export function FashionAssistantPanel({
                     ) : brief ? (
                       <p className="whitespace-pre-wrap text-sm leading-relaxed">{brief}</p>
                     ) : m.id === "streaming" ? (
-                      <p className="text-sm text-[#86868b]">正在生成…</p>
+                      <p className="text-sm text-[var(--ecom-subtle)]">正在生成…</p>
                     ) : null
                   ) : (
                     <p className="whitespace-pre-wrap">{m.content}</p>
@@ -1511,10 +1511,10 @@ export function FashionAssistantPanel({
                   <div className={cn(ECOM_ASSISTANT_CHOICE_SHELL_CLASS, "w-full max-w-[95%]")}>
                     {canReviseDimensions && dimMeta ? (
                       <div className="mb-2 flex items-center justify-between gap-2">
-                        <p className="text-[11px] font-medium text-[#6e6e73]">本次点选记录（只读）</p>
+                        <p className="text-[11px] font-medium text-[var(--ecom-muted)]">本次点选记录（只读）</p>
                         <button
                           type="button"
-                          className="text-[11px] font-medium text-[#0071e3] underline decoration-[#0071e3]/45 underline-offset-2 hover:decoration-[#0071e3] disabled:opacity-50"
+                          className="text-[11px] font-medium text-[var(--ecom-primary)] underline decoration-[var(--ecom-primary)]/45 underline-offset-2 hover:decoration-[var(--ecom-primary)] disabled:opacity-50"
                           disabled={isBusy}
                           onClick={() =>
                             void handleChoice(fashionReviseDimensionChoiceLabel(dimMeta.stepIndex))
@@ -1553,8 +1553,8 @@ export function FashionAssistantPanel({
               ) : null}
               {userStoryTheaterKey && userStoryTheaterVersion?.panels?.length ? (
                 <div className="flex w-full flex-col items-start">
-                  <div className="w-full max-w-[95%] rounded-lg border border-[#e8e8ed] bg-white p-3">
-                    <p className="mb-2 text-xs font-semibold text-[#6e6e73]">
+                  <div className="w-full max-w-[95%] rounded-lg border border-[var(--ecom-divider)] bg-white p-3">
+                    <p className="mb-2 text-xs font-semibold text-[var(--ecom-muted)]">
                       故事剧场 · {userStoryTheaterKey}
                       {userStoryTheaterVersion.title ? ` · ${userStoryTheaterVersion.title}` : ""}
                       {deliverable?.storyTheaterLocked ? " · 已定稿" : ""}
@@ -1587,7 +1587,7 @@ export function FashionAssistantPanel({
                 projectDeliverable={deliverable}
               />
             ) : (
-              <p className="whitespace-pre-wrap text-sm leading-relaxed text-[#1d1d1f]">
+              <p className="whitespace-pre-wrap text-sm leading-relaxed text-[var(--ecom-ink)]">
                 {stripProDeliverableFence(streamText) || "正在生成…"}
               </p>
             )}
@@ -1620,26 +1620,26 @@ export function FashionAssistantPanel({
 
         {showDimensionStepPrompt ? (
           <div className={ECOM_ASSISTANT_CHOICE_SHELL_CLASS}>
-            <div className="rounded-2xl border border-[var(--ecom-outline-border)] bg-[#f0f6ff] p-4 shadow-sm">
+            <div className="rounded-2xl border border-[var(--ecom-outline-border)] bg-[var(--ecom-content-selected-bg)] p-4 shadow-sm">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-sm font-semibold text-[#1d1d1f]">
+                  <p className="text-sm font-semibold text-[var(--ecom-ink)]">
                     {currentDimStepDef!.label}
                   </p>
-                  <p className="mt-1 text-xs leading-relaxed text-[#6e6e73]">
+                  <p className="mt-1 text-xs leading-relaxed text-[var(--ecom-muted)]">
                     {vertical && isNonFashionProVertical(project)
                       ? proDimensionPrompt(vertical, currentDimStep)
                       : fashionDimensionPrompt(currentDimStep)}
                   </p>
                   {currentDimStepDef!.freeText ? (
-                    <p className="mt-2 text-xs text-[#86868b]">
+                    <p className="mt-2 text-xs text-[var(--ecom-subtle)]">
                       此步骤无选项卡片，请直接在下方输入框填写场景描述后发送。
                     </p>
                   ) : awaitingCustomDimension ? (
-                    <p className="mt-2 text-xs text-[#86868b]">{customDimensionHint}</p>
+                    <p className="mt-2 text-xs text-[var(--ecom-subtle)]">{customDimensionHint}</p>
                   ) : null}
                 </div>
-                <span className="shrink-0 rounded-full bg-white px-2.5 py-0.5 text-[10px] font-medium text-[#0071e3]">
+                <span className="shrink-0 rounded-full bg-white px-2.5 py-0.5 text-[10px] font-medium text-[var(--ecom-primary)]">
                   {dimStepProgress}
                 </span>
               </div>
@@ -1659,12 +1659,12 @@ export function FashionAssistantPanel({
 
         {showSellpointUserInputHint ? (
           <div className={ECOM_ASSISTANT_CHOICE_SHELL_CLASS}>
-            <div className="rounded-2xl border border-[#e8e8ed] bg-white p-4 shadow-sm">
-              <p className="text-sm font-semibold text-[#1d1d1f]">填写您的卖点（五段式）</p>
+            <div className="rounded-2xl border border-[var(--ecom-divider)] bg-white p-4 shadow-sm">
+              <p className="text-sm font-semibold text-[var(--ecom-ink)]">填写您的卖点（五段式）</p>
               <div className="mt-2">
-                <EcomSellpointFivePartHint className="flex gap-2 rounded-lg border-0 bg-[#f5f5f7] px-0 py-0 text-[11px]" />
+                <EcomSellpointFivePartHint className="flex gap-2 rounded-lg border-0 bg-[var(--ecom-parchment)] px-0 py-0 text-[11px]" />
               </div>
-              <p className="mt-2 text-xs text-[#6e6e73]">
+              <p className="mt-2 text-xs text-[var(--ecom-muted)]">
                 在下方输入框发送完整五段式内容，或在左侧「卖点清单」点「添加卖点」。完成后可选 AI 润色，或直接确认定稿。
               </p>
             </div>
@@ -1673,9 +1673,9 @@ export function FashionAssistantPanel({
 
         {!legacyReadonly && showStoryTopicLoading ? (
           <div className={ECOM_ASSISTANT_CHOICE_SHELL_CLASS}>
-            <div className="rounded-2xl border border-[var(--ecom-outline-border)] bg-[#f0f6ff] p-4 shadow-sm">
-              <p className="text-sm font-semibold text-[#1d1d1f]">选择故事主题</p>
-              <p className="mt-1 text-xs leading-relaxed text-[#6e6e73]">
+            <div className="rounded-2xl border border-[var(--ecom-outline-border)] bg-[var(--ecom-content-selected-bg)] p-4 shadow-sm">
+              <p className="text-sm font-semibold text-[var(--ecom-ink)]">选择故事主题</p>
+              <p className="mt-1 text-xs leading-relaxed text-[var(--ecom-muted)]">
                 正在从选题库加载 5 个故事主题，请稍候…
               </p>
             </div>
@@ -1749,8 +1749,8 @@ export function FashionAssistantPanel({
         {inProduce && !isBusy ? (
           <div className={ECOM_ASSISTANT_CHOICE_SHELL_CLASS}>
             <div className="rounded-2xl border border-[#34c759]/25 bg-[#f6fff8] p-4 shadow-sm">
-              <p className="text-sm font-semibold text-[#1d1d1f]">策划流程已完成</p>
-              <p className="mt-1.5 text-xs leading-relaxed text-[#6e6e73]">
+              <p className="text-sm font-semibold text-[var(--ecom-ink)]">策划流程已完成</p>
+              <p className="mt-1.5 text-xs leading-relaxed text-[var(--ecom-muted)]">
                 {deliverable?.outputMode === "direct_video"
                   ? "路径 B 已选定。请在中栏顶部「故事版 · 成片工作区」一键生图，完成后在同一区域合成整图视频或分镜视频。右侧无需再点「故事版一键成片」。"
                   : "路径 A 已选定。请在中栏顶部「分镜图」生成各镜图片并导出交付。右侧无需重复选择成片方式。"}

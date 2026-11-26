@@ -46,7 +46,7 @@ export function MediaDecomposeReplicaIdleComposer({ mode, busy, onStartReplica }
     <EcomAssistantBottomDock
       composer={
         <div className="flex min-h-[2.25rem] flex-1 items-center gap-3">
-          <p className="min-w-0 flex-1 truncate text-sm text-[#86868b]">
+          <p className="min-w-0 flex-1 truncate text-sm text-[var(--ecom-subtle)]">
             {mode === "replica-setup"
               ? "在上方上传参考图并生成复刻脚本…"
               : mode === "ready"

@@ -96,7 +96,7 @@ export function BackgroundGenerationDock({
   if (!mounted || displayTasks.length === 0) return null;
 
   const shellLight =
-    "border-[#e8e8ed] bg-white shadow-lg ring-1 ring-black/[0.04]";
+    "border-[var(--ecom-divider)] bg-white shadow-lg ring-1 ring-black/[0.04]";
   const shellDark = "border-orange-400/35 bg-[#141418]/98 shadow-xl";
   const shell = variant === "light" ? shellLight : shellDark;
 
@@ -110,7 +110,7 @@ export function BackgroundGenerationDock({
             ? "border-[#ff3b30]/35 bg-[#fff5f5] text-[#ff3b30] hover:bg-[#ffecec]"
             : "border-red-400/45 bg-red-950/90 text-red-200"
           : variant === "light"
-            ? "border-[#d2d2d7] bg-white text-[#1d1d1f] hover:bg-[#f5f5f7]"
+            ? "border-[var(--ecom-border-soft)] bg-white text-[var(--ecom-ink)] hover:bg-[var(--ecom-parchment)]"
             : "border-orange-400/40 bg-[#141418]/95 text-orange-100",
       )}
       onClick={() => onExpandedChange(true)}
@@ -122,14 +122,14 @@ export function BackgroundGenerationDock({
         <Loader2
           className={cn(
             "size-4 shrink-0 animate-spin",
-            variant === "light" ? "text-[#0071e3]" : "text-orange-300",
+            variant === "light" ? "text-[var(--ecom-primary)]" : "text-orange-300",
           )}
         />
       ) : (
         <Sparkles
           className={cn(
             "size-4 shrink-0",
-            variant === "light" ? "text-[#0071e3]" : "text-orange-300",
+            variant === "light" ? "text-[var(--ecom-primary)]" : "text-orange-300",
           )}
         />
       )}
@@ -155,7 +155,7 @@ export function BackgroundGenerationDock({
       <div
         className={cn(
           "flex items-center justify-between gap-2 border-b px-3 py-2",
-          variant === "light" ? "border-[#e8e8ed]" : "border-white/10",
+          variant === "light" ? "border-[var(--ecom-divider)]" : "border-white/10",
           hasFailed && !hasSuccessFlash && variant === "light" && "bg-[#fffafa]",
           hasFailed && !hasSuccessFlash && variant === "dark" && "bg-red-950/40",
         )}
@@ -168,7 +168,7 @@ export function BackgroundGenerationDock({
                 ? "text-[#ff3b30]"
                 : "text-red-200"
               : variant === "light"
-                ? "text-[#1d1d1f]"
+                ? "text-[var(--ecom-ink)]"
                 : "text-orange-100",
           )}
         >
@@ -185,14 +185,14 @@ export function BackgroundGenerationDock({
             <Loader2
               className={cn(
                 "size-4 shrink-0 animate-spin",
-                variant === "light" ? "text-[#0071e3]" : "text-orange-300",
+                variant === "light" ? "text-[var(--ecom-primary)]" : "text-orange-300",
               )}
             />
           ) : (
             <Sparkles
               className={cn(
                 "size-4 shrink-0",
-                variant === "light" ? "text-[#0071e3]" : "text-orange-300",
+                variant === "light" ? "text-[var(--ecom-primary)]" : "text-orange-300",
               )}
             />
           )}
@@ -211,7 +211,7 @@ export function BackgroundGenerationDock({
               className={cn(
                 "rounded-md p-1",
                 variant === "light"
-                  ? "text-[#86868b] hover:bg-[#f5f5f7] hover:text-[#1d1d1f]"
+                  ? "text-[var(--ecom-subtle)] hover:bg-[var(--ecom-parchment)] hover:text-[var(--ecom-ink)]"
                   : "text-zinc-500 hover:text-zinc-300",
               )}
               aria-label="最小化"
@@ -224,7 +224,7 @@ export function BackgroundGenerationDock({
               className={cn(
                 "rounded-md p-1",
                 variant === "light"
-                  ? "text-[#86868b] hover:bg-[#f5f5f7] hover:text-[#1d1d1f]"
+                  ? "text-[var(--ecom-subtle)] hover:bg-[var(--ecom-parchment)] hover:text-[var(--ecom-ink)]"
                   : "text-zinc-500 hover:text-zinc-300",
               )}
               aria-label="关闭面板"
@@ -273,7 +273,7 @@ export function BackgroundGenerationDock({
                     ? "border-[#ff3b30]/25 bg-[#fff5f5]"
                     : "border-red-400/30 bg-red-950/30"
                   : variant === "light"
-                    ? "border-[#e8e8ed] bg-[#fafafa]"
+                    ? "border-[var(--ecom-divider)] bg-[#fafafa]"
                     : "border-white/10 bg-black/30",
               )}
             >
@@ -286,7 +286,7 @@ export function BackgroundGenerationDock({
                         ? "text-[#ff3b30]"
                         : "text-red-300"
                       : variant === "light"
-                        ? "text-[#0071e3]"
+                        ? "text-[var(--ecom-primary)]"
                         : "text-orange-300",
                   )}
                 />
@@ -299,7 +299,7 @@ export function BackgroundGenerationDock({
                           ? "text-[#ff3b30]"
                           : "text-red-200"
                         : variant === "light"
-                          ? "text-[#1d1d1f]"
+                          ? "text-[var(--ecom-ink)]"
                           : "text-zinc-100",
                     )}
                   >
@@ -309,7 +309,7 @@ export function BackgroundGenerationDock({
                     <div
                       className={cn(
                         "mt-0.5 text-[11px] leading-snug",
-                        variant === "light" ? "text-[#86868b]" : "text-zinc-400",
+                        variant === "light" ? "text-[var(--ecom-subtle)]" : "text-zinc-400",
                       )}
                     >
                       {task.hint}
@@ -328,7 +328,7 @@ export function BackgroundGenerationDock({
                   <div
                     className={cn(
                       "mt-1 text-[10px] leading-snug",
-                      variant === "light" ? "text-[#86868b]" : "text-zinc-500",
+                      variant === "light" ? "text-[var(--ecom-subtle)]" : "text-zinc-500",
                     )}
                   >
                     已等待 {formatBackgroundGenerationAge(ageSec)} · {statusLabel}
@@ -348,13 +348,13 @@ export function BackgroundGenerationDock({
                     <div
                       className={cn(
                         "mt-2 h-1 overflow-hidden rounded-full",
-                        variant === "light" ? "bg-[#e8e8ed]" : "bg-white/10",
+                        variant === "light" ? "bg-[var(--ecom-divider)]" : "bg-white/10",
                       )}
                     >
                       <div
                         className={cn(
                           "h-full rounded-full transition-[width] duration-700",
-                          variant === "light" ? "bg-[#0071e3]" : "bg-orange-400",
+                          variant === "light" ? "bg-[var(--ecom-primary)]" : "bg-orange-400",
                         )}
                         style={{ width: `${Math.round(progress * 100)}%` }}
                       />
@@ -382,7 +382,7 @@ export function BackgroundGenerationDock({
                       className={cn(
                         "text-[10px] font-medium",
                         variant === "light"
-                          ? "text-[#0071e3] hover:text-[#0077ed]"
+                          ? "text-[var(--ecom-primary)] hover:text-[#0077ed]"
                           : "text-orange-300 hover:text-orange-200",
                       )}
                       onClick={() => void task.onOpen?.()}
@@ -396,7 +396,7 @@ export function BackgroundGenerationDock({
                       className={cn(
                         "text-[10px]",
                         variant === "light"
-                          ? "text-[#86868b] hover:text-[#1d1d1f]"
+                          ? "text-[var(--ecom-subtle)] hover:text-[var(--ecom-ink)]"
                           : "text-zinc-500 hover:text-zinc-300",
                       )}
                       onClick={() => onDismiss(task.id)}
@@ -409,7 +409,7 @@ export function BackgroundGenerationDock({
                       className={cn(
                         "text-[10px]",
                         variant === "light"
-                          ? "text-[#86868b] hover:text-[#1d1d1f]"
+                          ? "text-[var(--ecom-subtle)] hover:text-[var(--ecom-ink)]"
                           : "text-zinc-500 hover:text-zinc-300",
                       )}
                       onClick={() => onExpandedChange(false)}

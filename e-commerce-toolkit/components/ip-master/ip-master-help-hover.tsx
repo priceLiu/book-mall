@@ -17,12 +17,12 @@ export function IpMasterHelpHover({
 }) {
   return (
     <span className="group relative ml-1.5 inline-flex align-middle">
-      <span className="cursor-help text-[#86868b] hover:text-[#6e6e73]" aria-label={ariaLabel}>
+      <span className="cursor-help text-[var(--ecom-subtle)] hover:text-[var(--ecom-muted)]" aria-label={ariaLabel}>
         <HelpCircle className="h-4 w-4" />
       </span>
       <span
         className={cn(
-          "pointer-events-none absolute left-0 top-full z-[100] mt-2 hidden rounded-xl border border-[#d2d2d7] bg-[#1d1d1f] p-3 text-left text-[11px] leading-relaxed text-white shadow-2xl",
+          "pointer-events-none absolute left-0 top-full z-[100] mt-2 hidden rounded-xl border border-[var(--ecom-border-soft)] bg-[var(--ecom-ink)] p-3 text-left text-[11px] leading-relaxed text-white shadow-2xl",
           "group-hover:block group-focus-within:block",
           wide ? "w-[min(720px,calc(100vw-2rem))]" : "w-[min(420px,calc(100vw-2rem))]",
         )}

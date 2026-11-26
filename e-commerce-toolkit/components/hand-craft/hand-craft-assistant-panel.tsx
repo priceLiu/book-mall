@@ -588,7 +588,7 @@ export function HandCraftAssistantPanel({
                   onSelect={(message) => void handleChoice(message)}
                 />
                 {isStepReady(project, currentStepId) ? (
-                  <p className="mt-2 text-[11px] text-[#6e6e73]">
+                  <p className="mt-2 text-[11px] text-[var(--ecom-muted)]">
                     第 {stepMeta.no} 步已出齐，可直接进入下一步。
                   </p>
                 ) : null}
@@ -596,11 +596,11 @@ export function HandCraftAssistantPanel({
             </div>
           ) : null}
           {heroGuideMode ? (
-            <div className="mt-3 rounded-xl border border-[#e8e8ed] bg-[#f5f5f7] px-3 py-3">
+            <div className="mt-3 rounded-xl border border-[var(--ecom-divider)] bg-[var(--ecom-parchment)] px-3 py-3">
               <StoryboardMarkdownBlock markdown={HAND_CRAFT_POST_HERO_GUIDE_MESSAGE} />
             </div>
           ) : workspaceBusy && !streaming ? (
-            <p className="mt-3 text-[11px] leading-relaxed text-[#6e6e73]">
+            <p className="mt-3 text-[11px] leading-relaxed text-[var(--ecom-muted)]">
               中间工作区正在出图或拼版；进度见右下角任务窗。
             </p>
           ) : null}

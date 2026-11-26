@@ -102,7 +102,7 @@ export function FilmPullProductionScriptEditDialog({
         </div>
       }
     >
-      <div className="shrink-0 border-b border-[#e8e8ed] bg-[#fafafa] px-5 py-3">
+      <div className="shrink-0 border-b border-[var(--ecom-divider)] bg-[#fafafa] px-5 py-3">
         <FilmPullRefsGalleryStrip characterRefs={characterRefs} />
       </div>
 
@@ -120,7 +120,7 @@ export function FilmPullProductionScriptEditDialog({
             onChangeShots={setDraftShots}
           />
         ) : (
-          <div className="flex min-h-[12rem] items-center justify-center text-sm text-[#86868b]">
+          <div className="flex min-h-[12rem] items-center justify-center text-sm text-[var(--ecom-subtle)]">
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             加载编辑表…
           </div>

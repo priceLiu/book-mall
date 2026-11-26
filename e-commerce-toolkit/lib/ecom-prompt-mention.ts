@@ -63,8 +63,8 @@ export function createEcomImageRefBadge(
   badge.setAttribute("draggable", "false");
   const tokenOnly = opts?.variant === "token-only";
   badge.className = tokenOnly
-    ? "mention-inline-badge align-middle inline-flex min-h-[1.15em] max-w-[160px] shrink-0 cursor-help select-none items-center rounded-md border border-[var(--ecom-outline-border)] bg-[#f0f6ff] px-1 py-[1px] text-[1em] leading-none text-[#0071e3] font-medium"
-    : "mention-inline-badge align-middle inline-flex min-h-[1.15em] max-w-[220px] shrink-0 cursor-help select-none items-center gap-1 rounded-lg border border-[var(--ecom-outline-border)] bg-[var(--ecom-outline-hover-bg)] px-1 py-[1px] text-[1em] leading-none text-[#1d1d1f]";
+    ? "mention-inline-badge align-middle inline-flex min-h-[1.15em] max-w-[160px] shrink-0 cursor-help select-none items-center rounded-md border border-[var(--ecom-outline-border)] bg-[var(--ecom-content-selected-bg)] px-1 py-[1px] text-[1em] leading-none text-[var(--ecom-primary)] font-medium"
+    : "mention-inline-badge align-middle inline-flex min-h-[1.15em] max-w-[220px] shrink-0 cursor-help select-none items-center gap-1 rounded-lg border border-[var(--ecom-outline-border)] bg-[var(--ecom-outline-hover-bg)] px-1 py-[1px] text-[1em] leading-none text-[var(--ecom-ink)]";
   badge.style.marginInline = "1px";
   badge.style.verticalAlign = "middle";
 
@@ -79,7 +79,7 @@ export function createEcomImageRefBadge(
     }
     if (item.cropBbox) {
       const wrap = document.createElement("span");
-      wrap.className = "relative h-4 w-4 shrink-0 overflow-hidden rounded-[4px] bg-[#f5f5f7]";
+      wrap.className = "relative h-4 w-4 shrink-0 overflow-hidden rounded-[4px] bg-[var(--ecom-parchment)]";
       img.className = "h-full w-full object-cover opacity-40";
       wrap.appendChild(img);
       badge.appendChild(wrap);
@@ -120,7 +120,7 @@ export function createEcomImageRefAlias(
   if (item?.index) alias.setAttribute(ECOM_IMAGE_REF_BADGE_ATTR, String(item.index));
   alias.setAttribute("draggable", "false");
   alias.className =
-    "mention-inline-alias align-middle inline cursor-help select-none text-[1em] font-medium leading-none text-[#0071e3]";
+    "mention-inline-alias align-middle inline cursor-help select-none text-[1em] font-medium leading-none text-[var(--ecom-primary)]";
   alias.style.marginInline = "1px";
   alias.style.verticalAlign = "baseline";
   alias.textContent = mentionTokenDisplay(token);

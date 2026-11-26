@@ -158,15 +158,15 @@ export default function WorkflowDraftsPage() {
   return (
     <EcomWorkspaceLayout fullWidth>
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-        <header className="shrink-0 border-b border-[#e8e8ed] bg-white px-4 py-4 sm:px-6 sm:py-5">
+        <header className="shrink-0 border-b border-[var(--ecom-divider)] bg-white px-4 py-4 sm:px-6 sm:py-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <EcomWorkspaceTitleHeading
               heading="h1"
               eyebrow="我的工作流"
-              titleClassName="text-lg font-semibold text-[#1d1d1f]"
+              titleClassName="text-lg font-semibold text-[var(--ecom-ink)]"
               title="暂存"
             >
-              <p className="mt-1 text-xs text-[#6e6e73]">
+              <p className="mt-1 text-xs text-[var(--ecom-muted)]">
                 各功能进行中的项目自动出现在此，可随时继续编辑或新建。
               </p>
             </EcomWorkspaceTitleHeading>
@@ -182,12 +182,12 @@ export default function WorkflowDraftsPage() {
                 </EcomIconToolbarGroup>
               </EcomIconToolbar>
               {newMenuOpen ? (
-                <div className="absolute right-0 z-20 mt-2 w-56 rounded-xl border border-[#e8e8ed] bg-white p-1 shadow-lg">
+                <div className="absolute right-0 z-20 mt-2 w-56 rounded-xl border border-[var(--ecom-divider)] bg-white p-1 shadow-lg">
                   {NEW_DRAFT_OPTIONS.map((opt) => (
                     <button
                       key={opt.kind}
                       type="button"
-                      className="flex w-full rounded-lg px-3 py-2 text-left text-xs text-[#1d1d1f] hover:bg-[#f5f5f7] disabled:opacity-50"
+                      className="flex w-full rounded-lg px-3 py-2 text-left text-xs text-[var(--ecom-ink)] hover:bg-[var(--ecom-parchment)] disabled:opacity-50"
                       disabled={Boolean(busyKey?.startsWith("new:"))}
                       onClick={() => void handleNew(opt.kind)}
                     >
@@ -212,8 +212,8 @@ export default function WorkflowDraftsPage() {
                 onClick={() => setActiveTab(tab.id)}
                 className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
                   activeTab === tab.id
-                    ? "bg-[#1d1d1f] text-white"
-                    : "bg-[#f5f5f7] text-[#6e6e73] hover:text-[#1d1d1f]"
+                    ? "bg-[var(--ecom-ink)] text-white"
+                    : "bg-[var(--ecom-parchment)] text-[var(--ecom-muted)] hover:text-[var(--ecom-ink)]"
                 }`}
               >
                 {tab.label}
@@ -222,7 +222,7 @@ export default function WorkflowDraftsPage() {
             ))}
             <Link
               href="/library"
-              className="ml-auto text-xs text-[#0071e3] hover:underline"
+              className="ml-auto text-xs text-[var(--ecom-primary)] hover:underline"
             >
               我的资产 →
             </Link>
@@ -233,14 +233,14 @@ export default function WorkflowDraftsPage() {
         {loading ? (
           <EcomMediaSkeletonGrid count={6} gridClass={ECOM_LIBRARY_MEDIA_GRID_CLASS} />
         ) : filtered.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-[#e8e8ed] bg-[#fafafa] px-6 py-16 text-center">
+          <div className="rounded-2xl border border-dashed border-[var(--ecom-divider)] bg-[#fafafa] px-6 py-16 text-center">
             <FolderOpen className="mx-auto mb-3 h-8 w-8 text-[#c7c7cc]" />
-            <p className="text-sm font-medium text-[#1d1d1f]">暂无暂存工作流</p>
-            <p className="mt-2 text-xs leading-relaxed text-[#6e6e73]">
+            <p className="text-sm font-medium text-[var(--ecom-ink)]">暂无暂存工作流</p>
+            <p className="mt-2 text-xs leading-relaxed text-[var(--ecom-muted)]">
               在故事版、主图、种草视频等功能中开始创作后，进度会自动保留在此。
               <br />
               主图/详情页、种草视频、故事版等点「保存工作流」后的可复用模板仍在
-              <Link href="/library" className="mx-1 text-[#0071e3] hover:underline">
+              <Link href="/library" className="mx-1 text-[var(--ecom-primary)] hover:underline">
                 我的资产 · 工作流
               </Link>
               。
@@ -250,9 +250,9 @@ export default function WorkflowDraftsPage() {
           <div className="space-y-8">
             {grouped.map((group) => (
               <section key={group.featureLabel}>
-                <h2 className="mb-3 text-xs font-semibold text-[#1d1d1f]">
+                <h2 className="mb-3 text-xs font-semibold text-[var(--ecom-ink)]">
                   {group.featureLabel}
-                  <span className="ml-2 font-normal text-[#86868b]">
+                  <span className="ml-2 font-normal text-[var(--ecom-subtle)]">
                     {group.items.length} 项
                   </span>
                 </h2>
@@ -264,9 +264,9 @@ export default function WorkflowDraftsPage() {
                     return (
                       <article
                         key={`${item.kind}:${item.projectId}`}
-                        className="flex flex-col overflow-hidden rounded-2xl border border-[#e8e8ed] bg-white shadow-sm"
+                        className="flex flex-col overflow-hidden rounded-2xl border border-[var(--ecom-divider)] bg-white shadow-sm"
                       >
-                        <div className="relative aspect-[4/5] bg-[#f5f5f7]">
+                        <div className="relative aspect-[4/5] bg-[var(--ecom-parchment)]">
                           {item.thumbnailUrl ? (
                             <Image
                               src={item.thumbnailUrl}
@@ -276,17 +276,17 @@ export default function WorkflowDraftsPage() {
                               unoptimized
                             />
                           ) : (
-                            <div className="flex h-full items-center justify-center text-[11px] text-[#86868b]">
+                            <div className="flex h-full items-center justify-center text-[11px] text-[var(--ecom-subtle)]">
                               暂无预览
                             </div>
                           )}
                         </div>
                         <div className="flex flex-1 flex-col gap-2 p-3">
                           <div>
-                            <p className="line-clamp-2 text-sm font-medium text-[#1d1d1f]">
+                            <p className="line-clamp-2 text-sm font-medium text-[var(--ecom-ink)]">
                               {item.title}
                             </p>
-                            <p className="mt-1 text-[11px] text-[#86868b]">
+                            <p className="mt-1 text-[11px] text-[var(--ecom-subtle)]">
                               {item.phaseLabel} · {item.summary}
                             </p>
                             <p className="mt-0.5 text-[10px] text-[#aeaeb2]">

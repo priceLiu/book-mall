@@ -103,12 +103,12 @@ export function VtonTryonLibraryPanel() {
         ) : error ? (
           <p className="text-sm text-red-600">{error}</p>
         ) : assets.length < 1 ? (
-          <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-[#e8e8ed] bg-[#fafafa] px-6 py-16 text-center">
-            <Shirt className="size-10 text-[#86868b]" />
-            <p className="text-sm text-[#6e6e73]">试衣库暂无成片</p>
+          <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-[var(--ecom-divider)] bg-[#fafafa] px-6 py-16 text-center">
+            <Shirt className="size-10 text-[var(--ecom-subtle)]" />
+            <p className="text-sm text-[var(--ecom-muted)]">试衣库暂无成片</p>
             <Link
               href="/ecom/model-tryon"
-              className="text-sm text-[#0071e3] hover:underline"
+              className="text-sm text-[var(--ecom-primary)] hover:underline"
             >
               去模特试衣生成 →
             </Link>
@@ -143,7 +143,7 @@ export function VtonTryonLibraryPanel() {
                       })
                     }
                   />
-                  <p className="truncate px-0.5 text-[11px] text-[#6e6e73]" title={title}>
+                  <p className="truncate px-0.5 text-[11px] text-[var(--ecom-muted)]" title={title}>
                     {title}
                   </p>
                 </li>
@@ -182,11 +182,11 @@ export function VtonTryonLibraryPageHeader() {
   }
 
   return (
-    <header className="shrink-0 border-b border-[#e8e8ed] bg-white px-4 py-4 sm:px-6 sm:py-5">
+    <header className="shrink-0 border-b border-[var(--ecom-divider)] bg-white px-4 py-4 sm:px-6 sm:py-5">
       <div className="mx-auto flex max-w-6xl flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold text-[#1d1d1f]">试衣库</h1>
-          <p className="mt-1 max-w-xl text-sm text-[#6e6e73]">
+          <h1 className="text-xl font-semibold text-[var(--ecom-ink)]">试衣库</h1>
+          <p className="mt-1 max-w-xl text-sm text-[var(--ecom-muted)]">
             电商模特试衣保存的成片；文生试衣成功后会自动写入。悬停可入库（个人库 / 管理员全平台库）。
           </p>
         </div>
@@ -195,13 +195,13 @@ export function VtonTryonLibraryPageHeader() {
             type="button"
             disabled={backfillBusy}
             onClick={() => void handleBackfillToday()}
-            className="inline-flex items-center rounded-lg border border-[#e8e8ed] px-3 py-1.5 text-xs text-[#1d1d1f] hover:bg-[#f5f5f7] disabled:opacity-50"
+            className="inline-flex items-center rounded-lg border border-[var(--ecom-divider)] px-3 py-1.5 text-xs text-[var(--ecom-ink)] hover:bg-[var(--ecom-parchment)] disabled:opacity-50"
           >
             {backfillBusy ? "恢复中…" : "恢复今日文生试衣"}
           </button>
           <Link
             href="/ecom/model-tryon"
-            className="inline-flex items-center gap-1 rounded-lg border border-[#e8e8ed] px-3 py-1.5 text-xs text-[#0071e3] hover:bg-[#f0f6ff]"
+            className="inline-flex items-center gap-1 rounded-lg border border-[var(--ecom-divider)] px-3 py-1.5 text-xs text-[var(--ecom-primary)] hover:bg-[var(--ecom-content-selected-bg)]"
           >
             <ArrowLeft className="size-3.5" />
             返回模特试衣

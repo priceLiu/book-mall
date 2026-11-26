@@ -170,20 +170,20 @@ export function BrandViSlotGrid({
   return (
     <section
       id={`brand-vi-step-${step.id}`}
-      className="scroll-mt-20 rounded-xl border border-[#e8e8ed] bg-[#fafafa] px-4 py-4"
+      className="scroll-mt-20 rounded-xl border border-[var(--ecom-divider)] bg-[#fafafa] px-4 py-4"
     >
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h3 className="text-sm font-semibold text-[#1d1d1f]">
+          <h3 className="text-sm font-semibold text-[var(--ecom-ink)]">
             第 {step.no} 步 · {step.label}
           </h3>
-          <p className="mt-0.5 text-[11px] text-[#6e6e73]">
+          <p className="mt-0.5 text-[11px] text-[var(--ecom-muted)]">
             {step.summary} · {step.ratio}
             <span className="ml-1">
               已出 {done}/{rows.length || step.count}
             </span>
             {editedCount > 0 ? (
-              <span className="ml-1 text-[#1d1d1f]">· 已手改 {editedCount} 条</span>
+              <span className="ml-1 text-[var(--ecom-ink)]">· 已手改 {editedCount} 条</span>
             ) : null}
           </p>
         </div>
@@ -224,10 +224,10 @@ export function BrandViSlotGrid({
 
       {rows.length > 1 ? (
         <div className="mb-2 flex items-center gap-2">
-          <label className="flex cursor-pointer items-center gap-1.5 text-[11px] text-[#6e6e73]">
+          <label className="flex cursor-pointer items-center gap-1.5 text-[11px] text-[var(--ecom-muted)]">
             <input
               type="checkbox"
-              className="rounded border-[#d2d2d7]"
+              className="rounded border-[var(--ecom-border-soft)]"
               checked={selected.size === rows.length && rows.length > 0}
               disabled={workspaceDisabled}
               onChange={() =>
@@ -248,12 +248,12 @@ export function BrandViSlotGrid({
           return (
             <article
               key={row.index}
-              className="flex min-w-0 flex-col overflow-hidden rounded-xl border border-[#e8e8ed] bg-white"
+              className="flex min-w-0 flex-col overflow-hidden rounded-xl border border-[var(--ecom-divider)] bg-white"
             >
               <div className="flex items-center gap-1.5 border-b border-[#f0f0f2] px-2.5 py-1.5">
                 <input
                   type="checkbox"
-                  className="rounded border-[#d2d2d7]"
+                  className="rounded border-[var(--ecom-border-soft)]"
                   checked={selected.has(row.index)}
                   disabled={workspaceDisabled || rowLocked}
                   onChange={() =>
@@ -265,10 +265,10 @@ export function BrandViSlotGrid({
                     })
                   }
                 />
-                <span className="shrink-0 text-[10px] font-semibold text-[#86868b]">
+                <span className="shrink-0 text-[10px] font-semibold text-[var(--ecom-subtle)]">
                   #{row.index}
                 </span>
-                <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-[#1d1d1f]">
+                <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-[var(--ecom-ink)]">
                   {row.title}
                 </span>
               </div>
@@ -292,7 +292,7 @@ export function BrandViSlotGrid({
               />
 
               {row.promptEdited ? (
-                <p className="border-t border-[#f0f0f2] px-2.5 py-1 text-[10px] text-[#86868b]">
+                <p className="border-t border-[#f0f0f2] px-2.5 py-1 text-[10px] text-[var(--ecom-subtle)]">
                   已手改说明
                 </p>
               ) : null}
@@ -302,7 +302,7 @@ export function BrandViSlotGrid({
       </div>
 
       {busy ? (
-        <p className="mt-2 flex items-center gap-2 text-[11px] text-[#6e6e73]">
+        <p className="mt-2 flex items-center gap-2 text-[11px] text-[var(--ecom-muted)]">
           <Loader2 className="h-3.5 w-3.5 animate-spin" />
           {busy}
         </p>
@@ -361,7 +361,7 @@ function BrandViSlotPreview({
 
   return (
     <div
-      className={cn("group/image relative w-full shrink-0 overflow-hidden bg-[#f5f5f7]", productDesignRatioFrameClass(ratio))}
+      className={cn("group/image relative w-full shrink-0 overflow-hidden bg-[var(--ecom-parchment)]", productDesignRatioFrameClass(ratio))}
       style={{ aspectRatio: productDesignCssAspectRatio(ratio) }}
     >
       <span className="absolute left-1.5 top-1.5 z-20 rounded bg-black/60 px-1 py-0.5 text-[9px] font-medium text-white">

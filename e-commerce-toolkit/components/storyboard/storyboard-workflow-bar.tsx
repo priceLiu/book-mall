@@ -143,8 +143,8 @@ export function StoryboardWorkflowBar({
   }
 
   return (
-    <div className="border-t border-[#e8e8ed] bg-white px-4 py-3">
-      <p className="mb-2 text-[10px] font-medium uppercase tracking-wide text-[#6e6e73]">
+    <div className="border-t border-[var(--ecom-divider)] bg-white px-4 py-3">
+      <p className="mb-2 text-[10px] font-medium uppercase tracking-wide text-[var(--ecom-muted)]">
         制作指引 · 快捷操作
       </p>
 
@@ -153,7 +153,7 @@ export function StoryboardWorkflowBar({
           <button
             key={q}
             type="button"
-            className="rounded-full border border-[#d2d2d7] bg-[#fafafa] px-2.5 py-1 text-[11px] text-[#1d1d1f] hover:border-[var(--ecom-outline-border)] hover:text-[#0071e3]"
+            className="rounded-full border border-[var(--ecom-border-soft)] bg-[#fafafa] px-2.5 py-1 text-[11px] text-[var(--ecom-ink)] hover:border-[var(--ecom-outline-border)] hover:text-[var(--ecom-primary)]"
             onClick={() => onQuickReply(q)}
           >
             {q}
@@ -161,12 +161,12 @@ export function StoryboardWorkflowBar({
         ))}
       </div>
 
-      <div className="space-y-2 rounded-lg border border-[#e8e8ed] bg-[#fafafa] p-3">
-        <div className="flex items-center gap-2 text-xs text-[#6e6e73]">
+      <div className="space-y-2 rounded-lg border border-[var(--ecom-divider)] bg-[#fafafa] p-3">
+        <div className="flex items-center gap-2 text-xs text-[var(--ecom-muted)]">
           <span
             className={
               phase === "finalized" || phase === "refs" || phase === "planning"
-                ? "font-semibold text-[#0071e3]"
+                ? "font-semibold text-[var(--ecom-primary)]"
                 : ""
             }
           >
@@ -176,7 +176,7 @@ export function StoryboardWorkflowBar({
           <span
             className={
               phase === "image" || !project.sheetPngUrl
-                ? "font-semibold text-[#0071e3]"
+                ? "font-semibold text-[var(--ecom-primary)]"
                 : project.sheetPngUrl
                   ? "text-[#34c759]"
                   : ""
@@ -190,7 +190,7 @@ export function StoryboardWorkflowBar({
               phase === "done" || project.videoAssetId
                 ? "text-[#34c759]"
                 : project.sheetPngUrl
-                  ? "font-semibold text-[#0071e3]"
+                  ? "font-semibold text-[var(--ecom-primary)]"
                   : ""
             }
           >
@@ -200,7 +200,7 @@ export function StoryboardWorkflowBar({
 
         <div className="flex flex-wrap items-center gap-2">
           <select
-            className="flex-1 rounded border border-[#d2d2d7] bg-white px-2 py-1.5 text-xs"
+            className="flex-1 rounded border border-[var(--ecom-border-soft)] bg-white px-2 py-1.5 text-xs"
             value={imageModel}
             onChange={(e) => setImageModel(e.target.value)}
             disabled={imgBusy}
@@ -212,7 +212,7 @@ export function StoryboardWorkflowBar({
               </option>
             ))}
           </select>
-          <label className="flex items-center gap-1 text-[11px] text-[#6e6e73]">
+          <label className="flex items-center gap-1 text-[11px] text-[var(--ecom-muted)]">
             <input
               type="checkbox"
               checked={autoGenChar}
@@ -232,7 +232,7 @@ export function StoryboardWorkflowBar({
 
         <div className="flex flex-wrap items-center gap-2">
           <select
-            className="flex-1 rounded border border-[#d2d2d7] bg-white px-2 py-1.5 text-xs"
+            className="flex-1 rounded border border-[var(--ecom-border-soft)] bg-white px-2 py-1.5 text-xs"
             value={videoModel}
             onChange={(e) => setVideoModel(e.target.value)}
             disabled={vidBusy || !project.sheetPngUrl}

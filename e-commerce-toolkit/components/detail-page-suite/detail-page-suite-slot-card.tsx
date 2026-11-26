@@ -104,8 +104,8 @@ export function DetailPageSuiteSlotCard({
         "group relative isolate flex shrink-0 flex-col overflow-hidden rounded-xl border bg-white shadow-sm transition",
         busy && "ecom-media-generating-sweep border-[var(--ecom-outline-border)]",
         !busy && selected
-          ? "border-[var(--ecom-outline-border)] ring-2 ring-[#1d1d1f]/15"
-          : !busy && "border-[#e8e8ed]",
+          ? "border-[var(--ecom-outline-border)] ring-2 ring-[var(--ecom-ink)]/15"
+          : !busy && "border-[var(--ecom-divider)]",
       )}
       style={{ width: cardWidth }}
       onClick={
@@ -120,7 +120,7 @@ export function DetailPageSuiteSlotCard({
     >
       <div
         className={cn(
-          "relative w-full bg-[#f5f5f7]",
+          "relative w-full bg-[var(--ecom-parchment)]",
           detailPageAspectClass(displayRatio),
           displayUrl && !busy && "group/image",
         )}
@@ -191,7 +191,7 @@ export function DetailPageSuiteSlotCard({
             </p>
           </button>
         ) : (
-          <div className="flex h-full w-full flex-col items-center justify-center gap-2 px-3 text-[#86868b]">
+          <div className="flex h-full w-full flex-col items-center justify-center gap-2 px-3 text-[var(--ecom-subtle)]">
             <ImageIcon className="h-8 w-8 opacity-40" />
             <span className="text-xs">{busy ? "提示词生成中…" : "待生成提示词"}</span>
           </div>
@@ -272,11 +272,11 @@ export function DetailPageSuiteSlotCard({
 
       <div className="space-y-1 px-3 py-2">
         <div className="flex items-center justify-between gap-2">
-          <p className="truncate text-xs font-semibold text-[#1d1d1f]" title={slot.item_label}>
+          <p className="truncate text-xs font-semibold text-[var(--ecom-ink)]" title={slot.item_label}>
             {slot.item_label}
           </p>
           {history.length > 0 ? (
-            <span className="shrink-0 text-[10px] text-[#86868b]">
+            <span className="shrink-0 text-[10px] text-[var(--ecom-subtle)]">
               {history.length > 1
                 ? `${history.length} 版${activeImage?.platformLabel ? ` · ${activeImage.platformLabel}` : ""}`
                 : activeImage?.platformLabel
@@ -294,15 +294,15 @@ export function DetailPageSuiteSlotCard({
               slot.slot_copy?.trim() || slot.slot_copy_ai?.trim() || undefined
             }
           >
-            <span className="text-[#86868b]">模块文案：</span>
+            <span className="text-[var(--ecom-subtle)]">模块文案：</span>
             {slot.slot_copy?.trim() ||
               slot.slot_copy_ai?.trim() ||
               "（未填写，可点格子编辑）"}
             {slot.copy_overlay?.layers?.some((l) => l.text?.trim()) ? (
-              <span className="ml-1 text-[#0066cc]">· 已排版</span>
+              <span className="ml-1 text-[var(--ecom-primary)]">· 已排版</span>
             ) : slot.burn_copy_in_image &&
               (slot.slot_copy?.trim() || slot.slot_copy_ai?.trim()) ? (
-              <span className="ml-1 text-[#86868b]">· AI 烧字</span>
+              <span className="ml-1 text-[var(--ecom-subtle)]">· AI 烧字</span>
             ) : null}
           </p>
         ) : slot.slot_copy?.trim() ? (

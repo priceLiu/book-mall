@@ -99,14 +99,14 @@ function MentionOrTextarea({
         showTopRefBar={false}
         pickerZIndex={pickerZIndex}
         minHeightClass={minHeightClass ?? "min-h-[3rem]"}
-        className="min-w-[10rem] rounded border border-[#d2d2d7] bg-white px-1.5 py-1 text-xs leading-relaxed"
+        className="min-w-[10rem] rounded border border-[var(--ecom-border-soft)] bg-white px-1.5 py-1 text-xs leading-relaxed"
         onChange={onChange}
       />
     );
   }
   return (
     <textarea
-      className={`w-full min-w-[10rem] ${minHeightClass ?? "min-h-[3rem]"} rounded border border-[#d2d2d7] px-1.5 py-1 text-xs outline-none focus:border-[var(--ecom-outline-border)]`}
+      className={`w-full min-w-[10rem] ${minHeightClass ?? "min-h-[3rem]"} rounded border border-[var(--ecom-border-soft)] px-1.5 py-1 text-xs outline-none focus:border-[var(--ecom-outline-border)]`}
       value={value}
       disabled={disabled}
       onChange={(e) => onChange(e.target.value)}
@@ -150,15 +150,15 @@ export function FilmPullConfirmScriptTable({
   }
 
   return (
-    <div className={cn("overflow-x-auto rounded-lg border border-[#e8e8ed]", className)}>
+    <div className={cn("overflow-x-auto rounded-lg border border-[var(--ecom-divider)]", className)}>
       {showRefsGallery ? (
-        <div className="border-b border-[#e8e8ed] bg-[#fafafa] px-3 py-2.5">
+        <div className="border-b border-[var(--ecom-divider)] bg-[#fafafa] px-3 py-2.5">
           <FilmPullRefsGalleryStrip characterRefs={characterRefs} />
         </div>
       ) : null}
       <table className="w-full min-w-[1600px] border-collapse text-left text-xs">
         <thead>
-          <tr className="bg-[#1d1d1f] text-white">
+          <tr className="bg-[var(--ecom-ink)] text-white">
             <th className="px-3 py-2 font-medium">镜号</th>
             <th className="px-3 py-2 font-medium">时间轴</th>
             <th className="px-3 py-2 font-medium">景别</th>
@@ -186,13 +186,13 @@ export function FilmPullConfirmScriptTable({
               refMatch,
             });
             return (
-            <tr key={shot.shotNo} className="border-t border-[#e8e8ed] align-top">
+            <tr key={shot.shotNo} className="border-t border-[var(--ecom-divider)] align-top">
               <td className="px-3 py-2 font-medium">{shot.shotNo}</td>
-              <td className="px-3 py-2 text-[#6e6e73]">{formatFilmPullShotTimeline(shot)}</td>
+              <td className="px-3 py-2 text-[var(--ecom-muted)]">{formatFilmPullShotTimeline(shot)}</td>
               <td className="px-3 py-2">
                 {isEdit ? (
                   <input
-                    className="w-full min-w-[4rem] rounded border border-[#d2d2d7] px-1.5 py-1 text-xs"
+                    className="w-full min-w-[4rem] rounded border border-[var(--ecom-border-soft)] px-1.5 py-1 text-xs"
                     value={shot.shotScale}
                     disabled={disabled}
                     onChange={(e) => patchShot(shot.shotNo, { shotScale: e.target.value })}
@@ -204,7 +204,7 @@ export function FilmPullConfirmScriptTable({
               <td className="px-3 py-2">
                 {isEdit ? (
                   <textarea
-                    className="min-h-[2.5rem] w-full min-w-[6rem] rounded border border-[#d2d2d7] px-1.5 py-1 text-xs"
+                    className="min-h-[2.5rem] w-full min-w-[6rem] rounded border border-[var(--ecom-border-soft)] px-1.5 py-1 text-xs"
                     value={shot.sceneEnvironment}
                     disabled={disabled}
                     onChange={(e) => patchShot(shot.shotNo, { sceneEnvironment: e.target.value })}
@@ -226,7 +226,7 @@ export function FilmPullConfirmScriptTable({
               <td className="px-3 py-2">
                 {isEdit ? (
                   <textarea
-                    className="min-h-[2.5rem] w-full min-w-[6rem] rounded border border-[#d2d2d7] px-1.5 py-1 text-xs"
+                    className="min-h-[2.5rem] w-full min-w-[6rem] rounded border border-[var(--ecom-border-soft)] px-1.5 py-1 text-xs"
                     value={shot.subjectBlocking}
                     disabled={disabled}
                     onChange={(e) => patchShot(shot.shotNo, { subjectBlocking: e.target.value })}
@@ -238,7 +238,7 @@ export function FilmPullConfirmScriptTable({
               <td className="px-3 py-2">
                 {isEdit ? (
                   <select
-                    className="w-full min-w-[5rem] rounded border border-[#d2d2d7] px-1.5 py-1 text-xs"
+                    className="w-full min-w-[5rem] rounded border border-[var(--ecom-border-soft)] px-1.5 py-1 text-xs"
                     value={shot.productInteraction ?? "none"}
                     disabled={disabled}
                     onChange={(e) =>
@@ -260,7 +260,7 @@ export function FilmPullConfirmScriptTable({
               <td className="px-3 py-2">
                 {isEdit ? (
                   <input
-                    className="w-full min-w-[5rem] rounded border border-[#d2d2d7] px-1.5 py-1 text-xs"
+                    className="w-full min-w-[5rem] rounded border border-[var(--ecom-border-soft)] px-1.5 py-1 text-xs"
                     value={shot.sellpointNote ?? ""}
                     disabled={disabled}
                     onChange={(e) => patchShot(shot.shotNo, { sellpointNote: e.target.value })}
@@ -272,7 +272,7 @@ export function FilmPullConfirmScriptTable({
               <td className="px-3 py-2">
                 {isEdit ? (
                   <textarea
-                    className="min-h-[2.5rem] w-full min-w-[6rem] rounded border border-[#d2d2d7] px-1.5 py-1 text-xs"
+                    className="min-h-[2.5rem] w-full min-w-[6rem] rounded border border-[var(--ecom-border-soft)] px-1.5 py-1 text-xs"
                     value={shot.audioInfo.scriptSubtitle}
                     disabled={disabled}
                     onChange={(e) => patchAudio(shot, "scriptSubtitle", e.target.value)}
@@ -284,7 +284,7 @@ export function FilmPullConfirmScriptTable({
               <td className="px-3 py-2">
                 {isEdit ? (
                   <input
-                    className="w-full min-w-[5rem] rounded border border-[#d2d2d7] px-1.5 py-1 text-xs"
+                    className="w-full min-w-[5rem] rounded border border-[var(--ecom-border-soft)] px-1.5 py-1 text-xs"
                     value={shot.cameraMovement}
                     disabled={disabled}
                     onChange={(e) => patchShot(shot.shotNo, { cameraMovement: e.target.value })}
@@ -296,7 +296,7 @@ export function FilmPullConfirmScriptTable({
               <td className="px-3 py-2">
                 {isEdit ? (
                   <input
-                    className="w-full min-w-[4rem] rounded border border-[#d2d2d7] px-1.5 py-1 text-xs"
+                    className="w-full min-w-[4rem] rounded border border-[var(--ecom-border-soft)] px-1.5 py-1 text-xs"
                     value={shot.audioInfo.vocalEmotion}
                     disabled={disabled}
                     onChange={(e) => patchAudio(shot, "vocalEmotion", e.target.value)}
@@ -361,7 +361,7 @@ export function FilmPullConfirmScriptTable({
                 <td className="px-3 py-2">
                   <button
                     type="button"
-                    className="flex size-8 items-center justify-center rounded-lg text-[#86868b] hover:bg-[#fff5f5] hover:text-[#ff3b30] disabled:opacity-30"
+                    className="flex size-8 items-center justify-center rounded-lg text-[var(--ecom-subtle)] hover:bg-[#fff5f5] hover:text-[#ff3b30] disabled:opacity-30"
                     disabled={disabled || shots.length <= 1}
                     title="删除本镜"
                     onClick={() => {
@@ -379,7 +379,7 @@ export function FilmPullConfirmScriptTable({
         </tbody>
         {showRowActions && isEdit ? (
           <tfoot>
-            <tr className="border-t border-[#e8e8ed] bg-[#fafafa]">
+            <tr className="border-t border-[var(--ecom-divider)] bg-[#fafafa]">
               <td colSpan={colCount} className="px-3 py-2.5">
                 <EcomButtonSecondary
                   type="button"

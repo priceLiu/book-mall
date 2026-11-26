@@ -30,7 +30,7 @@ const THUMB_HOVER_ACTIONS_ROW_CLASS =
   "pointer-events-none absolute inset-x-0 top-0 z-20 flex aspect-[3/4] items-center justify-center gap-1.5 px-1 opacity-0 transition-opacity duration-150 group-hover/image:opacity-100";
 
 const THUMB_HOVER_BTN_CLASS =
-  "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white text-[#1d1d1f] shadow-md ring-1 ring-black/10 transition hover:bg-[#f5f5f7] disabled:cursor-not-allowed disabled:opacity-50";
+  "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white text-[var(--ecom-ink)] shadow-md ring-1 ring-black/10 transition hover:bg-[var(--ecom-parchment)] disabled:cursor-not-allowed disabled:opacity-50";
 
 const THUMB_HOVER_ICON_CLASS = "h-3.5 w-3.5";
 

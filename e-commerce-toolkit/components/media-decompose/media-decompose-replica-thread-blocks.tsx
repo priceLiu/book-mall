@@ -45,14 +45,14 @@ function ReplicaRefSlot({
 
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-      <p className="text-[11px] font-medium text-[#6e6e73]">
+      <p className="text-[11px] font-medium text-[var(--ecom-muted)]">
         {label}
         {required ? <span className="text-[#c0392b]"> *</span> : null}
       </p>
       <div
         className={cn(
-          "relative aspect-[3/4] w-full max-w-[9.5rem] overflow-hidden rounded-xl border bg-[#f5f5f7]",
-          displayUrl ? "border-[#d2d2d7]" : "border-dashed border-[#c7c7cc]",
+          "relative aspect-[3/4] w-full max-w-[9.5rem] overflow-hidden rounded-xl border bg-[var(--ecom-parchment)]",
+          displayUrl ? "border-[var(--ecom-border-soft)]" : "border-dashed border-[#c7c7cc]",
           busy && "ecom-media-generating-sweep",
         )}
         aria-busy={busy || undefined}
@@ -70,7 +70,7 @@ function ReplicaRefSlot({
         ) : (
           <div className="flex size-full flex-col items-center justify-center gap-1.5 px-2 text-center">
             <ImageIcon className="h-6 w-6 text-[#aeaeb2]" aria-hidden />
-            <span className="text-[10px] leading-tight text-[#86868b]">待上传</span>
+            <span className="text-[10px] leading-tight text-[var(--ecom-subtle)]">待上传</span>
           </div>
         )}
       </div>
@@ -97,8 +97,8 @@ export function ReplicaRefSlotGrid({
   modelGenerating,
 }: RefGridProps) {
   return (
-    <div className="rounded-xl border border-[#e8e8ed] bg-white p-4">
-      <p className="mb-3 text-xs font-semibold text-[#1d1d1f]">复刻参考图</p>
+    <div className="rounded-xl border border-[var(--ecom-divider)] bg-white p-4">
+      <p className="mb-3 text-xs font-semibold text-[var(--ecom-ink)]">复刻参考图</p>
       <div className="flex flex-wrap gap-4">
         <ReplicaRefSlot
           label="模特 @图片1"
@@ -173,16 +173,16 @@ export function ReplicaAssetPlanGrid({
   if (sections.length === 0) return null;
 
   return (
-    <div className="rounded-xl border border-[#e8e8ed] bg-white p-4">
-      <p className="mb-1 text-xs font-semibold text-[#1d1d1f]">复刻资产方案</p>
-      <p className="mb-3 text-[11px] text-[#6e6e73]">
+    <div className="rounded-xl border border-[var(--ecom-divider)] bg-white p-4">
+      <p className="mb-1 text-xs font-semibold text-[var(--ecom-ink)]">复刻资产方案</p>
+      <p className="mb-3 text-[11px] text-[var(--ecom-muted)]">
         按拆解结果列出全身人物 / 产品 / 道具 / 场景；支持上传、粘贴、拖入与「我的资产」。上传即 replace（Prompt 用 @token），不上传则 inherit 原片描述。
         {IMAGE_UPLOAD_DROP_HINT}
       </p>
       <div className="space-y-4">
         {sections.map(({ category, slots }) => (
           <div key={category}>
-            <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-[#6e6e73]">
+            <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-[var(--ecom-muted)]">
               {replicaAssetCategoryTitle(category)}
             </p>
             <div className="space-y-3">
@@ -260,11 +260,11 @@ export function ReplicaAssetPlanGrid({
         ))}
       </div>
       {listReplicaSlotRefs(references).length > 0 ? (
-        <p className="mt-3 text-[10px] text-[#0071e3]">
+        <p className="mt-3 text-[10px] text-[var(--ecom-primary)]">
           已上传 {listReplicaSlotRefs(references).length} 张替换图；未上传槽位将沿用原片文字描述。
         </p>
       ) : (
-        <p className="mt-3 text-[10px] text-[#86868b]">尚未上传替换图，可直接生成脚本（全部 inherit）。</p>
+        <p className="mt-3 text-[10px] text-[var(--ecom-subtle)]">尚未上传替换图，可直接生成脚本（全部 inherit）。</p>
       )}
     </div>
   );
@@ -297,15 +297,15 @@ export function ReplicaProductBriefCard({
   return (
     <div
       className={cn(
-        "rounded-xl border border-[#e8e8ed] bg-white p-4",
+        "rounded-xl border border-[var(--ecom-divider)] bg-white p-4",
         recognizing && "ecom-media-generating-sweep",
       )}
       aria-busy={recognizing || undefined}
     >
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <div>
-          <p className="text-xs font-semibold text-[#1d1d1f]">产品描述</p>
-          <p className="text-[11px] text-[#6e6e73]">
+          <p className="text-xs font-semibold text-[var(--ecom-ink)]">产品描述</p>
+          <p className="text-[11px] text-[var(--ecom-muted)]">
             根据产品图 AI 识别，或结合已填文字润色补全；确认后保存并用于生成复刻脚本。
           </p>
         </div>
@@ -348,12 +348,12 @@ export function ReplicaProductBriefCard({
           disabled={disabled || saving || recognizing}
           rows={6}
           placeholder="例如：产品：驼色无袖收腰大摆长款连衣裙&#10;品类：女装/连衣裙&#10;材质/工艺：…"
-          className="w-full resize-y rounded-lg border border-[#d2d2d7] bg-[#fafafa] px-3 py-2.5 text-sm leading-relaxed text-[#1d1d1f] outline-none placeholder:text-[#86868b] focus:border-[var(--ecom-outline-border)] focus:bg-white focus:ring-2 focus:ring-[#1d1d1f]/15 disabled:opacity-60"
+          className="w-full resize-y rounded-lg border border-[var(--ecom-border-soft)] bg-[#fafafa] px-3 py-2.5 text-sm leading-relaxed text-[var(--ecom-ink)] outline-none placeholder:text-[var(--ecom-subtle)] focus:border-[var(--ecom-outline-border)] focus:bg-white focus:ring-2 focus:ring-[var(--ecom-ink)]/15 disabled:opacity-60"
           onChange={(e) => onChange(e.target.value)}
         />
         {recognizing ? (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-lg bg-white/70 backdrop-blur-[1px]">
-            <div className="flex items-center gap-2 rounded-full border border-[#e8e8ed] bg-white px-3 py-1.5 text-xs font-medium text-[#1d1d1f] shadow-sm">
+            <div className="flex items-center gap-2 rounded-full border border-[var(--ecom-divider)] bg-white px-3 py-1.5 text-xs font-medium text-[var(--ecom-ink)] shadow-sm">
               <Loader2 className="h-3.5 w-3.5 animate-spin text-[var(--ecom-chrome-accent)]" />
               AI 识产品中…
             </div>
@@ -403,15 +403,15 @@ export function ReplicaSellingPointsCard({
   return (
     <div
       className={cn(
-        "rounded-xl border border-[#e8e8ed] bg-white p-4",
+        "rounded-xl border border-[var(--ecom-divider)] bg-white p-4",
         generating && "ecom-media-generating-sweep",
       )}
       aria-busy={generating || voiceoverGenerating || undefined}
     >
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <div>
-          <p className="text-xs font-semibold text-[#1d1d1f]">卖点</p>
-          <p className="text-[11px] text-[#6e6e73]">
+          <p className="text-xs font-semibold text-[var(--ecom-ink)]">卖点</p>
+          <p className="text-[11px] text-[var(--ecom-muted)]">
             描述<strong>你上传的替换产品</strong>的卖点（非拆解原片文案）。可手动填写，或上传产品图后点「AI
             生成卖点」；与拆解无关的旧内容请清空。
           </p>
@@ -470,7 +470,7 @@ export function ReplicaSellingPointsCard({
         </div>
       </div>
       {decomposeHint?.trim() && !value.trim() ? (
-        <p className="mb-2 text-[10px] leading-relaxed text-[#86868b]">
+        <p className="mb-2 text-[10px] leading-relaxed text-[var(--ecom-subtle)]">
           原片拆解 · 产品/服装描述（仅供参考，非卖点）：{decomposeHint.trim()}
         </p>
       ) : null}
@@ -483,7 +483,7 @@ export function ReplicaSellingPointsCard({
             ? "填写你上传替换产品的卖点；或点 AI 生成卖点"
             : "例如：轻薄透气、莫兰迪配色、通勤百搭（可不填）"
         }
-        className="w-full rounded-lg border border-[#d2d2d7] bg-[#fafafa] px-3 py-2 text-sm text-[#1d1d1f] outline-none placeholder:text-[#86868b] focus:border-[var(--ecom-outline-border)] focus:bg-white focus:ring-2 focus:ring-[#1d1d1f]/15 disabled:opacity-60"
+        className="w-full rounded-lg border border-[var(--ecom-border-soft)] bg-[#fafafa] px-3 py-2 text-sm text-[var(--ecom-ink)] outline-none placeholder:text-[var(--ecom-subtle)] focus:border-[var(--ecom-outline-border)] focus:bg-white focus:ring-2 focus:ring-[var(--ecom-ink)]/15 disabled:opacity-60"
         onChange={(e) => onChange(e.target.value)}
       />
     </div>
@@ -507,7 +507,7 @@ export function ReplicaVoiceoverDraftCard({
   }, [draft.shots]);
 
   return (
-    <div className="rounded-xl border border-[#e8e8ed] bg-white px-3 py-2.5">
+    <div className="rounded-xl border border-[var(--ecom-divider)] bg-white px-3 py-2.5">
       <button
         type="button"
         className="flex w-full items-start gap-2 text-left"
@@ -516,36 +516,36 @@ export function ReplicaVoiceoverDraftCard({
       >
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-            <p className="text-xs font-semibold text-[#1d1d1f]">AI 口播方案</p>
-            <span className="text-[10px] text-[#86868b]">
+            <p className="text-xs font-semibold text-[var(--ecom-ink)]">AI 口播方案</p>
+            <span className="text-[10px] text-[var(--ecom-subtle)]">
               {filledCount}/{draft.shots.length} 段
             </span>
           </div>
           {!expanded && preview ? (
-            <p className="mt-0.5 truncate text-[11px] leading-snug text-[#6e6e73]">{preview}</p>
+            <p className="mt-0.5 truncate text-[11px] leading-snug text-[var(--ecom-muted)]">{preview}</p>
           ) : !expanded ? (
-            <p className="mt-0.5 text-[10px] text-[#86868b]">点击展开各段口播</p>
+            <p className="mt-0.5 text-[10px] text-[var(--ecom-subtle)]">点击展开各段口播</p>
           ) : null}
         </div>
         {expanded ? (
-          <ChevronUp className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#86868b]" aria-hidden />
+          <ChevronUp className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--ecom-subtle)]" aria-hidden />
         ) : (
-          <ChevronDown className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#86868b]" aria-hidden />
+          <ChevronDown className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--ecom-subtle)]" aria-hidden />
         )}
       </button>
       {expanded ? (
         <div
           className={cn(
-            "mt-2 max-h-36 overflow-y-auto rounded-lg border border-[#e8e8ed] bg-[#fafafa]",
+            "mt-2 max-h-36 overflow-y-auto rounded-lg border border-[var(--ecom-divider)] bg-[#fafafa]",
             "divide-y divide-[#ececef]",
           )}
         >
           {draft.shots.map((row) => (
             <div key={row.index} className="flex gap-2 px-2 py-1.5 text-[11px] leading-snug">
-              <span className="w-7 shrink-0 font-medium tabular-nums text-[#86868b]">
+              <span className="w-7 shrink-0 font-medium tabular-nums text-[var(--ecom-subtle)]">
                 段{row.index}
               </span>
-              <span className="min-w-0 flex-1 text-[#1d1d1f]">
+              <span className="min-w-0 flex-1 text-[var(--ecom-ink)]">
                 {row.voiceover.trim() || "—"}
               </span>
             </div>
@@ -581,7 +581,7 @@ export function ReplicaAttachmentTile({ url, label, status }: AttachmentTileProp
       <img src={url} alt={label ?? "图片"} className="max-h-36 max-w-[11rem] object-cover" />
       {uploading ? <EcomMediaGeneratingBusy label="上传中…" /> : null}
       {label ? (
-        <p className="px-2 py-1 text-[10px] leading-tight text-[#6e6e73]">{label}</p>
+        <p className="px-2 py-1 text-[10px] leading-tight text-[var(--ecom-muted)]">{label}</p>
       ) : null}
     </div>
   );

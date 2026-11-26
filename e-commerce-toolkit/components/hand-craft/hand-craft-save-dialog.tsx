@@ -101,9 +101,9 @@ export function HandCraftSaveDialog({
           </p>
         </div>
         <label className="block space-y-1.5">
-          <span className="text-xs font-medium text-[#6e6e73]">IP 名</span>
+          <span className="text-xs font-medium text-[var(--ecom-muted)]">IP 名</span>
           <input
-            className="w-full rounded-lg border border-[#e8e8ed] px-3 py-2 text-sm text-[#1d1d1f] focus:border-[var(--ecom-outline-border)] focus:outline-none focus:ring-2 focus:ring-[#1d1d1f]/12"
+            className="w-full rounded-lg border border-[var(--ecom-divider)] px-3 py-2 text-sm text-[var(--ecom-ink)] focus:border-[var(--ecom-outline-border)] focus:outline-none focus:ring-2 focus:ring-[var(--ecom-ink)]/12"
             value={name}
             autoFocus
             disabled={busy}
@@ -117,9 +117,9 @@ export function HandCraftSaveDialog({
             }}
           />
         </label>
-        <p className="rounded-lg bg-[#f5f5f7] px-3 py-2 font-mono text-[11px] text-[#6e6e73]">
+        <p className="rounded-lg bg-[var(--ecom-parchment)] px-3 py-2 font-mono text-[11px] text-[var(--ecom-muted)]">
           资产库标题预览：{titlePreview}
-          <span className="mt-1 block text-[10px] text-[#86868b]">
+          <span className="mt-1 block text-[10px] text-[var(--ecom-subtle)]">
             实际时间戳以点击保存时的服务器时间为准
           </span>
         </p>

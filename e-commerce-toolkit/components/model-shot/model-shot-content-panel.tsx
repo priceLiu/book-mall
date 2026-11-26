@@ -879,10 +879,10 @@ export function ModelShotContentPanel({
         )}
         aria-hidden={imagePickerOpen || undefined}
       >
-        <header className="sticky top-0 z-20 border-b border-[#e8e8ed] bg-white px-5 py-3 shadow-[0_1px_0_0_rgba(0,0,0,0.04)]">
+        <header className="sticky top-0 z-20 border-b border-[var(--ecom-divider)] bg-white px-5 py-3 shadow-[0_1px_0_0_rgba(0,0,0,0.04)]">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <EcomWorkspaceTitleHeading title={project.title?.trim() || "服装模特图"}>
-              <p className="text-[11px] text-[#6e6e73]">阶段：{phase}</p>
+              <p className="text-[11px] text-[var(--ecom-muted)]">阶段：{phase}</p>
             </EcomWorkspaceTitleHeading>
             <EcomIconToolbar>
               <EcomIconToolbarGroup label="项目">
@@ -942,7 +942,7 @@ export function ModelShotContentPanel({
           </div>
         </header>
 
-        <section className="border-b border-[#e8e8ed] px-5 py-4">
+        <section className="border-b border-[var(--ecom-divider)] px-5 py-4">
           <ModelShotRefUploader
             references={project.references}
             onUpload={handleRefUpload}
@@ -1021,10 +1021,10 @@ export function ModelShotContentPanel({
           ) : null}
 
           {modelsLoadError ? (
-            <div className="rounded-xl border border-[#ffd6a5] bg-[#fff8ed] p-3 text-xs text-[#6e6e73]">
+            <div className="rounded-xl border border-[#ffd6a5] bg-[#fff8ed] p-3 text-xs text-[var(--ecom-muted)]">
               {modelsLoadError}
               {onRefreshModels ? (
-                <button type="button" className="ml-2 text-[#0071e3]" onClick={() => void onRefreshModels()}>
+                <button type="button" className="ml-2 text-[var(--ecom-primary)]" onClick={() => void onRefreshModels()}>
                   重试
                 </button>
               ) : null}

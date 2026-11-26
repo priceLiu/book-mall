@@ -388,7 +388,7 @@ export function PosterStudio({ initialProjectId }: { initialProjectId?: string }
 
   if (loading || !project) {
     return (
-      <div className="flex min-h-[40vh] items-center justify-center text-sm text-[#6e6e73]">
+      <div className="flex min-h-[40vh] items-center justify-center text-sm text-[var(--ecom-muted)]">
         <Loader2 className="mr-2 size-5 animate-spin" />
         加载海报项目…
       </div>
@@ -410,19 +410,19 @@ export function PosterStudio({ initialProjectId }: { initialProjectId?: string }
         <EcomWorkspaceTitleHeading
           heading="h1"
           guideModuleId="poster"
-          titleClassName="text-xl font-semibold text-[#1d1d1f]"
+          titleClassName="text-xl font-semibold text-[var(--ecom-ink)]"
           title="海报制作"
         >
-          <p className="mt-1 text-sm text-[#6e6e73]">
+          <p className="mt-1 text-sm text-[var(--ecom-muted)]">
             四步出图：选路径 → 活动与尺寸 → 生成无字底图 → 排版加字
           </p>
         </EcomWorkspaceTitleHeading>
-        <div className="mt-4 inline-flex rounded-xl border border-[#e8e8ed] bg-[#f5f5f7] p-1">
+        <div className="mt-4 inline-flex rounded-xl border border-[var(--ecom-divider)] bg-[var(--ecom-parchment)] p-1">
           <button
             type="button"
             className={cn(
               "rounded-lg px-4 py-2 text-sm font-medium transition",
-              tab === "easy" ? "bg-white text-[#1d1d1f] shadow-sm" : "text-[#6e6e73]",
+              tab === "easy" ? "bg-white text-[var(--ecom-ink)] shadow-sm" : "text-[var(--ecom-muted)]",
             )}
             onClick={() => void patchPlan({ tier: "easy" }).then(() => setTab("easy"))}
           >
@@ -432,7 +432,7 @@ export function PosterStudio({ initialProjectId }: { initialProjectId?: string }
             type="button"
             className={cn(
               "rounded-lg px-4 py-2 text-sm font-medium transition",
-              tab === "pro" ? "bg-white text-[#1d1d1f] shadow-sm" : "text-[#6e6e73]",
+              tab === "pro" ? "bg-white text-[var(--ecom-ink)] shadow-sm" : "text-[var(--ecom-muted)]",
             )}
             onClick={() => void patchPlan({ tier: "pro" }).then(() => setTab("pro"))}
           >
@@ -461,18 +461,18 @@ export function PosterStudio({ initialProjectId }: { initialProjectId?: string }
                   className={cn(
                     "rounded-xl border p-3 text-left text-sm transition",
                     easyPath === c.path
-                      ? "border-[var(--ecom-outline-border)] bg-[#f0f6ff] ring-1 ring-[#1d1d1f]/15"
-                      : "border-[#e8e8ed] hover:border-[#d2d2d7]",
+                      ? "border-[var(--ecom-outline-border)] bg-[var(--ecom-content-selected-bg)] ring-1 ring-[var(--ecom-ink)]/15"
+                      : "border-[var(--ecom-divider)] hover:border-[var(--ecom-border-soft)]",
                   )}
                   onClick={() => {
                     setEasyPath(c.path);
                     void patchPlan({ easyPath: c.path });
                   }}
                 >
-                  <p className="font-medium text-[#1d1d1f]">
+                  <p className="font-medium text-[var(--ecom-ink)]">
                     {c.path} · {c.title}
                   </p>
-                  <p className="mt-1 text-xs text-[#6e6e73]">{c.desc}</p>
+                  <p className="mt-1 text-xs text-[var(--ecom-muted)]">{c.desc}</p>
                 </button>
               ))}
             </div>
@@ -481,7 +481,7 @@ export function PosterStudio({ initialProjectId }: { initialProjectId?: string }
               <label className="block text-sm">
                 专业模式
                 <select
-                  className="mt-1 w-full rounded-lg border border-[#d2d2d7] px-3 py-2 text-sm"
+                  className="mt-1 w-full rounded-lg border border-[var(--ecom-border-soft)] px-3 py-2 text-sm"
                   value={project.plan.proMode ?? "text"}
                   onChange={(e) =>
                     void patchPlan({
@@ -494,8 +494,8 @@ export function PosterStudio({ initialProjectId }: { initialProjectId?: string }
                   <option value="template">模板重构</option>
                 </select>
               </label>
-              <div className="flex items-center justify-between gap-2 rounded-lg border border-[#e8e8ed] px-3 py-2 text-sm">
-                <span className="text-[#6e6e73]">生图模型</span>
+              <div className="flex items-center justify-between gap-2 rounded-lg border border-[var(--ecom-divider)] px-3 py-2 text-sm">
+                <span className="text-[var(--ecom-muted)]">生图模型</span>
                 <EcomButtonSecondary
                   type="button"
                   size="sm"
@@ -511,7 +511,7 @@ export function PosterStudio({ initialProjectId }: { initialProjectId?: string }
               <label className="block text-sm">
                 画面描述 / 无字摄影 prompt
                 <textarea
-                  className="mt-1 min-h-[72px] w-full rounded-lg border border-[#d2d2d7] px-3 py-2 text-sm"
+                  className="mt-1 min-h-[72px] w-full rounded-lg border border-[var(--ecom-border-soft)] px-3 py-2 text-sm"
                   value={proImagePrompt}
                   onChange={(e) => setProImagePrompt(e.target.value)}
                   placeholder="专业文生/图生：描述营销海报摄影画面（不含文字）"
@@ -519,7 +519,7 @@ export function PosterStudio({ initialProjectId }: { initialProjectId?: string }
               </label>
               {project.plan.proMode === "template" ? (
                 <div className="mt-3 space-y-2">
-                  <p className="text-sm font-medium text-[#1d1d1f]">选择电商模板（catalog）</p>
+                  <p className="text-sm font-medium text-[var(--ecom-ink)]">选择电商模板（catalog）</p>
                   <PosterTemplatePicker
                     selectedId={project.plan.templateCatalogId}
                     onSelect={(entry) =>
@@ -542,10 +542,10 @@ export function PosterStudio({ initialProjectId }: { initialProjectId?: string }
           description="默认无字底图 + 程序排版；需要时可勾选字图同出。"
         >
           <div className="space-y-4">
-            <label className="block text-sm font-medium text-[#1d1d1f]">
+            <label className="block text-sm font-medium text-[var(--ecom-ink)]">
               节日 / 活动
               <select
-                className="mt-1 w-full rounded-lg border border-[#d2d2d7] px-3 py-2 text-sm"
+                className="mt-1 w-full rounded-lg border border-[var(--ecom-border-soft)] px-3 py-2 text-sm"
                 value={project.plan.festivalId ?? ""}
                 onChange={(e) => void patchPlan({ festivalId: e.target.value || undefined })}
               >
@@ -558,7 +558,7 @@ export function PosterStudio({ initialProjectId }: { initialProjectId?: string }
               </select>
             </label>
             <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:gap-4">
-              <label className="flex items-center gap-2 text-sm text-[#1d1d1f]">
+              <label className="flex items-center gap-2 text-sm text-[var(--ecom-ink)]">
                 <input
                   type="checkbox"
                   checked={project.plan.useBrandRefs}
@@ -566,7 +566,7 @@ export function PosterStudio({ initialProjectId }: { initialProjectId?: string }
                 />
                 使用品牌参考
               </label>
-              <label className="flex items-center gap-2 text-sm text-[#1d1d1f]">
+              <label className="flex items-center gap-2 text-sm text-[var(--ecom-ink)]">
                 <input
                   type="checkbox"
                   checked={project.plan.burnCopyInImage}
@@ -579,7 +579,7 @@ export function PosterStudio({ initialProjectId }: { initialProjectId?: string }
               <label className="block text-sm">
                 风格
                 <select
-                  className="mt-1 w-full rounded-lg border border-[#d2d2d7] px-2 py-2 text-sm"
+                  className="mt-1 w-full rounded-lg border border-[var(--ecom-border-soft)] px-2 py-2 text-sm"
                   value={project.plan.posterStyleId}
                   onChange={(e) => void patchPlan({ posterStyleId: e.target.value })}
                 >
@@ -593,7 +593,7 @@ export function PosterStudio({ initialProjectId }: { initialProjectId?: string }
               <label className="block text-sm">
                 尺寸
                 <select
-                  className="mt-1 w-full rounded-lg border border-[#d2d2d7] px-2 py-2 text-sm"
+                  className="mt-1 w-full rounded-lg border border-[var(--ecom-border-soft)] px-2 py-2 text-sm"
                   value={project.plan.aspectRatio}
                   onChange={(e) => void patchPlan({ aspectRatio: e.target.value })}
                 >
@@ -609,7 +609,7 @@ export function PosterStudio({ initialProjectId }: { initialProjectId?: string }
               <label className="block text-sm">
                 活动一句话
                 <input
-                  className="mt-1 w-full rounded-lg border border-[#d2d2d7] px-3 py-2 text-sm"
+                  className="mt-1 w-full rounded-lg border border-[var(--ecom-border-soft)] px-3 py-2 text-sm"
                   value={oneLineBrief}
                   onChange={(e) => setOneLineBrief(e.target.value)}
                   placeholder="例：冬款羽绒服限时 5 折"
@@ -639,18 +639,18 @@ export function PosterStudio({ initialProjectId }: { initialProjectId?: string }
                 return (
                   <div
                     key={role}
-                    className="rounded-xl border border-[#e8e8ed] bg-[#fafafa] p-3"
+                    className="rounded-xl border border-[var(--ecom-divider)] bg-[#fafafa] p-3"
                   >
                     <div className="mb-2 flex items-center justify-between text-xs">
-                      <span className="font-medium text-[#1d1d1f]">
+                      <span className="font-medium text-[var(--ecom-ink)]">
                         {label}
                         {required ? (
-                          <span className="ml-1 text-[#0071e3]">建议上传</span>
+                          <span className="ml-1 text-[var(--ecom-primary)]">建议上传</span>
                         ) : null}
                       </span>
                       <button
                         type="button"
-                        className="text-[#0071e3]"
+                        className="text-[var(--ecom-primary)]"
                         onClick={() => {
                           setPickerRole(role);
                           setPickerOpen(true);
@@ -722,20 +722,20 @@ export function PosterStudio({ initialProjectId }: { initialProjectId?: string }
               </EcomButtonPrimary>
             )}
             {tab === "easy" ? (
-              <p className="text-center text-[11px] text-[#86868b]">
+              <p className="text-center text-[11px] text-[var(--ecom-subtle)]">
                 默认模型 Seedream 5 Lite（火山方舟）
               </p>
             ) : null}
             {project.plan.autoPlan?.summary ? (
-              <p className="rounded-lg bg-[#f5f5f7] px-3 py-2 text-xs text-[#6e6e73]">
+              <p className="rounded-lg bg-[var(--ecom-parchment)] px-3 py-2 text-xs text-[var(--ecom-muted)]">
                 策划摘要：{project.plan.autoPlan.summary}
               </p>
             ) : null}
-            <details className="rounded-lg border border-[#e8e8ed] px-3 py-2 text-sm">
-              <summary className="cursor-pointer text-[#6e6e73]">批量出图（高级）</summary>
+            <details className="rounded-lg border border-[var(--ecom-divider)] px-3 py-2 text-sm">
+              <summary className="cursor-pointer text-[var(--ecom-muted)]">批量出图（高级）</summary>
               <div className="mt-3 space-y-2">
                 <textarea
-                  className="min-h-[80px] w-full rounded-lg border border-[#d2d2d7] px-3 py-2 text-sm"
+                  className="min-h-[80px] w-full rounded-lg border border-[var(--ecom-border-soft)] px-3 py-2 text-sm"
                   value={batchLines}
                   onChange={(e) => setBatchLines(e.target.value)}
                   placeholder="每行一条文案"
@@ -786,19 +786,19 @@ export function PosterStudio({ initialProjectId }: { initialProjectId?: string }
             {project.plan.artifacts.length === 0 && !busy ? (
               <div
                 className={cn(
-                  "mt-4 flex flex-col items-center justify-center rounded-xl border border-dashed border-[#d2d2d7] bg-[#fafafa] px-4 py-10 text-center",
+                  "mt-4 flex flex-col items-center justify-center rounded-xl border border-dashed border-[var(--ecom-border-soft)] bg-[#fafafa] px-4 py-10 text-center",
                   aspectClass(project.plan.aspectRatio),
                   "max-h-[min(60vh,24rem)] w-full max-w-md",
                 )}
               >
-                <p className="text-sm text-[#6e6e73]">
+                <p className="text-sm text-[var(--ecom-muted)]">
                   在左侧点「一键策划并出图」后，无字底图与进度会显示在本区域。
                 </p>
               </div>
             ) : project.plan.artifacts.length === 0 && busy ? (
               <div
                 className={cn(
-                  "mt-4 w-full max-w-md rounded-xl bg-[#f5f5f7]",
+                  "mt-4 w-full max-w-md rounded-xl bg-[var(--ecom-parchment)]",
                   aspectClass(project.plan.aspectRatio),
                   "max-h-[min(60vh,24rem)]",
                 )}
@@ -811,7 +811,7 @@ export function PosterStudio({ initialProjectId }: { initialProjectId?: string }
                   return (
                     <div
                       key={`${i}-${art.image.baseImageUrl ?? i}`}
-                      className="overflow-hidden rounded-xl border border-[#e8e8ed] bg-[#fafafa] shadow-sm"
+                      className="overflow-hidden rounded-xl border border-[var(--ecom-divider)] bg-[#fafafa] shadow-sm"
                     >
                       {preview ? (
                         project.plan.aspectRatio === "1:1" ? (
@@ -829,9 +829,9 @@ export function PosterStudio({ initialProjectId }: { initialProjectId?: string }
                           />
                         )
                       ) : (
-                        <div className={cn("bg-[#f5f5f7]", aspectClass(project.plan.aspectRatio))} />
+                        <div className={cn("bg-[var(--ecom-parchment)]", aspectClass(project.plan.aspectRatio))} />
                       )}
-                      <div className="flex flex-wrap gap-2 border-t border-[#e8e8ed] bg-white p-3">
+                      <div className="flex flex-wrap gap-2 border-t border-[var(--ecom-divider)] bg-white p-3">
                         <EcomButtonPrimary type="button" size="sm" onClick={() => openLayout(i)}>
                           排版与出图
                         </EcomButtonPrimary>
@@ -1011,9 +1011,9 @@ export function PosterStudio({ initialProjectId }: { initialProjectId?: string }
         }}
       />
 
-      <p className="mt-6 text-xs text-[#86868b]">
+      <p className="mt-6 text-xs text-[var(--ecom-subtle)]">
         图片处理里的「AI海报生成器」已
-        <Link href="/brand/poster" className="text-[#0071e3]">
+        <Link href="/brand/poster" className="text-[var(--ecom-primary)]">
           收敛至本页
         </Link>
         。

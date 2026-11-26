@@ -99,7 +99,7 @@ export function EcomPublishDialog({
           value={title}
           onChange={(e) => setTitle(e.target.value)}
         />
-        <p className="mb-2 line-clamp-4 rounded-xl bg-[#f5f5f7] p-3 text-xs text-[var(--ecom-muted)]">
+        <p className="mb-2 line-clamp-4 rounded-xl bg-[var(--ecom-parchment)] p-3 text-xs text-[var(--ecom-muted)]">
           {content}
         </p>
         <div className="mb-3 flex flex-wrap gap-2">

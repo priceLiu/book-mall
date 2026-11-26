@@ -6,7 +6,7 @@ import type { EcomPromptImageRef } from "@/lib/ecom-prompt-mention";
 import { cn } from "@/lib/utils";
 
 const MENTION_CELL_CLASS =
-  "min-w-[9rem] max-w-[20rem] rounded-md border border-transparent bg-transparent px-1 py-0.5 text-xs leading-relaxed hover:border-[#e8e8ed] focus-within:border-[var(--ecom-outline-border)] focus-within:bg-white focus-within:ring-2 focus-within:ring-[#1d1d1f]/12";
+  "min-w-[9rem] max-w-[20rem] rounded-md border border-transparent bg-transparent px-1 py-0.5 text-xs leading-relaxed hover:border-[var(--ecom-divider)] focus-within:border-[var(--ecom-outline-border)] focus-within:bg-white focus-within:ring-2 focus-within:ring-[var(--ecom-ink)]/12";
 
 type Props = {
   value: string;

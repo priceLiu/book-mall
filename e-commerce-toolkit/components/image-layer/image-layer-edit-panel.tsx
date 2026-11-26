@@ -105,7 +105,7 @@ export function ImageLayerEditPanel({
                   className={cn(
                     "rounded-xl border bg-white p-3 shadow-sm transition",
                     selected
-                      ? "border-[#2563eb] bg-[#f0f6ff] ring-2 ring-[#2563eb]/25"
+                      ? "border-[#2563eb] bg-[var(--ecom-content-selected-bg)] ring-2 ring-[#2563eb]/25"
                       : "border-[#e5e7eb] hover:border-[#2563eb]/40",
                     rowBusy && "ring-2 ring-[#2563eb]/30",
                   )}
@@ -171,7 +171,7 @@ export function ImageLayerEditPanel({
               type="button"
               disabled={busy}
               onClick={onOpenSeedreamModelPicker}
-              className="mb-3 flex w-full items-center justify-between rounded-lg border border-[#e5e7eb] bg-white px-3 py-2 text-left text-sm transition hover:border-[#2563eb]/40 hover:bg-[#f0f6ff]/50 disabled:opacity-60"
+              className="mb-3 flex w-full items-center justify-between rounded-lg border border-[#e5e7eb] bg-white px-3 py-2 text-left text-sm transition hover:border-[#2563eb]/40 hover:bg-[var(--ecom-content-selected-bg)]/50 disabled:opacity-60"
             >
               <span className="text-[11px] font-medium text-[#6b7280]">Seedream 模型</span>
               <span className="truncate font-medium text-[#111827]">

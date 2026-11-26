@@ -622,7 +622,7 @@ export function StoryboardStudio() {
 
   if (loading || !project) {
     return (
-      <div className="flex h-full items-center justify-center text-sm text-[#6e6e73]">
+      <div className="flex h-full items-center justify-center text-sm text-[var(--ecom-muted)]">
         正在打开故事版工作室…
       </div>
     );

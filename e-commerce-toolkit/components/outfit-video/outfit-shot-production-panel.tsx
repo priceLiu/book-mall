@@ -83,13 +83,13 @@ function resolveShotFailReason(shot: SceneShot): string | undefined {
 }
 
 function shotStatusLabel(shot: SceneShot, generating: boolean): { label: string; className: string } {
-  if (generating) return { label: "生成中", className: "text-[#0071e3]" };
+  if (generating) return { label: "生成中", className: "text-[var(--ecom-primary)]" };
   if (shot.outfitProduction?.status === "failed") {
     return { label: "策划失败", className: "text-[#ff3b30]" };
   }
   if (shot.status === "failed") return { label: "生成失败", className: "text-[#ff3b30]" };
   if (shot.videoUrl?.trim()) return { label: "视频 OK", className: "text-[#34c759]" };
-  return { label: "待生成", className: "text-[#86868b]" };
+  return { label: "待生成", className: "text-[var(--ecom-subtle)]" };
 }
 
 function isOutfitShotComposeReady(shot: SceneShot): boolean {
@@ -277,9 +277,9 @@ export function OutfitShotProductionPanel({
 
   if (!productionReady && !productionGenerating) {
     return (
-      <section className="space-y-2 rounded-xl border border-dashed border-[#e8e8ed] bg-[#fafafa] p-4">
-        <h2 className="text-sm font-semibold text-[#1d1d1f]">分镜制作表</h2>
-        <p className="text-xs leading-relaxed text-[#6e6e73]">
+      <section className="space-y-2 rounded-xl border border-dashed border-[var(--ecom-divider)] bg-[#fafafa] p-4">
+        <h2 className="text-sm font-semibold text-[var(--ecom-ink)]">分镜制作表</h2>
+        <p className="text-xs leading-relaxed text-[var(--ecom-muted)]">
           完成上方「拆解分镜表」调整、上传模特参考并完成「识别服装」后，点击「生成分镜制作表」，AI
           将根据卖点与服装信息生成可编辑的制作表（运镜/动作/光影/场景/Prompt、场景融图、逐镜视频）。
         </p>
@@ -289,11 +289,11 @@ export function OutfitShotProductionPanel({
 
   return (
     <section
-      className="min-w-0 max-w-full space-y-3 overflow-hidden rounded-xl border border-[#e8e8ed] bg-white p-4"
+      className="min-w-0 max-w-full space-y-3 overflow-hidden rounded-xl border border-[var(--ecom-divider)] bg-white p-4"
       aria-busy={anyGenerating || renderBusy || productionGenerating || undefined}
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold text-[#1d1d1f]">分镜制作表</h2>
+        <h2 className="text-sm font-semibold text-[var(--ecom-ink)]">分镜制作表</h2>
         <div className="flex flex-wrap gap-2">
           <EcomButtonSecondary
             size="sm"
@@ -320,12 +320,12 @@ export function OutfitShotProductionPanel({
         </div>
       </div>
 
-      <p className="text-[11px] leading-relaxed text-[#6e6e73]">
+      <p className="text-[11px] leading-relaxed text-[var(--ecom-muted)]">
         可编辑各镜字段；动作/场景/Prompt 支持 @ 引用下方参考资产（点击缩略图可放大）。至少 2 镜「视频 OK」即可合成；勾选后仅合成选中且已生成的镜头。
       </p>
 
       {mentionRefs.length > 0 ? (
-        <div className="rounded-lg border border-[#e8e8ed] bg-[#fafafa] px-3 py-2.5">
+        <div className="rounded-lg border border-[var(--ecom-divider)] bg-[#fafafa] px-3 py-2.5">
           <EcomPromptMentionRefBar
             refs={mentionRefs}
             hint="参考资产 · 分镜表内输入 @ 可插入代号（@图片1=全片模特/穿搭参考，场景参考在后）"
@@ -335,7 +335,7 @@ export function OutfitShotProductionPanel({
       ) : null}
 
       {productionGenerating ? (
-        <div className="flex items-center gap-2 rounded-lg border border-[var(--ecom-outline-border)] bg-[#f0f6ff] px-3 py-2 text-xs text-[#0058c7]">
+        <div className="flex items-center gap-2 rounded-lg border border-[var(--ecom-outline-border)] bg-[var(--ecom-content-selected-bg)] px-3 py-2 text-xs text-[#0058c7]">
           <Loader2 className="h-4 w-4 animate-spin" />
           正在 AI 生成分镜制作表…
         </div>
@@ -356,8 +356,8 @@ export function OutfitShotProductionPanel({
       </div>
 
       {refGallery.length > 0 ? (
-        <div className="rounded-lg border border-[#e8e8ed] bg-[#fafafa] px-3 py-2.5">
-          <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-[#6e6e73]">
+        <div className="rounded-lg border border-[var(--ecom-divider)] bg-[#fafafa] px-3 py-2.5">
+          <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-[var(--ecom-muted)]">
             全片参考
           </p>
           <div className="flex flex-wrap gap-2">
@@ -365,7 +365,7 @@ export function OutfitShotProductionPanel({
               <button
                 key={item.url}
                 type="button"
-                className="flex items-center gap-1.5 rounded-lg border border-[#e8e8ed] bg-white px-1.5 py-1 text-left transition hover:border-[var(--ecom-outline-border)] hover:bg-[#f0f6ff]"
+                className="flex items-center gap-1.5 rounded-lg border border-[var(--ecom-divider)] bg-white px-1.5 py-1 text-left transition hover:border-[var(--ecom-outline-border)] hover:bg-[var(--ecom-content-selected-bg)]"
                 title={`${item.label} · 点击放大`}
                 onClick={() => openPreview(item.url, item.label, previewGallery)}
               >
@@ -373,9 +373,9 @@ export function OutfitShotProductionPanel({
                 <img
                   src={item.url}
                   alt={item.label}
-                  className="h-10 w-10 shrink-0 rounded-md border border-[#e8e8ed] object-cover"
+                  className="h-10 w-10 shrink-0 rounded-md border border-[var(--ecom-divider)] object-cover"
                 />
-                <span className="pr-1 text-[10px] font-medium text-[#1d1d1f]">{item.label}</span>
+                <span className="pr-1 text-[10px] font-medium text-[var(--ecom-ink)]">{item.label}</span>
               </button>
             ))}
           </div>
@@ -409,7 +409,7 @@ export function OutfitShotProductionPanel({
                     <td className={ecomDataTableTdClass}>
                       <input
                         type="checkbox"
-                        className="size-3.5 rounded border-[#d2d2d7] text-[#0071e3] focus:ring-[#1d1d1f]/15 disabled:opacity-40"
+                        className="size-3.5 rounded border-[var(--ecom-border-soft)] text-[var(--ecom-primary)] focus:ring-[var(--ecom-ink)]/15 disabled:opacity-40"
                         checked={isSelected}
                         disabled={tableBusy || !productionReady}
                         aria-label={`选择镜 ${row.index}`}
@@ -417,7 +417,7 @@ export function OutfitShotProductionPanel({
                       />
                     </td>
                     <td className={ecomDataTableTdClass}>
-                      <span className="font-medium text-[#1d1d1f]">{row.index}</span>
+                      <span className="font-medium text-[var(--ecom-ink)]">{row.index}</span>
                     </td>
                     <td className={ecomDataTableTdClass}>{row.durationSec}s</td>
                     <td className={ecomDataTableTdClass}>
@@ -459,7 +459,7 @@ export function OutfitShotProductionPanel({
                         type="button"
                         disabled={tableBusy || productionBusy}
                         className={cn(
-                          "relative flex aspect-[9/16] w-14 items-center justify-center overflow-hidden rounded-md border border-[#e8e8ed] bg-[#fafafa] transition-colors hover:border-[var(--ecom-outline-border)]",
+                          "relative flex aspect-[9/16] w-14 items-center justify-center overflow-hidden rounded-md border border-[var(--ecom-divider)] bg-[#fafafa] transition-colors hover:border-[var(--ecom-outline-border)]",
                           fusingIndices?.has(row.index) && "opacity-70",
                         )}
                         aria-label={`镜 ${row.index} 场景设置`}
@@ -471,12 +471,12 @@ export function OutfitShotProductionPanel({
                             <img src={fusedUrl} alt="" className="h-full w-full object-cover" />
                             {fusingIndices?.has(row.index) ? (
                               <div className="absolute inset-0 flex items-center justify-center bg-white/70">
-                                <Loader2 className="h-4 w-4 animate-spin text-[#0071e3]" />
+                                <Loader2 className="h-4 w-4 animate-spin text-[var(--ecom-primary)]" />
                               </div>
                             ) : null}
                           </>
                         ) : (
-                          <Plus className="h-5 w-5 text-[#86868b]" />
+                          <Plus className="h-5 w-5 text-[var(--ecom-subtle)]" />
                         )}
                       </button>
                     </td>
@@ -521,8 +521,8 @@ export function OutfitShotProductionPanel({
                   </tr>
                   {getOutfitProductionField(row, "adjustLogic") ? (
                     <tr className="border-0 bg-[#fafafa]">
-                      <td colSpan={columnCount} className="px-3 py-1.5 text-[10px] leading-relaxed text-[#6e6e73]">
-                        <span className="font-medium text-[#86868b]">适配说明：</span>
+                      <td colSpan={columnCount} className="px-3 py-1.5 text-[10px] leading-relaxed text-[var(--ecom-muted)]">
+                        <span className="font-medium text-[var(--ecom-subtle)]">适配说明：</span>
                         {getOutfitProductionField(row, "adjustLogic")}
                       </td>
                     </tr>
@@ -532,7 +532,7 @@ export function OutfitShotProductionPanel({
                       <td colSpan={columnCount} className="border-0 px-3 py-0">
                         <div className="flex justify-center pb-2 pt-0.5">
                           <div
-                            className="ecom-upload-progress ecom-upload-progress-indeterminate h-0.5 w-40 overflow-hidden rounded-full bg-[#e8e8ed]"
+                            className="ecom-upload-progress ecom-upload-progress-indeterminate h-0.5 w-40 overflow-hidden rounded-full bg-[var(--ecom-divider)]"
                             role="progressbar"
                             aria-label={`镜 ${row.index} 生成中`}
                           >
@@ -547,7 +547,7 @@ export function OutfitShotProductionPanel({
             })}
           </tbody>
           <tfoot>
-            <tr className="border-t border-[#e8e8ed] bg-[#fafafa]">
+            <tr className="border-t border-[var(--ecom-divider)] bg-[#fafafa]">
               <td colSpan={columnCount} className="px-3 py-2.5">
                 <div className="flex flex-wrap items-center gap-2">
                   <EcomButtonSecondary
@@ -593,9 +593,9 @@ export function OutfitShotProductionPanel({
       />
 
       {finalVideoUrl ? (
-        <div className="space-y-2 border-t border-[#e8e8ed] pt-4">
-          <h3 className="text-sm font-semibold text-[#1d1d1f]">成片视频</h3>
-          <p className="text-[11px] text-[#6e6e73]">逐镜合成已完成，可预览或保存到「我的资产」。</p>
+        <div className="space-y-2 border-t border-[var(--ecom-divider)] pt-4">
+          <h3 className="text-sm font-semibold text-[var(--ecom-ink)]">成片视频</h3>
+          <p className="text-[11px] text-[var(--ecom-muted)]">逐镜合成已完成，可预览或保存到「我的资产」。</p>
           <div className="mx-auto w-full max-w-md">
             <EcomDeliverableVideoPreview
               videoSrc={finalVideoUrl}

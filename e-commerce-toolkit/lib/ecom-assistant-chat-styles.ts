@@ -2,7 +2,7 @@
 
 /** 折叠态悬浮输入外框（浅灰描边，内边距尽量小） */
 export const ECOM_ASSISTANT_FLOATING_COMPOSER_SHELL_CLASS =
-  "rounded-2xl border border-[#e8e8ed] bg-white p-1 shadow-[0_8px_32px_rgba(0,0,0,0.08)]";
+  "rounded-2xl border border-[var(--ecom-divider)] bg-white p-1 shadow-[0_8px_32px_rgba(0,0,0,0.08)]";
 
 /** 展开态 composer 底栏 */
 export const ECOM_ASSISTANT_COMPOSER_SHELL_BASE =
@@ -18,15 +18,15 @@ export const ECOM_ASSISTANT_COMPOSER_ROW_CLASS =
 
 /** 助手输入框（悬浮 / 展开共用） */
 export const ECOM_ASSISTANT_COMPOSER_TEXTAREA_CLASS =
-  "min-h-[2.25rem] min-w-0 flex-1 resize-y rounded-lg border border-[var(--ecom-assistant-input-border)] bg-[var(--ecom-assistant-input-bg)] px-2 py-1.5 text-sm leading-snug text-[#1d1d1f] outline-none placeholder:text-[#86868b] focus:border-[#d2d2d7] disabled:opacity-50";
+  "min-h-[2.25rem] min-w-0 flex-1 resize-y rounded-lg border border-[var(--ecom-assistant-input-border)] bg-[var(--ecom-assistant-input-bg)] px-2 py-1.5 text-sm leading-snug text-[var(--ecom-ink)] outline-none placeholder:text-[var(--ecom-subtle)] focus:border-[var(--ecom-border-soft)] disabled:opacity-50";
 
 export const ECOM_ASSISTANT_COMPOSER_SHELL_EXPANDED_BORDER =
   "border-t border-[var(--ecom-assistant-border)]";
 
 export const ECOM_ASSISTANT_BUBBLE_CLASS =
-  "border border-[var(--ecom-assistant-border)] bg-[var(--ecom-assistant-bubble-bg)] text-[#1d1d1f]";
+  "border border-[var(--ecom-assistant-border)] bg-[var(--ecom-assistant-bubble-bg)] text-[var(--ecom-ink)]";
 
-export const ECOM_ASSISTANT_USER_BUBBLE_CLASS = "bg-[#0071e3] text-white";
+export const ECOM_ASSISTANT_USER_BUBBLE_CLASS = "bg-[var(--ecom-primary)] text-white";
 
 /** 用户短回复气泡（与产品主图助手一致：宽度随内容，上限 95%） */
 export const ECOM_ASSISTANT_USER_MESSAGE_BUBBLE_BASE =

@@ -68,7 +68,7 @@ export function MainImageHitReplicaConfigSidebar({
   return (
     <div className="flex h-full min-h-0 flex-col overflow-y-auto px-4 py-4">
       <div className="mb-4">
-        <p className="mb-2 text-[11px] font-semibold text-[#1d1d1f]">复刻类型</p>
+        <p className="mb-2 text-[11px] font-semibold text-[var(--ecom-ink)]">复刻类型</p>
         <div className="grid grid-cols-2 gap-2">
           {MAIN_IMAGE_HIT_REPLICA_CATEGORY_OPTIONS.map((opt) => {
             const selected = project.settings.replicaCategory === opt.id;
@@ -80,8 +80,8 @@ export function MainImageHitReplicaConfigSidebar({
                 className={cn(
                   "rounded-lg border px-2 py-2 text-left text-[11px] leading-snug transition-colors",
                   selected
-                    ? "border-[#1d1d1f] bg-[#fafafa] text-[#1d1d1f] ring-2 ring-[#1d1d1f]/15"
-                    : "border-[#e8e8ed] bg-white text-[#424245] hover:border-[#d2d2d7]",
+                    ? "border-[var(--ecom-ink)] bg-[#fafafa] text-[var(--ecom-ink)] ring-2 ring-[var(--ecom-ink)]/15"
+                    : "border-[var(--ecom-divider)] bg-white text-[#424245] hover:border-[var(--ecom-border-soft)]",
                 )}
                 onClick={() => void persistSettings({ replicaCategory: opt.id })}
               >
@@ -93,7 +93,7 @@ export function MainImageHitReplicaConfigSidebar({
       </div>
 
       <div className="mb-4">
-        <p className="mb-2 text-[11px] font-semibold text-[#1d1d1f]">复刻程度</p>
+        <p className="mb-2 text-[11px] font-semibold text-[var(--ecom-ink)]">复刻程度</p>
         <div className="grid gap-2">
           {(
             [
@@ -118,13 +118,13 @@ export function MainImageHitReplicaConfigSidebar({
                 className={cn(
                   "rounded-xl border px-3 py-2.5 text-left transition-colors",
                   selected
-                    ? "border-[#1d1d1f] bg-[#fafafa] ring-2 ring-[#1d1d1f]/15"
-                    : "border-[#e8e8ed] bg-white hover:border-[#d2d2d7]",
+                    ? "border-[var(--ecom-ink)] bg-[#fafafa] ring-2 ring-[var(--ecom-ink)]/15"
+                    : "border-[var(--ecom-divider)] bg-white hover:border-[var(--ecom-border-soft)]",
                 )}
                 onClick={() => void persistSettings({ replicaDegree: opt.id })}
               >
-                <p className="text-[11px] font-semibold text-[#1d1d1f]">{opt.title}</p>
-                <p className="mt-0.5 text-[10px] leading-relaxed text-[#86868b]">{opt.desc}</p>
+                <p className="text-[11px] font-semibold text-[var(--ecom-ink)]">{opt.title}</p>
+                <p className="mt-0.5 text-[10px] leading-relaxed text-[var(--ecom-subtle)]">{opt.desc}</p>
               </button>
             );
           })}
@@ -132,12 +132,12 @@ export function MainImageHitReplicaConfigSidebar({
       </div>
 
       <div className="mb-4">
-        <p className="mb-1.5 text-[11px] font-semibold text-[#1d1d1f]">
+        <p className="mb-1.5 text-[11px] font-semibold text-[var(--ecom-ink)]">
           统一复刻要求
-          <span className="ml-1 font-normal text-[#86868b]">（选填）</span>
+          <span className="ml-1 font-normal text-[var(--ecom-subtle)]">（选填）</span>
         </p>
         <textarea
-          className="min-h-[5.5rem] w-full resize-y rounded-lg border border-[#e8e8ed] bg-white px-2.5 py-2 text-[11px] text-[#1d1d1f] placeholder:text-[#86868b] focus:border-[var(--ecom-chrome-accent)] focus:outline-none"
+          className="min-h-[5.5rem] w-full resize-y rounded-lg border border-[var(--ecom-divider)] bg-white px-2.5 py-2 text-[11px] text-[var(--ecom-ink)] placeholder:text-[var(--ecom-subtle)] focus:border-[var(--ecom-chrome-accent)] focus:outline-none"
           placeholder="例如：参考图文案保持不变，模特完全不变，场景不变仅替换产品"
           value={globalReq}
           disabled={disabled || replicating}
@@ -149,10 +149,10 @@ export function MainImageHitReplicaConfigSidebar({
         />
       </div>
 
-      <label className="mb-3 flex cursor-pointer items-center gap-2 text-[11px] text-[#1d1d1f]">
+      <label className="mb-3 flex cursor-pointer items-center gap-2 text-[11px] text-[var(--ecom-ink)]">
         <input
           type="checkbox"
-          className="h-3.5 w-3.5 shrink-0 rounded border-[#d2d2d7] text-[var(--ecom-chrome-accent)] focus:ring-[var(--ecom-chrome-accent)]"
+          className="h-3.5 w-3.5 shrink-0 rounded border-[var(--ecom-border-soft)] text-[var(--ecom-chrome-accent)] focus:ring-[var(--ecom-chrome-accent)]"
           checked={project.settings.keepOutputStyleConsistent !== false}
           disabled={disabled || replicating}
           onChange={(e) =>
@@ -167,21 +167,21 @@ export function MainImageHitReplicaConfigSidebar({
         </span>
       </label>
 
-      <div className="mb-4 rounded-xl border border-[#e8e8ed] bg-[#fafafa]">
+      <div className="mb-4 rounded-xl border border-[var(--ecom-divider)] bg-[#fafafa]">
         <button
           type="button"
-          className="flex w-full items-center justify-between px-3 py-2.5 text-[11px] font-semibold text-[#1d1d1f]"
+          className="flex w-full items-center justify-between px-3 py-2.5 text-[11px] font-semibold text-[var(--ecom-ink)]"
           onClick={() => setSettingsOpen((v) => !v)}
         >
           生成设置
           {settingsOpen ? (
-            <ChevronUp className="h-3.5 w-3.5 text-[#86868b]" />
+            <ChevronUp className="h-3.5 w-3.5 text-[var(--ecom-subtle)]" />
           ) : (
-            <ChevronDown className="h-3.5 w-3.5 text-[#86868b]" />
+            <ChevronDown className="h-3.5 w-3.5 text-[var(--ecom-subtle)]" />
           )}
         </button>
         {settingsOpen ? (
-          <div className="space-y-3 border-t border-[#e8e8ed] px-3 py-3">
+          <div className="space-y-3 border-t border-[var(--ecom-divider)] px-3 py-3">
             <div className="grid grid-cols-3 gap-2">
               <HitReplicaInlineSelect
                 ariaLabel="语言"
@@ -224,7 +224,7 @@ export function MainImageHitReplicaConfigSidebar({
       </div>
 
       {saving || replicating ? (
-        <p className="mt-auto flex items-center gap-2 text-[10px] text-[#86868b]">
+        <p className="mt-auto flex items-center gap-2 text-[10px] text-[var(--ecom-subtle)]">
           <Loader2 className="h-3 w-3 animate-spin" />
           {replicating ? "复刻进行中…" : "保存设置…"}
         </p>
@@ -242,11 +242,11 @@ function HitReplicaHelpTip({
 }) {
   return (
     <span className="group relative inline-flex shrink-0 align-middle">
-      <span className="cursor-help text-[#86868b] hover:text-[#6e6e73]" aria-label={ariaLabel}>
+      <span className="cursor-help text-[var(--ecom-subtle)] hover:text-[var(--ecom-muted)]" aria-label={ariaLabel}>
         <HelpCircle className="h-3.5 w-3.5" />
       </span>
       <span
-        className="pointer-events-none absolute left-0 top-full z-[100] mt-1.5 hidden w-[min(280px,calc(100vw-2rem))] rounded-lg border border-[#d2d2d7] bg-[#1d1d1f] p-2.5 text-left text-[10px] leading-relaxed text-white shadow-lg group-hover:block"
+        className="pointer-events-none absolute left-0 top-full z-[100] mt-1.5 hidden w-[min(280px,calc(100vw-2rem))] rounded-lg border border-[var(--ecom-border-soft)] bg-[var(--ecom-ink)] p-2.5 text-left text-[10px] leading-relaxed text-white shadow-lg group-hover:block"
         role="tooltip"
       >
         {children}
@@ -277,7 +277,7 @@ function HitReplicaInlineSelect({
         disabled={disabled}
         value={value}
         className={cn(
-          "w-full min-w-0 appearance-none truncate rounded-lg border border-[#e8e8ed] bg-white py-2 pl-2.5 pr-7 text-[11px] text-[#1d1d1f]",
+          "w-full min-w-0 appearance-none truncate rounded-lg border border-[var(--ecom-divider)] bg-white py-2 pl-2.5 pr-7 text-[11px] text-[var(--ecom-ink)]",
           "focus:border-[var(--ecom-chrome-accent)] focus:outline-none",
           disabled && "opacity-50",
         )}
@@ -290,7 +290,7 @@ function HitReplicaInlineSelect({
         ))}
       </select>
       <ChevronDown
-        className="pointer-events-none absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#86868b]"
+        className="pointer-events-none absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--ecom-subtle)]"
         aria-hidden
       />
       {!selected ? (

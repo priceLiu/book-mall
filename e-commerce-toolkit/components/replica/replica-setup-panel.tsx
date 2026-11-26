@@ -792,12 +792,12 @@ export function ReplicaSetupPanel({
     : productRefs.length > 0;
 
   return (
-    <div className="space-y-4 rounded-xl border border-[#e8e8ed] bg-white p-4">
+    <div className="space-y-4 rounded-xl border border-[var(--ecom-divider)] bg-white p-4">
       <div>
-        <h3 className="text-sm font-semibold text-[#1d1d1f]">
+        <h3 className="text-sm font-semibold text-[var(--ecom-ink)]">
           {variant === "refs-only" ? copy.refSectionLabel : copy.panelTitle}
         </h3>
-        <p className="mt-1 text-[11px] leading-relaxed text-[#6e6e73]">
+        <p className="mt-1 text-[11px] leading-relaxed text-[var(--ecom-muted)]">
           {variant === "refs-only"
             ? hasAssetPlan
               ? "可随时更换各槽位替换图；更换后分镜表中的 @token 引用将自动同步。"
@@ -812,13 +812,13 @@ export function ReplicaSetupPanel({
           className={cn(
             "rounded-lg outline-none transition-shadow",
             slotDragOver && "ring-2 ring-[var(--ecom-chrome-accent)]/30",
-            slotPasteReady && "ring-2 ring-[#0071e3]/20",
-            slotImportState && "ring-2 ring-[#0071e3]/25",
+            slotPasteReady && "ring-2 ring-[var(--ecom-primary)]/20",
+            slotImportState && "ring-2 ring-[var(--ecom-primary)]/25",
           )}
           onMouseEnter={() => slotFocusZone()}
         >
           <div className="mb-2 flex items-center justify-between gap-2 px-0.5">
-            <span className="text-[10px] text-[#86868b]">
+            <span className="text-[10px] text-[var(--ecom-subtle)]">
               {IMAGE_UPLOAD_DROP_HINT}
               {activeSlot ? ` · 粘贴/拖入至 ${activeSlot.label}` : ""}
               {slotPasteReady ? " · 可粘贴" : ""}
@@ -869,16 +869,16 @@ export function ReplicaSetupPanel({
         className={cn(
           "space-y-2 rounded-lg outline-none transition-shadow",
           dragOver && "ring-2 ring-[var(--ecom-chrome-accent)]/30",
-          pasteReady && "ring-2 ring-[#0071e3]/20",
-          importState && "ring-2 ring-[#0071e3]/25",
+          pasteReady && "ring-2 ring-[var(--ecom-primary)]/20",
+          importState && "ring-2 ring-[var(--ecom-primary)]/25",
         )}
         onMouseEnter={() => focusZone()}
       >
         <div className="flex items-center justify-between gap-2">
-          <span className="text-xs font-medium uppercase tracking-wide text-[#6e6e73]">
+          <span className="text-xs font-medium uppercase tracking-wide text-[var(--ecom-muted)]">
             {copy.refSectionLabel}
           </span>
-          <span className="text-[10px] text-[#86868b]">
+          <span className="text-[10px] text-[var(--ecom-subtle)]">
             {IMAGE_UPLOAD_DROP_HINT}
             {pasteReady ? " · 粘贴至当前选中行" : ""}
           </span>

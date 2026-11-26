@@ -30,7 +30,7 @@ export function EcomLinearProgressLabel({ progress = null, label, className }: P
         />
       </div>
       {label?.trim() ? (
-        <p className="text-[10px] text-[#0071e3]">{label.trim()}</p>
+        <p className="text-[10px] text-[var(--ecom-primary)]">{label.trim()}</p>
       ) : null}
     </div>
   );

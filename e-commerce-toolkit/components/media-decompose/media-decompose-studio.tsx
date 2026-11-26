@@ -297,8 +297,8 @@ export function MediaDecomposeStudio() {
     return (
       <EcomWorkspaceLayout fullWidth>
         <div className="flex h-full min-h-0 animate-pulse flex-col gap-4 p-5">
-          <div className="h-10 w-48 rounded-lg bg-[#e8e8ed]" />
-          <div className="h-32 rounded-xl bg-[#e8e8ed]" />
+          <div className="h-10 w-48 rounded-lg bg-[var(--ecom-divider)]" />
+          <div className="h-32 rounded-xl bg-[var(--ecom-divider)]" />
           <div className="h-48 rounded-xl bg-[#f0f0f2]" />
         </div>
       </EcomWorkspaceLayout>

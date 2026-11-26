@@ -79,7 +79,7 @@ function Stepper({
       <button
         type="button"
         disabled={disabled || value <= min}
-        className="flex h-6 w-6 items-center justify-center rounded border border-[#e8e8ed] text-xs disabled:opacity-40"
+        className="flex h-6 w-6 items-center justify-center rounded border border-[var(--ecom-divider)] text-xs disabled:opacity-40"
         onClick={() => onChange(Math.max(min, value - 1))}
       >
         −
@@ -88,7 +88,7 @@ function Stepper({
       <button
         type="button"
         disabled={disabled || value >= max}
-        className="flex h-6 w-6 items-center justify-center rounded border border-[#e8e8ed] text-xs disabled:opacity-40"
+        className="flex h-6 w-6 items-center justify-center rounded border border-[var(--ecom-divider)] text-xs disabled:opacity-40"
         onClick={() => onChange(Math.min(max, value + 1))}
       >
         +
@@ -240,9 +240,9 @@ export function AiDetailPageConfigSidebar({
             }}
           />
 
-          <section className="mb-3 rounded-xl border border-[#e8e8ed] bg-white px-3 py-3">
+          <section className="mb-3 rounded-xl border border-[var(--ecom-divider)] bg-white px-3 py-3">
             <p className="mb-2 text-xs font-semibold">产品品类</p>
-            <p className="mb-2 text-[10px] leading-relaxed text-[#86868b]">
+            <p className="mb-2 text-[10px] leading-relaxed text-[var(--ecom-subtle)]">
               左侧一级品类；右侧二、三级与口播专业版一致。用于子维度自动匹配，并参与生成 Prompt 与 AI 识图卖点。
             </p>
             <AiDetailPageProductCategoryPicker
@@ -256,7 +256,7 @@ export function AiDetailPageConfigSidebar({
 
           <section
             className={cn(
-              "mb-3 rounded-xl border border-[#e8e8ed] bg-white px-3 py-3",
+              "mb-3 rounded-xl border border-[var(--ecom-divider)] bg-white px-3 py-3",
               busy === "AI 帮写" && "ecom-media-generating-sweep border-[var(--ecom-outline-border)]",
             )}
           >
@@ -285,7 +285,7 @@ export function AiDetailPageConfigSidebar({
               </EcomButtonSecondary>
             </div>
             <textarea
-              className="mt-2 min-h-[100px] w-full rounded-lg border border-[#e8e8ed] px-2 py-2 font-mono text-[11px]"
+              className="mt-2 min-h-[100px] w-full rounded-lg border border-[var(--ecom-divider)] px-2 py-2 font-mono text-[11px]"
               placeholder={ECOM_SELLPOINT_FIVE_PART_PLACEHOLDER}
               value={sellpointDraft}
               disabled={disabled || Boolean(busy)}
@@ -301,7 +301,7 @@ export function AiDetailPageConfigSidebar({
             />
           </section>
 
-          <section className="mb-3 rounded-xl border border-[#e8e8ed] bg-white">
+          <section className="mb-3 rounded-xl border border-[var(--ecom-divider)] bg-white">
             <button
               type="button"
               className="flex w-full items-center justify-between px-3 py-2.5"
@@ -311,16 +311,16 @@ export function AiDetailPageConfigSidebar({
               {modulesOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
             </button>
             {modulesOpen ? (
-              <div className="grid grid-cols-2 gap-2 border-t border-[#e8e8ed] px-3 py-3">
+              <div className="grid grid-cols-2 gap-2 border-t border-[var(--ecom-divider)] px-3 py-3">
                 {project.suite.modules.map((mod) => (
                   <div
                     key={mod.module_id}
                     className={cn(
                       "rounded-lg border px-2 py-2",
-                      mod.enable ? "border-[#1d1d1f] bg-[#fafafa]" : "border-[#e8e8ed]",
+                      mod.enable ? "border-[var(--ecom-ink)] bg-[#fafafa]" : "border-[var(--ecom-divider)]",
                     )}
                   >
-                    <label className="flex items-start gap-2 text-[10px] font-medium text-[#1d1d1f]">
+                    <label className="flex items-start gap-2 text-[10px] font-medium text-[var(--ecom-ink)]">
                       <input
                         type="checkbox"
                         className="mt-0.5"
@@ -341,14 +341,14 @@ export function AiDetailPageConfigSidebar({
                       />
                       <span className="min-w-0">
                         <span className="block leading-snug">{mod.module_name}</span>
-                        <span className="mt-0.5 block text-[9px] font-normal leading-snug text-[#86868b]">
+                        <span className="mt-0.5 block text-[9px] font-normal leading-snug text-[var(--ecom-subtle)]">
                           {detailPageModuleCardSubtitle(mod.candidate_pool)}
                         </span>
                       </span>
                     </label>
                     {mod.enable ? (
                       <div className="mt-2 flex items-center justify-between">
-                        <span className="text-[9px] text-[#86868b]">张数</span>
+                        <span className="text-[9px] text-[var(--ecom-subtle)]">张数</span>
                         <Stepper
                           value={mod.generate_count}
                           min={1}
@@ -366,7 +366,7 @@ export function AiDetailPageConfigSidebar({
             ) : null}
           </section>
 
-          <section className="mb-3 rounded-xl border border-[#e8e8ed] bg-white">
+          <section className="mb-3 rounded-xl border border-[var(--ecom-divider)] bg-white">
             <button
               type="button"
               className="flex w-full items-center justify-between px-3 py-2.5"
@@ -376,7 +376,7 @@ export function AiDetailPageConfigSidebar({
               {plannerOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
             </button>
             {plannerOpen ? (
-              <div className="space-y-2 border-t border-[#e8e8ed] px-3 py-3">
+              <div className="space-y-2 border-t border-[var(--ecom-divider)] px-3 py-3">
                 <div className="flex gap-3 text-[10px]">
                   <label className="flex items-center gap-1.5">
                     <input
@@ -408,19 +408,19 @@ export function AiDetailPageConfigSidebar({
                     自定义
                   </label>
                 </div>
-                <p className="text-[10px] leading-relaxed text-[#86868b]">
+                <p className="text-[10px] leading-relaxed text-[var(--ecom-subtle)]">
                   自定义时可粘贴或上传 .md / .txt；详见 docs/ecom/AI详情页提示词.md。
                 </p>
-                <div className="rounded-lg border border-dashed border-[#d2d2d7] bg-[#f5f5f7] px-2 py-2 text-[9px] leading-relaxed text-[#86868b]">
+                <div className="rounded-lg border border-dashed border-[var(--ecom-border-soft)] bg-[var(--ecom-parchment)] px-2 py-2 text-[9px] leading-relaxed text-[var(--ecom-subtle)]">
                   {APLUS_JSON_CONTRACT_SUMMARY}
                 </div>
                 {plannerIsCustom ? (
-                  <p className="text-[9px] text-[#0071e3]">
+                  <p className="text-[9px] text-[var(--ecom-primary)]">
                     修改策划 Prompt 后，请重新点击「生成模块 Prompt」以应用到未手改的点位。
                   </p>
                 ) : null}
                 <textarea
-                  className="min-h-[88px] w-full rounded-lg border border-[#e8e8ed] px-2 py-2 font-mono text-[10px] disabled:bg-[#f5f5f7]"
+                  className="min-h-[88px] w-full rounded-lg border border-[var(--ecom-divider)] px-2 py-2 font-mono text-[10px] disabled:bg-[var(--ecom-parchment)]"
                   placeholder="自定义正文：可粘贴整份策划 SOP…"
                   value={plannerDraft}
                   disabled={disabled || Boolean(busy) || !plannerIsCustom}
@@ -473,7 +473,7 @@ export function AiDetailPageConfigSidebar({
                           .finally(() => setBusy(null));
                       }}
                     />
-                    <span className="inline-flex h-7 items-center rounded-lg border border-[#e8e8ed] px-2 text-[10px]">
+                    <span className="inline-flex h-7 items-center rounded-lg border border-[var(--ecom-divider)] px-2 text-[10px]">
                       上传文件
                     </span>
                   </label>
@@ -482,13 +482,13 @@ export function AiDetailPageConfigSidebar({
             ) : null}
           </section>
 
-          <section className="mb-3 rounded-xl border border-[#e8e8ed] bg-white px-3 py-3">
+          <section className="mb-3 rounded-xl border border-[var(--ecom-divider)] bg-white px-3 py-3">
             <p className="mb-2 text-xs font-semibold">生图模型</p>
-            <div className="flex items-center gap-2 rounded-lg border border-[#e8e8ed] bg-[#fafafa] px-2.5 py-2">
+            <div className="flex items-center gap-2 rounded-lg border border-[var(--ecom-divider)] bg-[#fafafa] px-2.5 py-2">
               <Cpu className="h-4 w-4 shrink-0 text-[#007aff]" />
               <div className="min-w-0 flex-1">
                 <p className="truncate text-[11px] font-medium">{modelsLoading ? "…" : modelLabel}</p>
-                <p className="truncate text-[10px] text-[#86868b]">{imageModelKey}</p>
+                <p className="truncate text-[10px] text-[var(--ecom-subtle)]">{imageModelKey}</p>
               </div>
               <EcomButtonSecondary
                 size="sm"

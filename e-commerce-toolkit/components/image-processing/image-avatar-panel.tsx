@@ -61,7 +61,7 @@ const USE_CASES = [
   },
   {
     icon: BookOpen,
-    color: "text-[#6e6e73]",
+    color: "text-[var(--ecom-muted)]",
     title: "同人小说/原创角色参考",
     desc: "为写作社区 OC、AO3 故事标题、同人封面提供视觉参考。风格统一的角色设定图帮助形象化阵容。",
   },
@@ -138,13 +138,13 @@ export function ImageAvatarPanel({
 
   return (
     <div className="mt-6 space-y-4 sm:mt-8 sm:space-y-6">
-      <div className="rounded-xl border border-sky-100 bg-sky-50/80 px-3 py-3 text-sm leading-relaxed text-[#1d1d1f] sm:px-4">
+      <div className="rounded-xl border border-sky-100 bg-sky-50/80 px-3 py-3 text-sm leading-relaxed text-[var(--ecom-ink)] sm:px-4">
         生成创意、奇幻或专业风格的虚拟形象头像。经 Gateway 调用 Seedream / KIE 模型，支持多种裁剪形状。
       </div>
 
       <div className="rounded-2xl border border-[#e5e5ea] bg-white p-4 shadow-sm sm:p-6">
         <div>
-          <p className="text-sm font-medium text-[#1d1d1f]">头像风格</p>
+          <p className="text-sm font-medium text-[var(--ecom-ink)]">头像风格</p>
           <div className="mt-2 flex flex-wrap gap-2">
             {AVATAR_STYLE_OPTIONS.map((o) => (
               <button
@@ -164,7 +164,7 @@ export function ImageAvatarPanel({
           </div>
         </div>
 
-        <label className="mt-4 block text-sm font-medium text-[#1d1d1f]">
+        <label className="mt-4 block text-sm font-medium text-[var(--ecom-ink)]">
           描述这个角色
           <textarea
             value={characterDescription}
@@ -172,10 +172,10 @@ export function ImageAvatarPanel({
             rows={4}
             maxLength={400}
             placeholder="一位戴护目镜的年轻巫师，紫色长袍，手持发光法杖……"
-            className="mt-2 w-full resize-y rounded-xl border border-[#d2d2d7] px-4 py-3 text-sm font-normal"
+            className="mt-2 w-full resize-y rounded-xl border border-[var(--ecom-border-soft)] px-4 py-3 text-sm font-normal"
           />
         </label>
-        <p className="mt-1 text-xs text-[#6e6e73]">
+        <p className="mt-1 text-xs text-[var(--ecom-muted)]">
           {characterDescription.length} / 400 字符
         </p>
         <div className="mt-2 flex flex-wrap gap-2">
@@ -188,7 +188,7 @@ export function ImageAvatarPanel({
                   prev.trim() ? `${prev.trim()}，${tag}` : tag,
                 )
               }
-              className="rounded-full border border-[#e5e5ea] px-2.5 py-1 text-xs text-[#6e6e73] hover:border-[var(--ecom-outline-border)] hover:text-[#0071e3]"
+              className="rounded-full border border-[#e5e5ea] px-2.5 py-1 text-xs text-[var(--ecom-muted)] hover:border-[var(--ecom-outline-border)] hover:text-[var(--ecom-primary)]"
             >
               {tag}
             </button>
@@ -197,11 +197,11 @@ export function ImageAvatarPanel({
 
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="text-sm font-medium text-[#1d1d1f]">形状（裁剪）</label>
+            <label className="text-sm font-medium text-[var(--ecom-ink)]">形状（裁剪）</label>
             <select
               value={cropShape}
               onChange={(e) => setCropShape(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-[#d2d2d7] bg-white px-3 py-2.5 text-sm"
+              className="mt-1 w-full rounded-lg border border-[var(--ecom-border-soft)] bg-white px-3 py-2.5 text-sm"
             >
               {AVATAR_CROP_OPTIONS.map((o) => (
                 <option key={o.id} value={o.id}>
@@ -211,14 +211,14 @@ export function ImageAvatarPanel({
             </select>
           </div>
           <div>
-            <label className="text-sm font-medium text-[#1d1d1f]">变体</label>
+            <label className="text-sm font-medium text-[var(--ecom-ink)]">变体</label>
             <select
               value={variantCount}
               onChange={(e) => {
                 setVariantCount(e.target.value);
                 setImageCount(e.target.value);
               }}
-              className="mt-1 w-full rounded-lg border border-[#d2d2d7] bg-white px-3 py-2.5 text-sm"
+              className="mt-1 w-full rounded-lg border border-[var(--ecom-border-soft)] bg-white px-3 py-2.5 text-sm"
             >
               {COUNT_OPTIONS.map((o) => (
                 <option key={o.id} value={o.id}>
@@ -263,13 +263,13 @@ export function ImageAvatarPanel({
       </div>
 
       <section className="rounded-2xl border border-[#e5e5ea] bg-white p-4 sm:p-6">
-        <h3 className="text-lg font-semibold text-[#1d1d1f]">你可以创造什么</h3>
+        <h3 className="text-lg font-semibold text-[var(--ecom-ink)]">你可以创造什么</h3>
         <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {USE_CASES.map((c) => (
             <div key={c.title} className="rounded-xl border border-[#e5e5ea] bg-[#fafafa] p-4">
               <c.icon className={cn("mb-2 h-5 w-5", c.color)} />
-              <p className="font-medium text-[#1d1d1f]">{c.title}</p>
-              <p className="mt-1 text-sm text-[#6e6e73]">{c.desc}</p>
+              <p className="font-medium text-[var(--ecom-ink)]">{c.title}</p>
+              <p className="mt-1 text-sm text-[var(--ecom-muted)]">{c.desc}</p>
             </div>
           ))}
         </div>

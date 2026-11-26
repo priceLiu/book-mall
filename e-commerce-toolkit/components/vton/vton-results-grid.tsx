@@ -98,8 +98,8 @@ export function vtonTryonResultShellClass(opts?: {
   return cn(
     "group/image relative overflow-hidden rounded-lg border bg-[#fafafa]",
     opts?.running && "ecom-media-generating-sweep border-[var(--ecom-outline-border)]",
-    opts?.selected && "border-[var(--ecom-outline-border)] ring-2 ring-[#1d1d1f]/15",
-    !opts?.running && !opts?.selected && "border-[#e8e8ed]",
+    opts?.selected && "border-[var(--ecom-outline-border)] ring-2 ring-[var(--ecom-ink)]/15",
+    !opts?.running && !opts?.selected && "border-[var(--ecom-divider)]",
   );
 }
 
@@ -111,12 +111,12 @@ function resultCellClass(
   const cellRunning = opts?.cellRunning ?? false;
   return cn(
     "group/image relative overflow-hidden rounded-lg border bg-[#fafafa]",
-    result.status === "success" && selected && "border-[var(--ecom-outline-border)] ring-2 ring-[#1d1d1f]/15",
-    result.status === "success" && !selected && "border-[#e8e8ed]",
+    result.status === "success" && selected && "border-[var(--ecom-outline-border)] ring-2 ring-[var(--ecom-ink)]/15",
+    result.status === "success" && !selected && "border-[var(--ecom-divider)]",
     result.status === "failed" && "border-[#ff3b30]/40",
     cellRunning && "ecom-media-generating-sweep border-[var(--ecom-outline-border)]",
-    result.status === "pending" && !cellRunning && "border-dashed border-[#d2d2d7]",
-    result.status === "cancelled" && "border-[#86868b]/40 bg-[#f5f5f7]",
+    result.status === "pending" && !cellRunning && "border-dashed border-[var(--ecom-border-soft)]",
+    result.status === "cancelled" && "border-[var(--ecom-subtle)]/40 bg-[var(--ecom-parchment)]",
   );
 }
 
@@ -256,7 +256,7 @@ function VtonTryonQueuedSlot({
     <VtonTryonResultAspectFrame
       modelImageSize={modelImageSize}
       className={cn(
-        "flex flex-col items-center justify-center border border-dashed border-[#e8e8ed] px-1 text-center text-[10px] text-[#86868b]",
+        "flex flex-col items-center justify-center border border-dashed border-[var(--ecom-divider)] px-1 text-center text-[10px] text-[var(--ecom-subtle)]",
         className,
       )}
     >
@@ -388,14 +388,14 @@ export function VtonResultsGrid({
 
   return (
     <>
-      <section className="space-y-3 rounded-xl border border-[#e8e8ed] bg-white p-3">
+      <section className="space-y-3 rounded-xl border border-[var(--ecom-divider)] bg-white p-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
-            <h3 className="text-xs font-semibold text-[#1d1d1f]">试衣结果</h3>
+            <h3 className="text-xs font-semibold text-[var(--ecom-ink)]">试衣结果</h3>
             {batch ? (
-              <p className="text-[11px] text-[#6e6e73]">{formatVtonBatchTryonLabel(batch)}</p>
+              <p className="text-[11px] text-[var(--ecom-muted)]">{formatVtonBatchTryonLabel(batch)}</p>
             ) : (
-              <p className="text-[11px] text-[#6e6e73]">
+              <p className="text-[11px] text-[var(--ecom-muted)]">
                 勾选搭配后试衣；未勾选时可点「全部生成试衣」
               </p>
             )}
@@ -443,8 +443,8 @@ export function VtonResultsGrid({
         </div>
 
         {!showResultsGrid ? (
-          <div className="flex min-h-[28vh] flex-col items-center justify-center rounded-lg border border-dashed border-[#e8e8ed] bg-[#fafafa] px-6 py-10 text-center">
-            <p className="max-w-md text-sm text-[#6e6e73]">
+          <div className="flex min-h-[28vh] flex-col items-center justify-center rounded-lg border border-dashed border-[var(--ecom-divider)] bg-[#fafafa] px-6 py-10 text-center">
+            <p className="max-w-md text-sm text-[var(--ecom-muted)]">
               勾选搭配并点击「试衣」后，成片将显示在此。生成完成后可勾选结果并锁定为参考图。
             </p>
           </div>
@@ -575,7 +575,7 @@ export function VtonResultsGrid({
                           type="button"
                           className={cn(
                             "absolute left-1 top-1 z-[30] rounded-full p-0.5",
-                            selected ? "bg-[#0071e3] text-white" : "bg-black/40 text-white",
+                            selected ? "bg-[var(--ecom-primary)] text-white" : "bg-black/40 text-white",
                             (busy || disabled || isLocked) && "pointer-events-none opacity-50",
                           )}
                           disabled={busy || disabled || isLocked}
@@ -601,7 +601,7 @@ export function VtonResultsGrid({
                         {onRegenerateLook && !running ? (
                           <button
                             type="button"
-                            className="text-[#0071e3] hover:underline disabled:opacity-50"
+                            className="text-[var(--ecom-primary)] hover:underline disabled:opacity-50"
                             disabled={busy || disabled}
                             onClick={() => void onRegenerateLook(result.lookId)}
                           >
@@ -612,7 +612,7 @@ export function VtonResultsGrid({
                     ) : result.status === "cancelled" ? (
                       <VtonTryonResultAspectFrame
                         modelImageSize={modelImageSize}
-                        className="flex flex-col items-center justify-center p-2 text-center text-[10px] text-[#86868b]"
+                        className="flex flex-col items-center justify-center p-2 text-center text-[10px] text-[var(--ecom-subtle)]"
                       >
                         {result.failReason ?? "已停止"}
                       </VtonTryonResultAspectFrame>
@@ -641,8 +641,8 @@ export function VtonResultsGrid({
         ) : null}
 
         {lockedLooks.length > 0 ? (
-          <div className="space-y-2 border-t border-[#e8e8ed] pt-3">
-            <h4 className="text-[11px] font-medium text-[#6e6e73]">
+          <div className="space-y-2 border-t border-[var(--ecom-divider)] pt-3">
+            <h4 className="text-[11px] font-medium text-[var(--ecom-muted)]">
               已锁定参考 ({lockedLooks.length})
               {mode === "outfit-video" ? " · 锁定后可进入逐镜生成" : ""}
             </h4>
@@ -654,7 +654,7 @@ export function VtonResultsGrid({
                     <div
                       className={cn(
                         "relative w-full overflow-hidden rounded-lg border",
-                        isDefault ? "border-[var(--ecom-outline-border)]" : "border-[#e8e8ed]",
+                        isDefault ? "border-[var(--ecom-outline-border)]" : "border-[var(--ecom-divider)]",
                       )}
                     >
                       <button
@@ -676,14 +676,14 @@ export function VtonResultsGrid({
                         </VtonTryonResultAspectFrame>
                       </button>
                       {isDefault ? (
-                        <Star className="absolute left-1 top-1 z-[30] h-3 w-3 fill-[#0071e3] text-[#0071e3]" />
+                        <Star className="absolute left-1 top-1 z-[30] h-3 w-3 fill-[var(--ecom-primary)] text-[var(--ecom-primary)]" />
                       ) : null}
                     </div>
                     <div className="flex gap-0.5 p-0.5">
                       {onSetDefaultLocked && !isDefault ? (
                         <button
                           type="button"
-                          className="flex-1 text-[9px] text-[#0071e3] hover:underline disabled:opacity-50"
+                          className="flex-1 text-[9px] text-[var(--ecom-primary)] hover:underline disabled:opacity-50"
                           disabled={busy || disabled}
                           onClick={() => void onSetDefaultLocked(look.id)}
                         >

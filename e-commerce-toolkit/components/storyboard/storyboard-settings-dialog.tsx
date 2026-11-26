@@ -47,8 +47,8 @@ const optBtn = (active: boolean) =>
   cn(
     "rounded-lg border-2 px-3 py-2 text-sm font-medium transition-colors",
     active
-      ? "border-[#1d1d1f] bg-[#f5f5f7] text-[#1d1d1f]"
-      : "border-[#e8e8ed] bg-white text-[#1d1d1f] hover:border-[#d2d2d7]",
+      ? "border-[var(--ecom-ink)] bg-[var(--ecom-parchment)] text-[var(--ecom-ink)]"
+      : "border-[var(--ecom-divider)] bg-white text-[var(--ecom-ink)] hover:border-[var(--ecom-border-soft)]",
   );
 
 /** 影片参数（不含生图/生视频模型，模型在卡片上单独选择） */
@@ -70,7 +70,7 @@ export function StoryboardSettingsDialog({
         <div className="space-y-5 py-2">
           {chatModels.length > 0 ? (
             <div>
-              <p className="mb-2 text-sm font-bold text-[#1d1d1f]">助手模型</p>
+              <p className="mb-2 text-sm font-bold text-[var(--ecom-ink)]">助手模型</p>
               <div className="ecom-scrollbar-thin max-h-[min(50vh,360px)] overflow-y-auto pr-0.5">
                 <EcomGatewayModelGroupedList
                   mode="chat"
@@ -94,7 +94,7 @@ export function StoryboardSettingsDialog({
           ) : null}
 
           <div>
-            <p className="mb-2 text-sm font-bold text-[#1d1d1f]">影片比例</p>
+            <p className="mb-2 text-sm font-bold text-[var(--ecom-ink)]">影片比例</p>
             <div className="grid grid-cols-2 gap-3">
               {(
                 [
@@ -115,7 +115,7 @@ export function StoryboardSettingsDialog({
           </div>
 
           <div>
-            <p className="mb-2 text-sm font-bold text-[#1d1d1f]">对白语言</p>
+            <p className="mb-2 text-sm font-bold text-[var(--ecom-ink)]">对白语言</p>
             <div className="flex gap-2">
               {(
                 [
@@ -135,7 +135,7 @@ export function StoryboardSettingsDialog({
             </div>
           </div>
 
-          <p className="text-xs leading-relaxed text-[#86868b]">
+          <p className="text-xs leading-relaxed text-[var(--ecom-subtle)]">
             成片时长与视频模型请在点击「整图成片」或单镜「生成视频」时，于模型选择弹层中确认。
           </p>
         </div>

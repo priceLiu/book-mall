@@ -2773,7 +2773,7 @@ export function StoryboardContentPanel({
   const fashionProduceWorkspaceFallback =
     isDirectVideoProduceReady(project) && !project.sheet ? (
       <div className="space-y-3">
-        <p className="text-sm text-[#86868b]">
+        <p className="text-sm text-[var(--ecom-subtle)]">
           正在将定稿分镜同步为故事版整页版式…若长时间无内容，请点下方按钮重试。
         </p>
         <EcomIconButton
@@ -2789,13 +2789,13 @@ export function StoryboardContentPanel({
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-white">
       <div className="ecom-scrollbar-overlay h-full min-h-0 w-full overflow-x-hidden overflow-y-auto overscroll-y-contain [overflow-anchor:none]">
-        <header className="sticky top-0 z-30 border-b border-[#e8e8ed] bg-white px-5 py-3 shadow-[0_1px_0_0_rgba(0,0,0,0.04)]">
+        <header className="sticky top-0 z-30 border-b border-[var(--ecom-divider)] bg-white px-5 py-3 shadow-[0_1px_0_0_rgba(0,0,0,0.04)]">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <EcomWorkspaceTitleHeading
               guideModuleId="storyboard-micro-drama"
               title={resolveStoryboardPageTitle(project)}
             >
-              <p className="text-[11px] text-[#6e6e73]">
+              <p className="text-[11px] text-[var(--ecom-muted)]">
                 带货短视频分镜 · {durationSec}秒 · {aspectRatio}
                 {project.sheet?.panels.length
                   ? ` · ${project.sheet.panels.length} 镜`
@@ -2867,7 +2867,7 @@ export function StoryboardContentPanel({
           </div>
         </header>
 
-        <section className="border-b border-[#e8e8ed] px-5 py-4">
+        <section className="border-b border-[var(--ecom-divider)] px-5 py-4">
           <StoryboardRefUploader
             references={references}
             onUpload={onRefUpload}
@@ -2953,7 +2953,7 @@ export function StoryboardContentPanel({
 
       <div className="ecom-scrollbar-thin min-h-0 flex-1 overflow-y-auto bg-white p-4 sm:p-6">
         {streaming ? (
-          <div className="mb-4 flex items-center gap-2 rounded-lg bg-[#0071e3]/10 px-4 py-3 text-sm text-[#0071e3]">
+          <div className="mb-4 flex items-center gap-2 rounded-lg bg-[var(--ecom-primary)]/10 px-4 py-3 text-sm text-[var(--ecom-primary)]">
             <Loader2 className="h-4 w-4 animate-spin" />
             助手正在流式输出，完成后将同步显示结构化结果…
           </div>

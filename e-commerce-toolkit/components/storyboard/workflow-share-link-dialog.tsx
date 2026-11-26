@@ -82,13 +82,13 @@ export function WorkflowShareLinkDialog({
 
   return (
     <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/40 p-4">
-      <div className="relative w-full max-w-md rounded-xl border border-[#e8e8ed] bg-white p-5 pr-12 shadow-xl">
+      <div className="relative w-full max-w-md rounded-xl border border-[var(--ecom-divider)] bg-white p-5 pr-12 shadow-xl">
         <EcomDialogCloseButton onClick={onClose} />
-        <h2 className="flex items-center gap-2 text-base font-semibold text-[#1d1d1f]">
+        <h2 className="flex items-center gap-2 text-base font-semibold text-[var(--ecom-ink)]">
           <EcomWechatShareIcon className="size-4" />
           {teamMemberShare ? "邀请成员体验" : "分享工作流"}
         </h2>
-        <p className="mt-2 text-xs text-[#6e6e73]">
+        <p className="mt-2 text-xs text-[var(--ecom-muted)]">
           {description ??
             (teamMemberShare
               ? "分享 10 位码或主站链接；好友领取副本后将加入你的团队（不发分享积分）。"
@@ -122,7 +122,7 @@ export function WorkflowShareLinkDialog({
               <img src={qrUrl} alt="微信扫码" width={140} height={140} className="mx-auto rounded border border-[#d9d9d9] p-1" />
             ) : null}
             {legacyUrl ? (
-              <details className="text-xs text-[#6e6e73]">
+              <details className="text-xs text-[var(--ecom-muted)]">
                 <summary className="cursor-pointer">兼容旧链接</summary>
                 <p className="mt-1 break-all font-mono">{legacyUrl}</p>
               </details>

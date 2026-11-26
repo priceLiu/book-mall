@@ -64,7 +64,7 @@ export function EcomWorkspaceLayout({
       <div className="flex min-h-0 min-w-0 max-w-full flex-1 flex-row overflow-hidden md:h-full">
         <main
           className={cn(
-            "flex min-h-0 min-w-0 max-w-full flex-1 flex-col overflow-clip bg-white",
+            "flex min-h-0 min-w-0 max-w-full flex-1 flex-col overflow-clip bg-[var(--ecom-workspace-bg)]",
             contentClassName,
           )}
           onPointerDown={onMainBlankPointerDown}

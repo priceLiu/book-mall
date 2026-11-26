@@ -10,9 +10,9 @@ const VARIANT_CLASS: Record<
   { active: string; idle: string; disabled: string }
 > = {
   light: {
-    active: "bg-[#f5f5f7] text-[#1d1d1f]",
-    idle: "text-[#6e6e73] hover:bg-[#f5f5f7]",
-    disabled: "text-[#86868b]",
+    active: "bg-[var(--ecom-parchment)] text-[var(--ecom-ink)]",
+    idle: "text-[var(--ecom-muted)] hover:bg-[var(--ecom-parchment)]",
+    disabled: "text-[var(--ecom-subtle)]",
   },
   dark: {
     active: "bg-white/15 text-white ring-1 ring-white/20",

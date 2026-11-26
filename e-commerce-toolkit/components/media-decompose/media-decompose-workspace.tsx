@@ -249,10 +249,10 @@ export function MediaDecomposeWorkspace({
 
   const mainScroll = (
     <>
-      <header className="sticky top-0 z-20 border-b border-[#e8e8ed] bg-white px-5 py-3 shadow-[0_1px_0_0_rgba(0,0,0,0.04)]">
+      <header className="sticky top-0 z-20 border-b border-[var(--ecom-divider)] bg-white px-5 py-3 shadow-[0_1px_0_0_rgba(0,0,0,0.04)]">
         <div className="flex flex-wrap items-center justify-between gap-2">
         <EcomWorkspaceTitleHeading guideModuleId="media-decompose" title="拆图拆视频">
-          <p className="text-[11px] text-[#6e6e73]">
+          <p className="text-[11px] text-[var(--ecom-muted)]">
             上传图片或视频，反推分镜拆解或静态画面要素与生图 Prompt。
           </p>
         </EcomWorkspaceTitleHeading>
@@ -310,7 +310,7 @@ export function MediaDecomposeWorkspace({
         onClear={onClearMedia}
       />
 
-      <div className="space-y-2 rounded-xl border border-[#e8e8ed] bg-white p-4">
+      <div className="space-y-2 rounded-xl border border-[var(--ecom-divider)] bg-white p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <button
             type="button"
@@ -318,10 +318,10 @@ export function MediaDecomposeWorkspace({
             aria-expanded={promptExpanded}
             onClick={() => setPromptExpanded((v) => !v)}
           >
-            <span className="text-sm font-semibold text-[#1d1d1f]">拆解指令</span>
+            <span className="text-sm font-semibold text-[var(--ecom-ink)]">拆解指令</span>
             <ChevronDown
               className={cn(
-                "h-4 w-4 shrink-0 text-[#6e6e73] transition-transform",
+                "h-4 w-4 shrink-0 text-[var(--ecom-muted)] transition-transform",
                 promptExpanded && "rotate-180",
               )}
               aria-hidden
@@ -361,7 +361,7 @@ export function MediaDecomposeWorkspace({
         {!promptExpanded && prompt.trim() ? (
           <button
             type="button"
-            className="w-full truncate rounded-lg bg-[#f5f5f7] px-3 py-2 text-left text-xs leading-relaxed text-[#6e6e73] hover:bg-[#ececee]"
+            className="w-full truncate rounded-lg bg-[var(--ecom-parchment)] px-3 py-2 text-left text-xs leading-relaxed text-[var(--ecom-muted)] hover:bg-[#ececee]"
             onClick={() => setPromptExpanded(true)}
           >
             {prompt.trim().replace(/\s+/g, " ").slice(0, 120)}
@@ -375,7 +375,7 @@ export function MediaDecomposeWorkspace({
             value={prompt}
             disabled={decomposing}
             rows={10}
-            className="w-full resize-y rounded-lg border border-[#d2d2d7] px-3 py-2 text-sm leading-relaxed outline-none focus:border-[var(--ecom-outline-border)] focus:ring-2 focus:ring-[#1d1d1f]/15"
+            className="w-full resize-y rounded-lg border border-[var(--ecom-border-soft)] px-3 py-2 text-sm leading-relaxed outline-none focus:border-[var(--ecom-outline-border)] focus:ring-2 focus:ring-[var(--ecom-ink)]/15"
             onChange={(e) => setPrompt(e.target.value)}
           />
         ) : null}
@@ -389,9 +389,9 @@ export function MediaDecomposeWorkspace({
       />
 
       {(displaySource || structured) && (
-        <div className="space-y-4 rounded-xl border border-[#e8e8ed] bg-white p-4">
+        <div className="space-y-4 rounded-xl border border-[var(--ecom-divider)] bg-white p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-sm font-semibold text-[#1d1d1f]">拆解结果</h2>
+            <h2 className="text-sm font-semibold text-[var(--ecom-ink)]">拆解结果</h2>
             {canStartReplica && !showReplicaSetup && !replicaScriptReady ? (
               <EcomButtonPrimary
                 type="button"
@@ -430,13 +430,13 @@ export function MediaDecomposeWorkspace({
         <div className="rounded-xl border border-[#ffd6d1] bg-[#fff5f3] px-4 py-3 text-sm text-[#c0392b]">
           <p className="font-medium">复刻进度加载失败</p>
           <p className="mt-1 text-[13px] leading-relaxed">{replicaLoadError}</p>
-          <p className="mt-2 text-[12px] text-[#6e6e73]">
+          <p className="mt-2 text-[12px] text-[var(--ecom-muted)]">
             若 book-mall 刚更新过代码，请重启 dev 服务后刷新本页；你的分镜数据仍在服务端。
           </p>
           {onReplicaProjectChange ? (
             <button
               type="button"
-              className="mt-3 text-[13px] font-medium text-[#0071e3] hover:underline"
+              className="mt-3 text-[13px] font-medium text-[var(--ecom-primary)] hover:underline"
               onClick={() => void onReplicaProjectChange()}
             >
               重试加载

@@ -24,7 +24,7 @@ export function ModelShotAssistantMessageBody({ content, project }: Props) {
 
   return (
     <div className="space-y-3">
-      <p className="text-sm leading-relaxed text-[#1d1d1f]">{parsed.intro}</p>
+      <p className="text-sm leading-relaxed text-[var(--ecom-ink)]">{parsed.intro}</p>
       <ModelShotCollectionSummaryTable rows={rows} />
       {parsed.outro ? <StoryboardMarkdownBlock markdown={parsed.outro} /> : null}
     </div>

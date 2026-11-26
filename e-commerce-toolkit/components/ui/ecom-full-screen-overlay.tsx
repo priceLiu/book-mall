@@ -76,18 +76,18 @@ export function EcomFullScreenOverlay({
       >
         <EcomDialogCloseButton onClick={onClose} />
         {title ? (
-          <div className="shrink-0 border-b border-[#e8e8ed] px-5 py-4 pr-14">
-            <h2 id="ecom-fullscreen-overlay-title" className="text-lg font-semibold text-[#1d1d1f]">
+          <div className="shrink-0 border-b border-[var(--ecom-divider)] px-5 py-4 pr-14">
+            <h2 id="ecom-fullscreen-overlay-title" className="text-lg font-semibold text-[var(--ecom-ink)]">
               {title}
             </h2>
             {description ? (
-              <p className="mt-1 text-sm leading-relaxed text-[#6e6e73]">{description}</p>
+              <p className="mt-1 text-sm leading-relaxed text-[var(--ecom-muted)]">{description}</p>
             ) : null}
           </div>
         ) : null}
         {children}
         {footer ? (
-          <div className="shrink-0 border-t border-[#e8e8ed] px-5 py-3">{footer}</div>
+          <div className="shrink-0 border-t border-[var(--ecom-divider)] px-5 py-3">{footer}</div>
         ) : null}
       </div>
     </div>,

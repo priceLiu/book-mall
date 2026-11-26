@@ -62,7 +62,7 @@ export function HandCraftSheetView({ project, stepId, page, variant = "export" }
       style={{
         width: HAND_CRAFT_SHEET_WIDTH,
         background: "#ffffff",
-        color: "#1d1d1f",
+        color: "var(--ecom-ink)",
         fontFamily: "system-ui, -apple-system, sans-serif",
         padding: 48,
         boxSizing: "border-box",
@@ -88,8 +88,8 @@ export function HandCraftSheetView({ project, stepId, page, variant = "export" }
             {project.title?.trim() || "手办盲盒 SOP"}
           </h1>
         </div>
-        <div style={{ textAlign: "right", fontSize: 13, color: "#6e6e73" }}>
-          <div style={{ fontWeight: 700, color: "#1d1d1f" }}>{page.title}</div>
+        <div style={{ textAlign: "right", fontSize: 13, color: "var(--ecom-muted)" }}>
+          <div style={{ fontWeight: 700, color: "var(--ecom-ink)" }}>{page.title}</div>
           <div>
             {handCraftStep(stepId).label} · P{String(page.index).padStart(2, "0")}
           </div>
@@ -110,9 +110,9 @@ export function HandCraftSheetView({ project, stepId, page, variant = "export" }
         style={{
           marginTop: 32,
           paddingTop: 14,
-          borderTop: "1px solid #e8e8ed",
+          borderTop: "1px solid var(--ecom-divider)",
           fontSize: 11,
-          color: "#86868b",
+          color: "var(--ecom-subtle)",
           display: "flex",
           justifyContent: "space-between",
         }}
@@ -193,12 +193,12 @@ function SheetSection({
         <SectionTitle text={section.title} />
         <div
           style={{
-            border: "1px dashed #d2d2d7",
+            border: "1px dashed var(--ecom-border-soft)",
             borderRadius: 12,
             padding: 28,
             textAlign: "center",
             fontSize: 13,
-            color: "#86868b",
+            color: "var(--ecom-subtle)",
           }}
         >
           该区块引用的成图尚未生成
@@ -214,10 +214,10 @@ function SheetSection({
         {section.title ? <SectionTitle text={section.title} /> : null}
         <div
           style={{
-            border: "1px solid #e8e8ed",
+            border: "1px solid var(--ecom-divider)",
             borderRadius: 12,
             overflow: "hidden",
-            background: "#f5f5f7",
+            background: "var(--ecom-parchment)",
             textAlign: "center",
           }}
         >
@@ -243,10 +243,10 @@ function SheetSection({
           <div key={`${img.url}-${i}`} style={{ width: cellWidth, padding: 6, boxSizing: "border-box" }}>
             <div
               style={{
-                border: "1px solid #e8e8ed",
+                border: "1px solid var(--ecom-divider)",
                 borderRadius: 10,
                 overflow: "hidden",
-                background: "#f5f5f7",
+                background: "var(--ecom-parchment)",
                 textAlign: "center",
               }}
             >
@@ -261,7 +261,7 @@ function SheetSection({
               style={{
                 margin: "6px 2px 0",
                 fontSize: 11,
-                color: "#6e6e73",
+                color: "var(--ecom-muted)",
                 textAlign: "center",
               }}
             >

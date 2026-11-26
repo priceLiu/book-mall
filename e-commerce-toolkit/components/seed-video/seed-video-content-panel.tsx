@@ -1434,13 +1434,13 @@ export function SeedVideoContentPanel({
     <>
     <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-white">
       <div className="ecom-scrollbar-overlay h-full min-h-0 w-full overflow-x-hidden overflow-y-auto overscroll-y-contain [overflow-anchor:none]">
-        <header className="sticky top-0 z-20 border-b border-[#e8e8ed] bg-white px-5 py-3 shadow-[0_1px_0_0_rgba(0,0,0,0.04)]">
+        <header className="sticky top-0 z-20 border-b border-[var(--ecom-divider)] bg-white px-5 py-3 shadow-[0_1px_0_0_rgba(0,0,0,0.04)]">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <EcomWorkspaceTitleHeading
               guideModuleId="seed-video"
               title={project.title ?? "服装种草视频"}
             >
-              <p className="text-[11px] text-[#6e6e73]">{displaySkillLabel} · 素材策划与成片</p>
+              <p className="text-[11px] text-[var(--ecom-muted)]">{displaySkillLabel} · 素材策划与成片</p>
             </EcomWorkspaceTitleHeading>
             <EcomIconToolbar>
               <EcomIconToolbarGroup label="项目">
@@ -1498,7 +1498,7 @@ export function SeedVideoContentPanel({
           </div>
         </header>
 
-        <section className="border-b border-[#e8e8ed] px-5 py-4">
+        <section className="border-b border-[var(--ecom-divider)] px-5 py-4">
           <SeedVideoRefUploader
             references={project.references}
             onUpload={onUploadRef}
@@ -1508,14 +1508,14 @@ export function SeedVideoContentPanel({
           />
         </section>
 
-        <section className="border-b border-[#e8e8ed] px-5 py-4">
-          <p className="mb-1 text-xs font-medium uppercase tracking-wide text-[#6e6e73]">
+        <section className="border-b border-[var(--ecom-divider)] px-5 py-4">
+          <p className="mb-1 text-xs font-medium uppercase tracking-wide text-[var(--ecom-muted)]">
             素材 + Prompt
           </p>
-          <p className="mb-4 text-[11px] leading-relaxed text-[#6e6e73]">
+          <p className="mb-4 text-[11px] leading-relaxed text-[var(--ecom-muted)]">
             上传素材后填写 Prompt（可 @ 图片），点击「开始策划」进入 Skill 流程；脚本、模式与风格点选请在右侧助手完成。
           </p>
-          <p className="mb-2 text-[11px] font-semibold text-[#1d1d1f]">Prompt（可 @ 图片）</p>
+          <p className="mb-2 text-[11px] font-semibold text-[var(--ecom-ink)]">Prompt（可 @ 图片）</p>
           <ProductDesignPromptMentionTextarea
             value={planningPrompt}
             referenceImages={mentionRefs}
@@ -1541,7 +1541,7 @@ export function SeedVideoContentPanel({
             {!planningPrompt.trim() ? (
               <button
                 type="button"
-                className="text-[11px] text-[#0071e3] hover:underline disabled:opacity-50"
+                className="text-[11px] text-[var(--ecom-primary)] hover:underline disabled:opacity-50"
                 disabled={Boolean(refBusy) || streaming}
                 onClick={() => onPlanningPromptChange(skillDef.defaultPlanningPrompt)}
               >
@@ -1553,7 +1553,7 @@ export function SeedVideoContentPanel({
 
         {!showProduction && !streaming ? (
           <div className="flex min-h-[24vh] flex-col items-center justify-center px-6 py-10 text-center">
-            <p className="max-w-md text-sm text-[#6e6e73]">
+            <p className="max-w-md text-sm text-[var(--ecom-muted)]">
               完成素材上传与 Prompt 并点击「开始策划」后，定稿脚本、镜头表与视频 Prompt 将显示在此。
             </p>
           </div>
@@ -1563,8 +1563,8 @@ export function SeedVideoContentPanel({
         <section className="mb-6 space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
-              <h2 className="text-sm font-semibold text-[#1d1d1f]">正式脚本 · 手动编辑</h2>
-              <p className="text-[11px] text-[#6e6e73]">
+              <h2 className="text-sm font-semibold text-[var(--ecom-ink)]">正式脚本 · 手动编辑</h2>
+              <p className="text-[11px] text-[var(--ecom-muted)]">
                 表头与中间工作区一致；完成后将直接同步，无需再确认一轮。
               </p>
             </div>
@@ -1605,7 +1605,7 @@ export function SeedVideoContentPanel({
 
       {finalUrl && !showDirectProduction && !showFineProduction ? (
         <section className="mb-6 mx-auto w-full max-w-md">
-          <h2 className="mb-2 text-sm font-semibold text-[#1d1d1f]">成片预览</h2>
+          <h2 className="mb-2 text-sm font-semibold text-[var(--ecom-ink)]">成片预览</h2>
           <EcomDeliverableVideoPreview
             videoSrc={finalUrl}
             onPreview={() => onPreviewVideo(finalUrl, project.title ?? "种草视频")}
@@ -1616,7 +1616,7 @@ export function SeedVideoContentPanel({
       {showDirectProduction ? (
         <section className="mb-6 space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-sm font-semibold text-[#1d1d1f]">方案① · 直接连贯生成</h2>
+            <h2 className="text-sm font-semibold text-[var(--ecom-ink)]">方案① · 直接连贯生成</h2>
             {localShots.length >= 2 ? (
               <EcomButtonSecondary
                 type="button"
@@ -1627,11 +1627,11 @@ export function SeedVideoContentPanel({
               </EcomButtonSecondary>
             ) : null}
           </div>
-          <p className="text-[11px] leading-relaxed text-[#6e6e73]">
+          <p className="text-[11px] leading-relaxed text-[var(--ecom-muted)]">
             将脚本与参考图一次性交给视频模型，生成一条连贯成片（时长由策划方案决定；单次生成受模型上限约 {SEED_VIDEO_DIRECT_MAX_DURATION_SEC} 秒约束，非逐镜单独生成）。
           </p>
           {!directPlanSynced && needsConfirmPreview ? (
-            <p className="rounded-lg bg-[#f5f5f7] px-3 py-2 text-xs leading-relaxed text-[#6e6e73]">
+            <p className="rounded-lg bg-[var(--ecom-parchment)] px-3 py-2 text-xs leading-relaxed text-[var(--ecom-muted)]">
               以下为参数预览。请在右侧点「确认成片参数」同步到此工作区后再生成视频。
             </p>
           ) : null}
@@ -1645,10 +1645,10 @@ export function SeedVideoContentPanel({
               hideStatusColumn
             />
           ) : effectiveDirectPlan?.shotSequence && effectiveDirectPlan.shotSequence.length > 0 ? (
-            <div className="overflow-x-auto rounded-xl border border-[#e8e8ed]">
+            <div className="overflow-x-auto rounded-xl border border-[var(--ecom-divider)]">
               <table className="min-w-full text-left text-xs">
                 <thead>
-                  <tr className="bg-[#1d1d1f] text-white">
+                  <tr className="bg-[var(--ecom-ink)] text-white">
                     <th className="px-3 py-2">镜号</th>
                     <th className="px-3 py-2">时间</th>
                     <th className="px-3 py-2">参考素材</th>
@@ -1658,7 +1658,7 @@ export function SeedVideoContentPanel({
                 </thead>
                 <tbody>
                   {effectiveDirectPlan.shotSequence.map((s) => (
-                    <tr key={s.index} className="border-t border-[#e8e8ed]">
+                    <tr key={s.index} className="border-t border-[var(--ecom-divider)]">
                       <td className="px-3 py-2">{s.index}</td>
                       <td className="px-3 py-2 whitespace-nowrap">{s.timeSlice}</td>
                       <td className="px-3 py-2">{s.refImageLabel}</td>
@@ -1672,9 +1672,9 @@ export function SeedVideoContentPanel({
           ) : null}
           {effectiveDirectPlan ? (
             <>
-              <label className="block text-xs text-[#6e6e73]">全局视频 Prompt</label>
+              <label className="block text-xs text-[var(--ecom-muted)]">全局视频 Prompt</label>
               <textarea
-                className="ecom-scrollbar-thin w-full min-h-[6rem] rounded-xl border border-[#e8e8ed] px-3 py-2 text-sm"
+                className="ecom-scrollbar-thin w-full min-h-[6rem] rounded-xl border border-[var(--ecom-divider)] px-3 py-2 text-sm"
                 value={effectiveDirectPlan.globalPrompt}
                 readOnly={!directPlanSynced && needsConfirmPreview}
                 onChange={(e) => {
@@ -1684,9 +1684,9 @@ export function SeedVideoContentPanel({
                   });
                 }}
               />
-              <label className="block text-xs text-[#6e6e73]">完整口播</label>
+              <label className="block text-xs text-[var(--ecom-muted)]">完整口播</label>
               <textarea
-                className="ecom-scrollbar-thin w-full min-h-[4rem] rounded-xl border border-[#e8e8ed] px-3 py-2 text-sm"
+                className="ecom-scrollbar-thin w-full min-h-[4rem] rounded-xl border border-[var(--ecom-divider)] px-3 py-2 text-sm"
                 value={effectiveDirectPlan.fullVoiceover}
                 readOnly={!directPlanSynced && needsConfirmPreview}
                 onChange={(e) => {
@@ -1699,7 +1699,7 @@ export function SeedVideoContentPanel({
             </>
           ) : null}
           <div className="pt-1">
-            <p className="mb-2 text-xs font-medium text-[#6e6e73]">成片视频</p>
+            <p className="mb-2 text-xs font-medium text-[var(--ecom-muted)]">成片视频</p>
             <div className={ECOM_WORKSPACE_RESULT_GRID_CLASS}>
               {directVideos.map((item, index) => (
                 <EcomVideoSlot
@@ -1750,7 +1750,7 @@ export function SeedVideoContentPanel({
       {showFineProduction ? (
         <section className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-sm font-semibold text-[#1d1d1f]">方案② · 精细成片</h2>
+            <h2 className="text-sm font-semibold text-[var(--ecom-ink)]">方案② · 精细成片</h2>
             <div className="flex flex-wrap gap-2">
               <EcomButtonSecondary
                 type="button"
@@ -1795,11 +1795,11 @@ export function SeedVideoContentPanel({
             </div>
           </div>
           {!finePlanSynced && needsConfirmPreview ? (
-            <p className="rounded-lg bg-[#f5f5f7] px-3 py-2 text-xs leading-relaxed text-[#6e6e73]">
+            <p className="rounded-lg bg-[var(--ecom-parchment)] px-3 py-2 text-xs leading-relaxed text-[var(--ecom-muted)]">
               以下为脚本预览。请在右侧点「确认逐镜参数表」同步后再逐镜生成。
             </p>
           ) : (
-            <p className="text-[11px] leading-relaxed text-[#6e6e73]">
+            <p className="text-[11px] leading-relaxed text-[var(--ecom-muted)]">
               推荐顺序：① 勾选后「生成 (N)」→ ② 含口播「批量 TTS (N)」→ ③ 就绪镜头「合成成片 (N)」。
             </p>
           )}
@@ -1854,9 +1854,9 @@ export function SeedVideoContentPanel({
             batchComposeLabel={batchComposeLabel}
           />
           {finalUrl ? (
-            <div className="space-y-2 border-t border-[#e8e8ed] pt-4">
-              <h3 className="text-sm font-semibold text-[#1d1d1f]">成片视频</h3>
-              <p className="text-[11px] text-[#6e6e73]">
+            <div className="space-y-2 border-t border-[var(--ecom-divider)] pt-4">
+              <h3 className="text-sm font-semibold text-[var(--ecom-ink)]">成片视频</h3>
+              <p className="text-[11px] text-[var(--ecom-muted)]">
                 逐镜合成已完成，可预览或保存到「我的资产」。
               </p>
               <EcomDeliverableVideoPreview

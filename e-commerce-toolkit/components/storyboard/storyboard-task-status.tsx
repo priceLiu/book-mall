@@ -37,7 +37,7 @@ export function StoryboardTaskStatus({
       className={cn(
         "mx-4 mb-3 rounded-xl border",
         isContent
-          ? "border-[#e8e8ed] bg-[var(--ecom-content-highlight)]"
+          ? "border-[var(--ecom-divider)] bg-[var(--ecom-content-highlight)]"
           : "border-[var(--ecom-chrome-accent)]/35 bg-[var(--ecom-chrome-accent)]/15",
         sweep && "ecom-media-generating-sweep",
         className,
@@ -63,9 +63,9 @@ export function StoryboardTaskStatus({
           {title}
         </span>
         {open ? (
-          <ChevronUp className="h-4 w-4 text-[#6e6e73]" />
+          <ChevronUp className="h-4 w-4 text-[var(--ecom-muted)]" />
         ) : (
-          <ChevronDown className="h-4 w-4 text-[#6e6e73]" />
+          <ChevronDown className="h-4 w-4 text-[var(--ecom-muted)]" />
         )}
       </button>
       {open ? (
@@ -73,18 +73,18 @@ export function StoryboardTaskStatus({
           className={cn(
             "space-y-2 border-t px-3 py-2.5",
             isContent
-              ? "border-[#e8e8ed]"
+              ? "border-[var(--ecom-divider)]"
               : "border-[var(--ecom-chrome-accent)]/25",
           )}
         >
           {detail ? (
-            <p className="text-xs leading-relaxed text-[#6e6e73]">{detail}</p>
+            <p className="text-xs leading-relaxed text-[var(--ecom-muted)]">{detail}</p>
           ) : null}
           {progress ? (
             <p
               className={cn(
                 "text-xs font-medium",
-                isContent ? "text-[var(--ecom-ink)]" : "text-[#1d1d1f]",
+                isContent ? "text-[var(--ecom-ink)]" : "text-[var(--ecom-ink)]",
               )}
             >
               {progress.label ?? "进度"}：{progress.current}/{progress.total}

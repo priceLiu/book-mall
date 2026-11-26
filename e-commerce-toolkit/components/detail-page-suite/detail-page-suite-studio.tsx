@@ -1945,10 +1945,10 @@ function DetailPageSuiteStudioInner() {
               <DialogTitle>新增子维度</DialogTitle>
               <EcomDialogCloseButton />
             </DialogHeader>
-            <label className="block text-sm text-[#6e6e73]">
+            <label className="block text-sm text-[var(--ecom-muted)]">
               拍摄对象
               <input
-                className="mt-1 w-full rounded-lg border border-[#d2d2d7] px-3 py-2 text-sm outline-none focus:border-[var(--ecom-outline-border)]"
+                className="mt-1 w-full rounded-lg border border-[var(--ecom-border-soft)] px-3 py-2 text-sm outline-none focus:border-[var(--ecom-outline-border)]"
                 value={addItemDialog.value}
                 autoFocus
                 onChange={(e) =>

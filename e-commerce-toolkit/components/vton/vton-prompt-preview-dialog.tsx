@@ -35,12 +35,12 @@ export function VtonPromptPreviewDialog({ open, title, prompt, onClose }: Props)
         <EcomDialogCloseButton onClick={onClose} />
         <h3
           id="vton-prompt-preview-title"
-          className="pr-10 text-lg font-semibold text-[#1d1d1f]"
+          className="pr-10 text-lg font-semibold text-[var(--ecom-ink)]"
         >
           {title}
         </h3>
-        <p className="mt-1 text-xs text-[#86868b]">生成时使用的 Prompt</p>
-        <div className="ecom-scrollbar-thin mt-4 min-h-[min(32vh,320px)] max-h-[min(72vh,680px)] w-full flex-1 overflow-y-auto whitespace-pre-wrap rounded-lg bg-[#f5f5f7] px-4 py-3 text-[13px] leading-relaxed text-[#1d1d1f]">
+        <p className="mt-1 text-xs text-[var(--ecom-subtle)]">生成时使用的 Prompt</p>
+        <div className="ecom-scrollbar-thin mt-4 min-h-[min(32vh,320px)] max-h-[min(72vh,680px)] w-full flex-1 overflow-y-auto whitespace-pre-wrap rounded-lg bg-[var(--ecom-parchment)] px-4 py-3 text-[13px] leading-relaxed text-[var(--ecom-ink)]">
           {body}
         </div>
       </div>

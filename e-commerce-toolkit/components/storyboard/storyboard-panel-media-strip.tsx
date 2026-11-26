@@ -173,7 +173,7 @@ export function StoryboardPanelMediaStrip({
     <div className="space-y-8">
       <section>
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <p className="text-xs font-medium text-[#1d1d1f]">各镜头分镜图</p>
+          <p className="text-xs font-medium text-[var(--ecom-ink)]">各镜头分镜图</p>
           <div className="flex flex-wrap items-center gap-2">
             <EcomButtonSecondary
               size="sm"
@@ -200,7 +200,7 @@ export function StoryboardPanelMediaStrip({
             </EcomButtonSecondary>
           </div>
         </div>
-        <p className="mb-3 text-[11px] leading-relaxed text-[#86868b]">
+        <p className="mb-3 text-[11px] leading-relaxed text-[var(--ecom-subtle)]">
           {anyPanelHasImage
             ? "已有分镜图的镜头可勾选后「再次生成」；勾选有分镜图的镜头后可批量生成视频。合并请在下方「单镜视频」区操作。"
             : "首次生成：请点各镜头卡片「待生成」，或点上方「生成全部分镜图」。专业版故事版一键成片请在上方「故事版 · 成片工作区」勾选后生成。"}
@@ -233,11 +233,11 @@ export function StoryboardPanelMediaStrip({
         </div>
       </section>
 
-      <section className="rounded-xl border border-[#e8e8ed] bg-[#fafafa] p-4">
+      <section className="rounded-xl border border-[var(--ecom-divider)] bg-[#fafafa] p-4">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <div>
-            <p className="text-xs font-medium text-[#1d1d1f]">各镜头单镜视频</p>
-            <p className="mt-0.5 text-[11px] text-[#86868b]">
+            <p className="text-xs font-medium text-[var(--ecom-ink)]">各镜头单镜视频</p>
+            <p className="mt-0.5 text-[11px] text-[var(--ecom-subtle)]">
               已生成 {panelVideoCount} / {sheet.panels.length} 镜
             </p>
           </div>
@@ -259,7 +259,7 @@ export function StoryboardPanelMediaStrip({
             </EcomButtonPrimary>
           </div>
         </div>
-        <p className="mb-3 text-[11px] leading-relaxed text-[#86868b]">
+        <p className="mb-3 text-[11px] leading-relaxed text-[var(--ecom-subtle)]">
           勾选至少 2 个已生成的单镜视频后点「合并视频」；成片显示在下方「合并成片」区。
         </p>
         <div className="flex flex-wrap gap-4">
@@ -289,11 +289,11 @@ export function StoryboardPanelMediaStrip({
         </div>
       </section>
 
-      <section className="rounded-xl border border-[#e8e8ed] bg-white p-4">
+      <section className="rounded-xl border border-[var(--ecom-divider)] bg-white p-4">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <div>
-            <p className="text-xs font-medium text-[#1d1d1f]">合并成片</p>
-            <p className="mt-0.5 text-[11px] text-[#86868b]">
+            <p className="text-xs font-medium text-[var(--ecom-ink)]">合并成片</p>
+            <p className="mt-0.5 text-[11px] text-[var(--ecom-subtle)]">
               {hasMergedVideo
                 ? "各镜头已云端合成（含转场）"
                 : mergeBusy
@@ -321,7 +321,7 @@ export function StoryboardPanelMediaStrip({
           />
         </div>
         {mergedExpiresLabel ? (
-          <p className="mt-2 text-center text-[10px] text-[#86868b]">
+          <p className="mt-2 text-center text-[10px] text-[var(--ecom-subtle)]">
             限时下载至 {mergedExpiresLabel}，请及时保存；到期后云端文件将清理。
           </p>
         ) : null}

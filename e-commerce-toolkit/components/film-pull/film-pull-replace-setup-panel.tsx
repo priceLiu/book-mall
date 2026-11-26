@@ -32,10 +32,10 @@ export function FilmPullReplaceSetupPanel({
   }));
 
   return (
-    <div className="space-y-4 rounded-xl border border-[#e8e8ed] bg-white p-4">
+    <div className="space-y-4 rounded-xl border border-[var(--ecom-divider)] bg-white p-4">
       <div>
-        <h3 className="text-sm font-semibold text-[#1d1d1f]">换角出镜 · 角色参考</h3>
-        <p className="mt-1 text-[11px] leading-relaxed text-[#6e6e73]">
+        <h3 className="text-sm font-semibold text-[var(--ecom-ink)]">换角出镜 · 角色参考</h3>
+        <p className="mt-1 text-[11px] leading-relaxed text-[var(--ecom-muted)]">
           上传新角色参考图并补充描述，渲染脚本将把原片人物替换为新角色后逐镜出视频。
         </p>
       </div>
@@ -55,12 +55,12 @@ export function FilmPullReplaceSetupPanel({
         }}
       />
       <div className="space-y-1.5">
-        <label className="text-xs font-semibold text-[#1d1d1f]" htmlFor="film-pull-character-desc">
+        <label className="text-xs font-semibold text-[var(--ecom-ink)]" htmlFor="film-pull-character-desc">
           角色描述
         </label>
         <textarea
           id="film-pull-character-desc"
-          className="w-full resize-y rounded-lg border border-[#d2d2d7] bg-[#fafafa] px-3 py-2.5 text-sm leading-relaxed outline-none placeholder:text-[#86868b] focus:border-[var(--ecom-outline-border)] focus:bg-white focus:ring-2 focus:ring-[#1d1d1f]/15 disabled:opacity-60"
+          className="w-full resize-y rounded-lg border border-[var(--ecom-border-soft)] bg-[#fafafa] px-3 py-2.5 text-sm leading-relaxed outline-none placeholder:text-[var(--ecom-subtle)] focus:border-[var(--ecom-outline-border)] focus:bg-white focus:ring-2 focus:ring-[var(--ecom-ink)]/15 disabled:opacity-60"
           rows={4}
           placeholder="例如：25 岁亚裔女性，黑色短发，休闲白 T，气质阳光…"
           value={characterDescription}

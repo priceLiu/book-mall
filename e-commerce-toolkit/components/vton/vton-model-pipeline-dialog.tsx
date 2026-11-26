@@ -81,8 +81,8 @@ const MODE_COPY: Record<
 
 function metricInputClass(disabled?: boolean): string {
   return cn(
-    "w-full rounded-md border border-[#e8e8ed] px-2 py-1.5 text-[11px] text-[#1d1d1f] outline-none focus:border-[var(--ecom-outline-border)]",
-    disabled && "cursor-not-allowed bg-[#f5f5f7] opacity-60",
+    "w-full rounded-md border border-[var(--ecom-divider)] px-2 py-1.5 text-[11px] text-[var(--ecom-ink)] outline-none focus:border-[var(--ecom-outline-border)]",
+    disabled && "cursor-not-allowed bg-[var(--ecom-parchment)] opacity-60",
   );
 }
 
@@ -225,19 +225,19 @@ export function VtonModelPipelineDialog({
       aria-labelledby="vton-model-pipeline-title"
       onMouseDown={ecomModalBackdropMouseDown(onClose, { disabled: busy })}
     >
-      <div className="relative flex max-h-[min(90vh,760px)] w-full max-w-3xl flex-col rounded-2xl border border-[#e8e8ed] bg-white shadow-xl">
+      <div className="relative flex max-h-[min(90vh,760px)] w-full max-w-3xl flex-col rounded-2xl border border-[var(--ecom-divider)] bg-white shadow-xl">
         <EcomDialogCloseButton disabled={busy} onClick={onClose} />
-        <div className="border-b border-[#e8e8ed] px-5 py-4 pr-14">
-          <h3 id="vton-model-pipeline-title" className="text-base font-semibold text-[#1d1d1f]">
+        <div className="border-b border-[var(--ecom-divider)] px-5 py-4 pr-14">
+          <h3 id="vton-model-pipeline-title" className="text-base font-semibold text-[var(--ecom-ink)]">
             {copy.title}
           </h3>
-          <p className="mt-1 text-xs text-[#86868b]">{copy.hint}</p>
+          <p className="mt-1 text-xs text-[var(--ecom-subtle)]">{copy.hint}</p>
         </div>
 
         <>
           <div className="ecom-scrollbar-thin min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
-              <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[#e8e8ed] bg-[#fafafa] px-3 py-2.5">
-                <span className="text-xs font-medium text-[#6e6e73]">出图精度</span>
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--ecom-divider)] bg-[#fafafa] px-3 py-2.5">
+                <span className="text-xs font-medium text-[var(--ecom-muted)]">出图精度</span>
                 <VtonImageQualityPicker
                   value={imageSize}
                   onChange={setImageSize}
@@ -246,8 +246,8 @@ export function VtonModelPipelineDialog({
               </div>
 
               <div>
-                <p className="mb-2 text-xs font-medium text-[#6e6e73]">出图比例</p>
-                <div className="inline-flex flex-wrap gap-1 rounded-lg border border-[#e8e8ed] bg-[#f5f5f7] p-0.5">
+                <p className="mb-2 text-xs font-medium text-[var(--ecom-muted)]">出图比例</p>
+                <div className="inline-flex flex-wrap gap-1 rounded-lg border border-[var(--ecom-divider)] bg-[var(--ecom-parchment)] p-0.5">
                   {VTON_MODEL_PIPELINE_RATIO_OPTIONS.map((opt) => {
                     const active = ratio === opt.value;
                     return (
@@ -259,8 +259,8 @@ export function VtonModelPipelineDialog({
                         className={cn(
                           "rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors",
                           active
-                            ? "bg-white text-[#1d1d1f] shadow-sm"
-                            : "text-[#6e6e73] hover:text-[#1d1d1f]",
+                            ? "bg-white text-[var(--ecom-ink)] shadow-sm"
+                            : "text-[var(--ecom-muted)] hover:text-[var(--ecom-ink)]",
                         )}
                         onClick={() => setRatio(opt.value)}
                       >
@@ -271,8 +271,8 @@ export function VtonModelPipelineDialog({
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[#e8e8ed] bg-[#fafafa] px-3 py-2">
-                <span className="text-xs text-[#6e6e73]">生图模型</span>
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[var(--ecom-divider)] bg-[#fafafa] px-3 py-2">
+                <span className="text-xs text-[var(--ecom-muted)]">生图模型</span>
                 <EcomButtonSecondary
                   size="sm"
                   type="button"
@@ -285,11 +285,11 @@ export function VtonModelPipelineDialog({
               </div>
 
               {localLoadError && effectiveImageModels.length === 0 ? (
-                <p className="rounded-lg border border-[#ffd6a5] bg-[#fff8ed] px-3 py-2 text-xs text-[#6e6e73]">
+                <p className="rounded-lg border border-[#ffd6a5] bg-[#fff8ed] px-3 py-2 text-xs text-[var(--ecom-muted)]">
                   {localLoadError}
                   <button
                     type="button"
-                    className="ml-2 text-[#0071e3]"
+                    className="ml-2 text-[var(--ecom-primary)]"
                     disabled={localLoading}
                     onClick={() => void refreshModels()}
                   >
@@ -299,7 +299,7 @@ export function VtonModelPipelineDialog({
               ) : null}
 
               <div>
-                <p className="mb-2 text-xs font-medium text-[#6e6e73]">年龄段</p>
+                <p className="mb-2 text-xs font-medium text-[var(--ecom-muted)]">年龄段</p>
                 <div className="flex flex-wrap gap-1.5">
                   {VTON_MODEL_AGE_GROUP_OPTIONS.map((opt) => (
                     <button
@@ -309,8 +309,8 @@ export function VtonModelPipelineDialog({
                       className={cn(
                         "rounded-full border px-3 py-1 text-[11px] font-medium transition",
                         ageGroup === opt.value
-                          ? "border-[var(--ecom-outline-border)] bg-[#f0f6ff] text-[#0071e3]"
-                          : "border-[#e8e8ed] text-[#6e6e73] hover:border-[var(--ecom-outline-border)]",
+                          ? "border-[var(--ecom-outline-border)] bg-[var(--ecom-content-selected-bg)] text-[var(--ecom-primary)]"
+                          : "border-[var(--ecom-divider)] text-[var(--ecom-muted)] hover:border-[var(--ecom-outline-border)]",
                       )}
                       onClick={() => setAgeGroup(opt.value)}
                     >
@@ -321,7 +321,7 @@ export function VtonModelPipelineDialog({
               </div>
 
               <div>
-                <p className="mb-2 text-xs font-medium text-[#6e6e73]">体型预设</p>
+                <p className="mb-2 text-xs font-medium text-[var(--ecom-muted)]">体型预设</p>
                 <div className="grid gap-1.5 sm:grid-cols-2">
                   {VTON_MODEL_BODY_PRESET_OPTIONS.map((opt) => {
                     const active = bodyPreset === opt.value;
@@ -333,13 +333,13 @@ export function VtonModelPipelineDialog({
                         className={cn(
                           "rounded-lg border px-3 py-2 text-left transition",
                           active
-                            ? "border-[var(--ecom-outline-border)] bg-[#f0f6ff]"
-                            : "border-[#e8e8ed] bg-white hover:border-[var(--ecom-outline-border)]",
+                            ? "border-[var(--ecom-outline-border)] bg-[var(--ecom-content-selected-bg)]"
+                            : "border-[var(--ecom-divider)] bg-white hover:border-[var(--ecom-outline-border)]",
                         )}
                         onClick={() => setBodyPreset(opt.value)}
                       >
-                        <p className="text-[12px] font-medium text-[#1d1d1f]">{opt.label}</p>
-                        <p className="text-[10px] text-[#86868b]">{opt.hint}</p>
+                        <p className="text-[12px] font-medium text-[var(--ecom-ink)]">{opt.label}</p>
+                        <p className="text-[10px] text-[var(--ecom-subtle)]">{opt.hint}</p>
                       </button>
                     );
                   })}
@@ -347,12 +347,12 @@ export function VtonModelPipelineDialog({
               </div>
 
               <div>
-                <p className="mb-2 text-xs font-medium text-[#6e6e73]">
+                <p className="mb-2 text-xs font-medium text-[var(--ecom-muted)]">
                   身材参考（可选 · 类似试衣间尺码）
                 </p>
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
                   <label className="space-y-1">
-                    <span className="text-[10px] text-[#86868b]">身高 cm</span>
+                    <span className="text-[10px] text-[var(--ecom-subtle)]">身高 cm</span>
                     <input
                       className={metricInputClass(busy)}
                       value={heightCm}
@@ -363,7 +363,7 @@ export function VtonModelPipelineDialog({
                     />
                   </label>
                   <label className="space-y-1">
-                    <span className="text-[10px] text-[#86868b]">体重 kg</span>
+                    <span className="text-[10px] text-[var(--ecom-subtle)]">体重 kg</span>
                     <input
                       className={metricInputClass(busy)}
                       value={weightKg}
@@ -374,7 +374,7 @@ export function VtonModelPipelineDialog({
                     />
                   </label>
                   <label className="space-y-1">
-                    <span className="text-[10px] text-[#86868b]">胸围 cm</span>
+                    <span className="text-[10px] text-[var(--ecom-subtle)]">胸围 cm</span>
                     <input
                       className={metricInputClass(busy)}
                       value={bustCm}
@@ -384,7 +384,7 @@ export function VtonModelPipelineDialog({
                     />
                   </label>
                   <label className="space-y-1">
-                    <span className="text-[10px] text-[#86868b]">腰围 cm</span>
+                    <span className="text-[10px] text-[var(--ecom-subtle)]">腰围 cm</span>
                     <input
                       className={metricInputClass(busy)}
                       value={waistCm}
@@ -394,7 +394,7 @@ export function VtonModelPipelineDialog({
                     />
                   </label>
                   <label className="space-y-1">
-                    <span className="text-[10px] text-[#86868b]">臀围 cm</span>
+                    <span className="text-[10px] text-[var(--ecom-subtle)]">臀围 cm</span>
                     <input
                       className={metricInputClass(busy)}
                       value={hipsCm}
@@ -407,11 +407,11 @@ export function VtonModelPipelineDialog({
               </div>
 
               <div>
-                <label className="mb-2 block text-xs font-medium text-[#6e6e73]">
+                <label className="mb-2 block text-xs font-medium text-[var(--ecom-muted)]">
                   外貌细节（可选）
                 </label>
                 <input
-                  className="w-full rounded-lg border border-[#e8e8ed] px-3 py-2 text-xs text-[#1d1d1f] outline-none focus:border-[var(--ecom-outline-border)]"
+                  className="w-full rounded-lg border border-[var(--ecom-divider)] px-3 py-2 text-xs text-[var(--ecom-ink)] outline-none focus:border-[var(--ecom-outline-border)]"
                   value={featureDetail}
                   disabled={busy}
                   placeholder="例如：眼角有泪痣、自然卷发…"
@@ -420,9 +420,9 @@ export function VtonModelPipelineDialog({
               </div>
 
               <div>
-                <p className="mb-2 text-xs font-medium text-[#6e6e73]">{copy.promptLabel}</p>
+                <p className="mb-2 text-xs font-medium text-[var(--ecom-muted)]">{copy.promptLabel}</p>
                 <textarea
-                  className="ecom-scrollbar-thin min-h-[140px] w-full resize-y rounded-lg border border-[#e8e8ed] px-3 py-2.5 text-[13px] leading-relaxed text-[#1d1d1f] focus:border-[var(--ecom-outline-border)] focus:outline-none focus:ring-2 focus:ring-[#1d1d1f]/12 disabled:cursor-not-allowed disabled:bg-[#f5f5f7]"
+                  className="ecom-scrollbar-thin min-h-[140px] w-full resize-y rounded-lg border border-[var(--ecom-divider)] px-3 py-2.5 text-[13px] leading-relaxed text-[var(--ecom-ink)] focus:border-[var(--ecom-outline-border)] focus:outline-none focus:ring-2 focus:ring-[var(--ecom-ink)]/12 disabled:cursor-not-allowed disabled:bg-[var(--ecom-parchment)]"
                   value={draftPrompt}
                   disabled={busy}
                   placeholder={
@@ -433,7 +433,7 @@ export function VtonModelPipelineDialog({
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center justify-end gap-2 border-t border-[#e8e8ed] px-5 py-4">
+            <div className="flex flex-wrap items-center justify-end gap-2 border-t border-[var(--ecom-divider)] px-5 py-4">
               <EcomGenerateCreditsBeside
                 modelKey={draftModelKey}
                 imageCount={1}

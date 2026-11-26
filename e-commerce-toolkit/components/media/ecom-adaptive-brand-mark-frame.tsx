@@ -55,7 +55,7 @@ export function EcomAdaptiveBrandMarkFrame({
       style={{ maxWidth: maxWidthPx }}
     >
       <div
-        className="relative w-full overflow-hidden rounded-lg border border-[#e8e8ed] bg-[#fafafa]"
+        className="relative w-full overflow-hidden rounded-lg border border-[var(--ecom-divider)] bg-[#fafafa]"
         style={{ aspectRatio: ASPECT_CSS[aspect] }}
       >
         {children}
@@ -70,7 +70,7 @@ export function EcomAdaptiveBrandMarkFrame({
           />
         ) : null}
         {!children && !hasSrc && emptyLabel ? (
-          <div className="flex h-full min-h-[80px] items-center justify-center px-2 text-center text-xs text-[#86868b]">
+          <div className="flex h-full min-h-[80px] items-center justify-center px-2 text-center text-xs text-[var(--ecom-subtle)]">
             {emptyLabel}
           </div>
         ) : null}

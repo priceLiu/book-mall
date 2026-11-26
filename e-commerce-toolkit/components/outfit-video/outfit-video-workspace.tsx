@@ -328,10 +328,10 @@ export function OutfitVideoWorkspace({
   }
 
   const workspaceHeader = (
-    <header className="z-20 shrink-0 border-b border-[#e8e8ed] bg-white px-5 py-3 shadow-[0_1px_0_0_rgba(0,0,0,0.04)]">
+    <header className="z-20 shrink-0 border-b border-[var(--ecom-divider)] bg-white px-5 py-3 shadow-[0_1px_0_0_rgba(0,0,0,0.04)]">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <EcomWorkspaceTitleHeading title="穿搭动作迁移">
-          <p className="text-[11px] text-[#6e6e73]">
+          <p className="text-[11px] text-[var(--ecom-muted)]">
             上传参考视频，拆镜后锁定穿搭参考，逐镜动作迁移并合成竖屏成片。
           </p>
         </EcomWorkspaceTitleHeading>
@@ -395,7 +395,7 @@ export function OutfitVideoWorkspace({
           onClear={onClearReferenceVideo}
         />
 
-        <div className="space-y-2 rounded-xl border border-[#e8e8ed] bg-white p-4">
+        <div className="space-y-2 rounded-xl border border-[var(--ecom-divider)] bg-white p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <button
               type="button"
@@ -403,10 +403,10 @@ export function OutfitVideoWorkspace({
               aria-expanded={splitPromptExpanded}
               onClick={() => setSplitPromptExpanded((v) => !v)}
             >
-              <span className="text-sm font-semibold text-[#1d1d1f]">拆解指令</span>
+              <span className="text-sm font-semibold text-[var(--ecom-ink)]">拆解指令</span>
               <ChevronDown
                 className={cn(
-                  "h-4 w-4 shrink-0 text-[#6e6e73] transition-transform",
+                  "h-4 w-4 shrink-0 text-[var(--ecom-muted)] transition-transform",
                   splitPromptExpanded && "rotate-180",
                 )}
                 aria-hidden
@@ -463,9 +463,9 @@ export function OutfitVideoWorkspace({
         <OutfitSplitProgressStrip active={Boolean(splitting)} progress={splitProgress} />
 
             {hasScenes ? (
-              <section className="space-y-3 rounded-xl border border-[#e8e8ed] bg-white p-4">
-                <h2 className="text-sm font-semibold text-[#1d1d1f]">拆解分镜表</h2>
-                <p className="text-xs text-[#6e6e73]">
+              <section className="space-y-3 rounded-xl border border-[var(--ecom-divider)] bg-white p-4">
+                <h2 className="text-sm font-semibold text-[var(--ecom-ink)]">拆解分镜表</h2>
+                <p className="text-xs text-[var(--ecom-muted)]">
                   来自参考视频拉片；可删镜、调序、编辑运镜/动作/光影/场景描述，作为 AI 生成制作表的输入。
                 </p>
                 {isStubSplitSceneList ? (

@@ -1090,8 +1090,8 @@ function DetailPageSuiteReplicaStudioInner() {
           {...chromeProjectHandlers}
         />
         <div className="ecom-scrollbar-overlay min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-y-contain">
-        <div className="border-b border-[#e8e8ed] bg-[#fafafa] px-5 py-4">
-          <h1 className="mb-3 text-base font-semibold text-[#1d1d1f]">上传与拆解</h1>
+        <div className="border-b border-[var(--ecom-divider)] bg-[#fafafa] px-5 py-4">
+          <h1 className="mb-3 text-base font-semibold text-[var(--ecom-ink)]">上传与拆解</h1>
           <div className="mb-4 grid gap-4 lg:grid-cols-3">
             <EcomRefUploadCard
               title="参考详情长图"
@@ -1162,10 +1162,10 @@ function DetailPageSuiteReplicaStudioInner() {
             />
           </div>
           <div className="mb-3">
-            <label className="mb-1 block text-sm font-medium text-[#1d1d1f]">卖点（五段式）</label>
+            <label className="mb-1 block text-sm font-medium text-[var(--ecom-ink)]">卖点（五段式）</label>
             <EcomSellpointFivePartHint />
             <textarea
-              className="min-h-[160px] w-full rounded-lg border border-[#d2d2d7] px-3 py-2 font-mono text-sm leading-relaxed"
+              className="min-h-[160px] w-full rounded-lg border border-[var(--ecom-border-soft)] px-3 py-2 font-mono text-sm leading-relaxed"
               value={sellpointDraft}
               onChange={(e) => setSellpointDraft(e.target.value)}
               placeholder={ECOM_SELLPOINT_FIVE_PART_PLACEHOLDER}
@@ -1212,17 +1212,17 @@ function DetailPageSuiteReplicaStudioInner() {
           {project.meta?.replicaWarning ? (
             <p className="mt-2 text-xs text-amber-800">{project.meta.replicaWarning}</p>
           ) : null}
-          <p className="mt-2 text-[11px] text-[#86868b]">
+          <p className="mt-2 text-[11px] text-[var(--ecom-subtle)]">
             拆解仅依赖参考长图；产品/模特用于卖点识图与出图，可在拆解后补传。
           </p>
         </div>
 
         {inventorySegments?.length ? (
-          <div className="border-b border-[#e8e8ed] bg-[#fafafa] px-5 py-3">
+          <div className="border-b border-[var(--ecom-divider)] bg-[#fafafa] px-5 py-3">
             <h2 className="text-sm font-semibold">
               画面清单（{inventorySegments.length} 条 · 自上而下）
             </h2>
-            <p className="mt-1 text-[11px] text-[#86868b]">
+            <p className="mt-1 text-[11px] text-[var(--ecom-subtle)]">
               先完整列段，再归入 12 模块；待归类项请选择模块后才会进入下方模块拆解与润色。
             </p>
             <ul className="mt-3 max-h-72 space-y-2 overflow-y-auto text-xs">
@@ -1234,10 +1234,10 @@ function DetailPageSuiteReplicaStudioInner() {
                 return (
                   <li
                     key={seg.item_key}
-                    className="rounded-lg border border-[#e8e8ed] bg-white p-2"
+                    className="rounded-lg border border-[var(--ecom-divider)] bg-white p-2"
                   >
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-medium text-[#1d1d1f]">
+                      <span className="font-medium text-[var(--ecom-ink)]">
                         #{seg.segmentIndex ?? "—"} {seg.item_label}
                       </span>
                       {pending ? (
@@ -1246,7 +1246,7 @@ function DetailPageSuiteReplicaStudioInner() {
                         </span>
                       ) : null}
                       <select
-                        className="ml-auto max-w-[220px] rounded-md border border-[#d2d2d7] bg-white px-2 py-1 text-[11px]"
+                        className="ml-auto max-w-[220px] rounded-md border border-[var(--ecom-border-soft)] bg-white px-2 py-1 text-[11px]"
                         disabled={replicaBusy || segmentAssignBusyKey === seg.item_key}
                         value={mapped}
                         onChange={(e) => {
@@ -1287,13 +1287,13 @@ function DetailPageSuiteReplicaStudioInner() {
                       </select>
                     </div>
                     {seg.layoutHint ? (
-                      <p className="mt-1 text-[#6e6e73]">版式：{seg.layoutHint}</p>
+                      <p className="mt-1 text-[var(--ecom-muted)]">版式：{seg.layoutHint}</p>
                     ) : null}
                     {copyLines.length ? (
                       <p className="mt-1 text-[#424245]">参考文案：{copyLines.join(" / ")}</p>
                     ) : null}
                     {detailLines.length ? (
-                      <ul className="mt-0.5 list-disc pl-4 text-[#6e6e73]">
+                      <ul className="mt-0.5 list-disc pl-4 text-[var(--ecom-muted)]">
                         {detailLines.map((line) => (
                           <li key={line}>{line}</li>
                         ))}
@@ -1307,7 +1307,7 @@ function DetailPageSuiteReplicaStudioInner() {
         ) : null}
 
         {phaseA ? (
-          <div className="border-b border-[#e8e8ed] bg-white px-5 py-3">
+          <div className="border-b border-[var(--ecom-divider)] bg-white px-5 py-3">
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-sm font-semibold">按模块汇总（只读）</h2>
               <div className="flex flex-wrap items-center gap-2">
@@ -1342,7 +1342,7 @@ function DetailPageSuiteReplicaStudioInner() {
             </div>
             <div className="space-y-2 text-xs text-[#424245]">
               {phaseA.map((m) => (
-                <div key={m.module_id} className="rounded-lg border border-[#e8e8ed] p-2">
+                <div key={m.module_id} className="rounded-lg border border-[var(--ecom-divider)] p-2">
                   <label className="flex cursor-pointer items-start gap-2">
                     <input
                       type="checkbox"
@@ -1363,21 +1363,21 @@ function DetailPageSuiteReplicaStudioInner() {
                       {m.items?.length ? ` · ${m.items.length} 条` : ""}
                     </span>
                   </label>
-                  {m.coverageNote ? <p className="text-[#6e6e73]">{m.coverageNote}</p> : null}
+                  {m.coverageNote ? <p className="text-[var(--ecom-muted)]">{m.coverageNote}</p> : null}
                   {m.items?.length ? (
                     <ul className="mt-1 space-y-2">
                       {m.items.map((it, i) => {
                         const copyLines = formatReferenceCopyHints(it.referenceCopyHints);
                         const detailLines = formatVisualDetailLines(it.visualDetail);
                         return (
-                          <li key={i} className="list-none rounded-md bg-[#f5f5f7] px-2 py-1.5">
-                            <div className="font-medium text-[#1d1d1f]">{it.item_label}</div>
+                          <li key={i} className="list-none rounded-md bg-[var(--ecom-parchment)] px-2 py-1.5">
+                            <div className="font-medium text-[var(--ecom-ink)]">{it.item_label}</div>
                             {it.layoutHint ? (
-                              <p className="text-[#6e6e73]">版式：{it.layoutHint}</p>
+                              <p className="text-[var(--ecom-muted)]">版式：{it.layoutHint}</p>
                             ) : null}
                             {copyLines.length ? (
                               <div className="mt-1">
-                                <p className="text-[11px] font-medium text-[#1d1d1f]">参考文案</p>
+                                <p className="text-[11px] font-medium text-[var(--ecom-ink)]">参考文案</p>
                                 <ul className="mt-0.5 list-disc pl-4 text-[#424245]">
                                   {copyLines.map((line) => (
                                     <li key={line}>{line}</li>
@@ -1397,7 +1397,7 @@ function DetailPageSuiteReplicaStudioInner() {
                       })}
                     </ul>
                   ) : (
-                    <p className="ml-6 text-[#86868b]">无</p>
+                    <p className="ml-6 text-[var(--ecom-subtle)]">无</p>
                   )}
                 </div>
               ))}

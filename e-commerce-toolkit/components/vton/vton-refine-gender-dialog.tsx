@@ -37,8 +37,8 @@ function GenderOption({
       className={cn(
         "flex-1 rounded-lg border px-3 py-2 text-sm transition",
         selected
-          ? "border-[var(--ecom-outline-border)] bg-[#f0f6ff] text-[#0071e3]"
-          : "border-[#e8e8ed] bg-white text-[#1d1d1f] hover:border-[var(--ecom-outline-border)]",
+          ? "border-[var(--ecom-outline-border)] bg-[var(--ecom-content-selected-bg)] text-[var(--ecom-primary)]"
+          : "border-[var(--ecom-divider)] bg-white text-[var(--ecom-ink)] hover:border-[var(--ecom-outline-border)]",
       )}
       onClick={onSelect}
     >

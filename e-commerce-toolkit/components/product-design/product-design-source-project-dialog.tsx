@@ -98,21 +98,21 @@ export function ProductDesignSourceProjectDialog({
       <DialogContent className="flex max-h-[85vh] max-w-2xl flex-col gap-0 overflow-hidden p-0">
         <DialogHeader className="border-b border-[#f0f0f2] px-5 py-4">
           <DialogTitle className="text-[15px]">从已有主图项目导入</DialogTitle>
-          <p className="text-[12px] text-[#86868b]">
+          <p className="text-[12px] text-[var(--ecom-subtle)]">
             导入信息采集、平台拆解、营销方案与购买理由（Step0–3），导入后仍可在中间工作区修改。
           </p>
         </DialogHeader>
 
         <div className="ecom-scrollbar-thin min-h-0 flex-1 overflow-y-auto px-5 py-4">
           {loading ? (
-            <div className="grid place-items-center gap-2 py-14 text-sm text-[#86868b]">
+            <div className="grid place-items-center gap-2 py-14 text-sm text-[var(--ecom-subtle)]">
               <Loader2 className="h-5 w-5 animate-spin" />
               正在加载主图项目…
             </div>
           ) : error ? (
             <p className="py-14 text-center text-sm text-[#c0392b]">{error}</p>
           ) : projects.length === 0 ? (
-            <p className="py-14 text-center text-sm text-[#86868b]">
+            <p className="py-14 text-center text-sm text-[var(--ecom-subtle)]">
               还没有主图项目。可以先去「电商产品主图创作」做一个，或直接从头开始做详情页。
             </p>
           ) : (
@@ -129,11 +129,11 @@ export function ProductDesignSourceProjectDialog({
                     className={cn(
                       "flex items-center gap-3 rounded-xl border-2 p-2.5 text-left transition-colors",
                       active
-                        ? "border-[var(--ecom-outline-border)] bg-[#f0f6ff]"
-                        : "border-[#e8e8ed] bg-white hover:border-[#d2d2d7]",
+                        ? "border-[var(--ecom-outline-border)] bg-[var(--ecom-content-selected-bg)]"
+                        : "border-[var(--ecom-divider)] bg-white hover:border-[var(--ecom-border-soft)]",
                     )}
                   >
-                    <span className="relative grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-lg bg-[#f5f5f7]">
+                    <span className="relative grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-lg bg-[var(--ecom-parchment)]">
                       {p.thumbnailUrl ? (
                         <Image
                           src={p.thumbnailUrl}
@@ -147,10 +147,10 @@ export function ProductDesignSourceProjectDialog({
                       )}
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[13px] font-medium text-[#1d1d1f]">
+                      <span className="block truncate text-[13px] font-medium text-[var(--ecom-ink)]">
                         {p.productName ?? p.title ?? "未命名项目"}
                       </span>
-                      <span className="mt-0.5 block text-[11px] text-[#86868b]">
+                      <span className="mt-0.5 block text-[11px] text-[var(--ecom-subtle)]">
                         {platform} · 主图 {p.mainImageCount ?? 0} 张 ·{" "}
                         {formatUpdatedAt(p.updatedAt)}
                       </span>
@@ -161,7 +161,7 @@ export function ProductDesignSourceProjectDialog({
                       ) : null}
                     </span>
                     {active ? (
-                      <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-[#0071e3] text-white">
+                      <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-[var(--ecom-primary)] text-white">
                         <Check className="h-3 w-3" strokeWidth={3} />
                       </span>
                     ) : null}
@@ -174,19 +174,19 @@ export function ProductDesignSourceProjectDialog({
 
         {selected ? (
           <div className="flex flex-col gap-2 border-t border-[#f0f0f2] px-5 py-3">
-            <label className="flex items-center gap-2 text-[12px] text-[#1d1d1f]">
+            <label className="flex items-center gap-2 text-[12px] text-[var(--ecom-ink)]">
               <input
                 type="checkbox"
                 checked={productRefs}
                 onChange={(e) => setProductRefs(e.target.checked)}
-                className="h-3.5 w-3.5 accent-[#0071e3]"
+                className="h-3.5 w-3.5 accent-[var(--ecom-primary)]"
               />
               一并导入产品图
             </label>
             <label
               className={cn(
                 "flex items-center gap-2 text-[12px]",
-                selectedMainImageCount > 0 ? "text-[#1d1d1f]" : "text-[#c7c7cc]",
+                selectedMainImageCount > 0 ? "text-[var(--ecom-ink)]" : "text-[#c7c7cc]",
               )}
             >
               <input
@@ -194,7 +194,7 @@ export function ProductDesignSourceProjectDialog({
                 checked={mainImagesAsStyleRefs && selectedMainImageCount > 0}
                 disabled={selectedMainImageCount === 0}
                 onChange={(e) => setMainImagesAsStyleRefs(e.target.checked)}
-                className="h-3.5 w-3.5 accent-[#0071e3]"
+                className="h-3.5 w-3.5 accent-[var(--ecom-primary)]"
               />
               用主图成品作为详情页风格参考（最多 3 张）
             </label>

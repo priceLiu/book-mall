@@ -42,7 +42,7 @@ export function NormalizedBboxCropImg({
   const src = cropUrl ?? fallback;
 
   return (
-    <span className={cn("relative block overflow-hidden bg-[#f5f5f7]", className)}>
+    <span className={cn("relative block overflow-hidden bg-[var(--ecom-parchment)]", className)}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={src}

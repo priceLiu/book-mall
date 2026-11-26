@@ -468,8 +468,8 @@ export function BrandViStudio() {
     return (
       <EcomWorkspaceLayout fullWidth>
         <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4 px-6 py-16 text-center">
-          <h2 className="text-xl font-semibold text-[#1d1d1f]">品牌VI表情包SOP</h2>
-          <p className="max-w-md text-sm text-[#6e6e73]">
+          <h2 className="text-xl font-semibold text-[var(--ecom-ink)]">品牌VI表情包SOP</h2>
+          <p className="max-w-md text-sm text-[var(--ecom-muted)]">
             上传一张手绘参考图，分 8 步做出品牌 IP VI 与表情包：主形象、规范三件套、盲盒卡、周边样机、包装、表情包，直到小红书长图、拼版规范页与作品集。
           </p>
           <EcomButtonSecondary

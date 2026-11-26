@@ -59,7 +59,7 @@ export function ProductDesignEditableField({
           <span
             className={cn(
               "text-[10px] font-medium",
-              isDark ? "text-[var(--ecom-chrome-text-subtle)]" : "text-[#86868b]",
+              isDark ? "text-[var(--ecom-chrome-text-subtle)]" : "text-[var(--ecom-subtle)]",
             )}
           >
             {label}
@@ -70,7 +70,7 @@ export function ProductDesignEditableField({
             "w-full rounded-lg border px-2 py-1.5 text-[11px] outline-none",
             isDark
               ? "border-[var(--ecom-chrome-accent)]/50 bg-[var(--ecom-chrome-surface-raised)] text-[var(--ecom-chrome-text)] ring-2 ring-[var(--ecom-chrome-accent)]/20"
-              : "border-[var(--ecom-outline-border)] bg-white text-[#1d1d1f] ring-2 ring-[#1d1d1f]/12",
+              : "border-[var(--ecom-outline-border)] bg-white text-[var(--ecom-ink)] ring-2 ring-[var(--ecom-ink)]/12",
           )}
           value={draft}
           rows={multiline ? rows : undefined}
@@ -124,7 +124,7 @@ export function ProductDesignEditableField({
           <span
             className={cn(
               "mb-0.5 block text-[10px] font-medium",
-              isDark ? "text-[var(--ecom-chrome-text-subtle)]" : "text-[#86868b]",
+              isDark ? "text-[var(--ecom-chrome-text-subtle)]" : "text-[var(--ecom-subtle)]",
             )}
           >
             {label}
@@ -133,7 +133,7 @@ export function ProductDesignEditableField({
         <p
           className={cn(
             "whitespace-pre-wrap text-[11px] leading-relaxed",
-            isDark ? "text-[var(--ecom-chrome-text-muted)]" : "text-[#6e6e73]",
+            isDark ? "text-[var(--ecom-chrome-text-muted)]" : "text-[var(--ecom-muted)]",
           )}
         >
           {value || "—"}
@@ -145,7 +145,7 @@ export function ProductDesignEditableField({
           "mt-0.5 shrink-0 rounded p-1 opacity-0 transition group-hover:opacity-100",
           isDark
             ? "text-[var(--ecom-chrome-text-subtle)] hover:bg-[var(--ecom-chrome-hover)] hover:text-[var(--ecom-chrome-text)]"
-            : "text-[#86868b] hover:bg-[#f0f0f2] hover:text-[#1d1d1f]",
+            : "text-[var(--ecom-subtle)] hover:bg-[#f0f0f2] hover:text-[var(--ecom-ink)]",
         )}
         title="编辑"
         onClick={() => setEditing(true)}

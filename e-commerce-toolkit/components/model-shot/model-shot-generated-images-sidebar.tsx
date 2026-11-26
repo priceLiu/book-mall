@@ -29,8 +29,8 @@ export function ModelShotGeneratedImagesSidebar({
   return (
     <aside className="sticky top-[5.5rem] flex w-[108px] shrink-0 flex-col self-start">
       <div className="mb-1.5 shrink-0 border-b border-[#f0f0f2] pb-1.5">
-        <h4 className="text-[11px] font-semibold text-[#1d1d1f]">全部成图</h4>
-        <p className="mt-0.5 text-[9px] text-[#86868b]">{entries.length} 张</p>
+        <h4 className="text-[11px] font-semibold text-[var(--ecom-ink)]">全部成图</h4>
+        <p className="mt-0.5 text-[9px] text-[var(--ecom-subtle)]">{entries.length} 张</p>
       </div>
       <div className="ecom-scrollbar-overlay max-h-[calc(100dvh-9rem)] overflow-y-auto overscroll-y-contain pr-0.5">
         <ul className="flex flex-col gap-1.5 pb-1">
@@ -46,13 +46,13 @@ export function ModelShotGeneratedImagesSidebar({
                   className={cn(
                     "group block w-full overflow-hidden rounded-md border text-left transition",
                     isActive
-                      ? "border-[var(--ecom-outline-border)] ring-1 ring-[#1d1d1f]/15"
-                      : "border-[#e8e8ed] hover:border-[#d2d2d7]",
+                      ? "border-[var(--ecom-outline-border)] ring-1 ring-[var(--ecom-ink)]/15"
+                      : "border-[var(--ecom-divider)] hover:border-[var(--ecom-border-soft)]",
                   )}
                   onClick={() => onPreview(entry.url, label)}
                   title={label}
                 >
-                  <div className="relative aspect-[3/4] w-full bg-[#f5f5f7]">
+                  <div className="relative aspect-[3/4] w-full bg-[var(--ecom-parchment)]">
                     <Image
                       src={entry.url}
                       alt={label}
@@ -65,7 +65,7 @@ export function ModelShotGeneratedImagesSidebar({
                     <p className="line-clamp-2 text-[9px] leading-tight text-[#424245]">
                       {entry.poseTitle}
                       {entry.versionCount > 1 ? (
-                        <span className="text-[#86868b]"> · {entry.versionIndex + 1}/{entry.versionCount}</span>
+                        <span className="text-[var(--ecom-subtle)]"> · {entry.versionIndex + 1}/{entry.versionCount}</span>
                       ) : null}
                     </p>
                   </div>

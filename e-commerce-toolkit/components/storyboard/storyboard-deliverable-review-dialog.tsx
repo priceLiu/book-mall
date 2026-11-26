@@ -77,7 +77,7 @@ export function StoryboardDeliverableReviewDialog({
         <DialogContent className="flex max-h-[92vh] max-w-[96vw] flex-col gap-4 overflow-hidden p-4 sm:p-6">
           <DialogHeader>
             <DialogTitle>交付快照查阅</DialogTitle>
-            <p className="text-xs text-[#86868b]">
+            <p className="text-xs text-[var(--ecom-subtle)]">
               {snapshot.title} · 保存于 {formatSavedAt(snapshot.savedAt)}
               {snapshot.videoMode === "merged_panels"
                 ? " · 分镜合并成片"
@@ -90,15 +90,15 @@ export function StoryboardDeliverableReviewDialog({
           <div className="ecom-scrollbar-thin min-h-0 flex-1 space-y-6 overflow-y-auto pr-1">
             {snapshot.deliverableMarkdown ? (
               <section>
-                <h3 className="mb-2 text-sm font-semibold text-[#1d1d1f]">剧本 / 策划稿</h3>
-                <pre className="max-h-64 overflow-auto whitespace-pre-wrap rounded-lg border border-[#e8e8ed] bg-[#f5f5f7] p-3 text-xs leading-relaxed text-[#1d1d1f]">
+                <h3 className="mb-2 text-sm font-semibold text-[var(--ecom-ink)]">剧本 / 策划稿</h3>
+                <pre className="max-h-64 overflow-auto whitespace-pre-wrap rounded-lg border border-[var(--ecom-divider)] bg-[var(--ecom-parchment)] p-3 text-xs leading-relaxed text-[var(--ecom-ink)]">
                   {snapshot.deliverableMarkdown}
                 </pre>
               </section>
             ) : null}
 
             <section>
-              <h3 className="mb-2 text-sm font-semibold text-[#1d1d1f]">场景图</h3>
+              <h3 className="mb-2 text-sm font-semibold text-[var(--ecom-ink)]">场景图</h3>
               <div className="flex flex-wrap gap-4">
                 <RefPreviewCard
                   title="产品图"
@@ -115,10 +115,10 @@ export function StoryboardDeliverableReviewDialog({
 
             <section>
               <div className="mb-2 flex items-center justify-between gap-2">
-                <h3 className="text-sm font-semibold text-[#1d1d1f]">完整分镜图</h3>
+                <h3 className="text-sm font-semibold text-[var(--ecom-ink)]">完整分镜图</h3>
                 <button
                   type="button"
-                  className="inline-flex items-center gap-1 rounded-lg border border-[#d2d2d7] px-2.5 py-1 text-xs font-medium text-[#1d1d1f] hover:bg-[#f5f5f7]"
+                  className="inline-flex items-center gap-1 rounded-lg border border-[var(--ecom-border-soft)] px-2.5 py-1 text-xs font-medium text-[var(--ecom-ink)] hover:bg-[var(--ecom-parchment)]"
                   onClick={() => setSheetPreviewOpen(true)}
                 >
                   <Eye className="h-3.5 w-3.5" />
@@ -127,7 +127,7 @@ export function StoryboardDeliverableReviewDialog({
               </div>
               <button
                 type="button"
-                className="relative aspect-[16/9] w-full max-w-xl overflow-hidden rounded-lg border border-[#e8e8ed] bg-white"
+                className="relative aspect-[16/9] w-full max-w-xl overflow-hidden rounded-lg border border-[var(--ecom-divider)] bg-white"
                 onClick={() => setSheetPreviewOpen(true)}
               >
                 <StoryboardSheetLiveThumb
@@ -142,7 +142,7 @@ export function StoryboardDeliverableReviewDialog({
               {snapshot.sheetPngUrl ? (
                 <button
                   type="button"
-                  className="mt-2 text-xs text-[#6e6e73] underline-offset-2 hover:text-[#1d1d1f] hover:underline"
+                  className="mt-2 text-xs text-[var(--ecom-muted)] underline-offset-2 hover:text-[var(--ecom-ink)] hover:underline"
                   onClick={() =>
                     openDeliverableImagePreview(
                       snapshot.sheetPngUrl!,
@@ -156,14 +156,14 @@ export function StoryboardDeliverableReviewDialog({
             </section>
 
             <section>
-              <h3 className="mb-2 text-sm font-semibold text-[#1d1d1f]">各镜头分镜图</h3>
+              <h3 className="mb-2 text-sm font-semibold text-[var(--ecom-ink)]">各镜头分镜图</h3>
               <div className="flex flex-wrap gap-3">
                 {snapshot.sheet.panels.map((panel) => (
                   <div key={panel.index} className="w-[120px]">
                     <button
                       type="button"
                       disabled={!panel.imageUrl}
-                      className="relative mb-1 h-[72px] w-full overflow-hidden rounded-lg border border-[#e8e8ed] bg-[#f5f5f7] disabled:opacity-50"
+                      className="relative mb-1 h-[72px] w-full overflow-hidden rounded-lg border border-[var(--ecom-divider)] bg-[var(--ecom-parchment)] disabled:opacity-50"
                       onClick={() =>
                         panel.imageUrl &&
                         openDeliverableImagePreview(
@@ -180,10 +180,10 @@ export function StoryboardDeliverableReviewDialog({
                           className="absolute inset-0 size-full object-cover"
                         />
                       ) : (
-                        <span className="text-[10px] text-[#86868b]">无图</span>
+                        <span className="text-[10px] text-[var(--ecom-subtle)]">无图</span>
                       )}
                     </button>
-                    <p className="text-center text-[10px] text-[#6e6e73]">镜头 {panel.index}</p>
+                    <p className="text-center text-[10px] text-[var(--ecom-muted)]">镜头 {panel.index}</p>
                   </div>
                 ))}
               </div>
@@ -191,7 +191,7 @@ export function StoryboardDeliverableReviewDialog({
 
             {snapshot.panelVideos.length > 0 ? (
               <section>
-                <h3 className="mb-2 text-sm font-semibold text-[#1d1d1f]">各镜头视频</h3>
+                <h3 className="mb-2 text-sm font-semibold text-[var(--ecom-ink)]">各镜头视频</h3>
                 <div className="flex flex-wrap gap-3">
                   {snapshot.panelVideos.map((pv) => (
                     <div key={pv.index} className="w-[100px]">
@@ -200,7 +200,7 @@ export function StoryboardDeliverableReviewDialog({
                         className="mb-1 h-[120px] w-full rounded-lg"
                         onClick={() => onPreviewVideo(pv.videoUrl, `镜头 ${pv.index} 视频`)}
                       />
-                      <p className="text-center text-[10px] text-[#6e6e73]">镜头 {pv.index}</p>
+                      <p className="text-center text-[10px] text-[var(--ecom-muted)]">镜头 {pv.index}</p>
                     </div>
                   ))}
                 </div>
@@ -209,7 +209,7 @@ export function StoryboardDeliverableReviewDialog({
 
             {snapshot.videoUrl ? (
               <section>
-                <h3 className="mb-2 text-sm font-semibold text-[#1d1d1f]">完整成片</h3>
+                <h3 className="mb-2 text-sm font-semibold text-[var(--ecom-ink)]">完整成片</h3>
                 <div className="max-w-[200px]">
                   <EcomVideoThumb
                     src={snapshot.videoUrl}
@@ -256,12 +256,12 @@ function RefPreviewCard({
 }) {
   const primary = refs[0];
   return (
-    <div className="w-[140px] rounded-lg border border-[#e8e8ed] bg-white p-3">
-      <p className="mb-2 text-xs font-semibold text-[#1d1d1f]">{title}</p>
+    <div className="w-[140px] rounded-lg border border-[var(--ecom-divider)] bg-white p-3">
+      <p className="mb-2 text-xs font-semibold text-[var(--ecom-ink)]">{title}</p>
       {primary ? (
         <button
           type="button"
-          className="relative mb-1 h-[88px] w-full overflow-hidden rounded-md border border-[#e8e8ed] bg-[#f5f5f7]"
+          className="relative mb-1 h-[88px] w-full overflow-hidden rounded-md border border-[var(--ecom-divider)] bg-[var(--ecom-parchment)]"
           onClick={() => onPreview(primary.ossUrl, `${title} · ${primary.label}`)}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -272,11 +272,11 @@ function RefPreviewCard({
           />
         </button>
       ) : (
-        <div className="mb-1 flex h-[88px] items-center justify-center rounded-md border border-dashed border-[#d2d2d7] text-[10px] text-[#86868b]">
+        <div className="mb-1 flex h-[88px] items-center justify-center rounded-md border border-dashed border-[var(--ecom-border-soft)] text-[10px] text-[var(--ecom-subtle)]">
           未上传
         </div>
       )}
-      <p className="truncate text-[10px] text-[#6e6e73]">{primary?.label ?? "—"}</p>
+      <p className="truncate text-[10px] text-[var(--ecom-muted)]">{primary?.label ?? "—"}</p>
     </div>
   );
 }

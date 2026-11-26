@@ -75,7 +75,7 @@ export function ImageEnhancerGuideSections() {
   return (
     <div className="mt-8 space-y-8">
       <section className="rounded-2xl border border-[#e5e5ea] bg-white p-4 sm:p-6">
-        <h3 className="text-lg font-semibold text-[#1d1d1f]">解决这些常见问题</h3>
+        <h3 className="text-lg font-semibold text-[var(--ecom-ink)]">解决这些常见问题</h3>
         <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {problems.map((p) => (
             <div
@@ -83,24 +83,24 @@ export function ImageEnhancerGuideSections() {
               className="rounded-xl border border-[#e5e5ea] bg-[#fafafa] p-4"
             >
               <p.icon className={cn("mb-2 h-5 w-5", p.color)} />
-              <p className="font-medium text-[#1d1d1f]">{p.title}</p>
-              <p className="mt-1 text-sm text-[#6e6e73]">{p.desc}</p>
+              <p className="font-medium text-[var(--ecom-ink)]">{p.title}</p>
+              <p className="mt-1 text-sm text-[var(--ecom-muted)]">{p.desc}</p>
             </div>
           ))}
         </div>
       </section>
 
       <section className="rounded-2xl border border-[#e5e5ea] bg-white p-4 sm:p-6">
-        <h3 className="text-lg font-semibold text-[#1d1d1f]">如何增强图像</h3>
+        <h3 className="text-lg font-semibold text-[var(--ecom-ink)]">如何增强图像</h3>
         <ol className="mt-4 grid gap-4 sm:grid-cols-2">
           {steps.map((s, i) => (
             <li key={s.title} className="flex gap-3">
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#0071e3] text-sm font-semibold text-white">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--ecom-primary)] text-sm font-semibold text-white">
                 {i + 1}
               </span>
               <div>
-                <p className="font-medium text-[#1d1d1f]">{s.title}</p>
-                <p className="mt-1 text-sm text-[#6e6e73]">{s.desc}</p>
+                <p className="font-medium text-[var(--ecom-ink)]">{s.title}</p>
+                <p className="mt-1 text-sm text-[var(--ecom-muted)]">{s.desc}</p>
               </div>
             </li>
           ))}
@@ -130,7 +130,7 @@ export function ImageOutpaintGuideSections() {
   return (
     <div className="mt-8 space-y-8">
       <section className="rounded-2xl border border-[#e5e5ea] bg-white p-4 sm:p-6">
-        <h3 className="text-lg font-semibold text-[#1d1d1f]">你可以扩展什么</h3>
+        <h3 className="text-lg font-semibold text-[var(--ecom-ink)]">你可以扩展什么</h3>
         <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {useCases.map((p) => (
             <div
@@ -138,15 +138,15 @@ export function ImageOutpaintGuideSections() {
               className="rounded-xl border border-[#e5e5ea] bg-[#fafafa] p-4"
             >
               <p.icon className={cn("mb-2 h-5 w-5", p.color)} />
-              <p className="font-medium text-[#1d1d1f]">{p.title}</p>
-              <p className="mt-1 text-sm text-[#6e6e73]">{p.desc}</p>
+              <p className="font-medium text-[var(--ecom-ink)]">{p.title}</p>
+              <p className="mt-1 text-sm text-[var(--ecom-muted)]">{p.desc}</p>
             </div>
           ))}
         </div>
       </section>
 
       <section className="rounded-2xl border border-[#e5e5ea] bg-white p-4 sm:p-6">
-        <h3 className="text-lg font-semibold text-[#1d1d1f]">如何将图像扩展</h3>
+        <h3 className="text-lg font-semibold text-[var(--ecom-ink)]">如何将图像扩展</h3>
         <ol className="mt-4 grid gap-4 sm:grid-cols-2">
           {steps.map((s, i) => (
             <li key={s.title} className="flex gap-3">
@@ -154,8 +154,8 @@ export function ImageOutpaintGuideSections() {
                 {i + 1}
               </span>
               <div>
-                <p className="font-medium text-[#1d1d1f]">{s.title}</p>
-                <p className="mt-1 text-sm text-[#6e6e73]">{s.desc}</p>
+                <p className="font-medium text-[var(--ecom-ink)]">{s.title}</p>
+                <p className="mt-1 text-sm text-[var(--ecom-muted)]">{s.desc}</p>
               </div>
             </li>
           ))}

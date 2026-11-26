@@ -35,7 +35,7 @@ export function AiDetailPageProductCategoryPicker({
   return (
     <div className="flex gap-2">
       <select
-        className="min-w-0 flex-1 rounded-lg border border-[#e8e8ed] bg-white px-2 py-1.5 text-[11px]"
+        className="min-w-0 flex-1 rounded-lg border border-[var(--ecom-divider)] bg-white px-2 py-1.5 text-[11px]"
         disabled={disabled}
         value={vertical}
         onChange={(e) => {
@@ -57,7 +57,7 @@ export function AiDetailPageProductCategoryPicker({
       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
         {step0 ? (
           <select
-            className="w-full rounded-lg border border-[#e8e8ed] bg-white px-2 py-1.5 text-[11px]"
+            className="w-full rounded-lg border border-[var(--ecom-divider)] bg-white px-2 py-1.5 text-[11px]"
             disabled={disabled}
             value={l2Value}
             onChange={(e) => {
@@ -83,7 +83,7 @@ export function AiDetailPageProductCategoryPicker({
         {step1 ? (
           <select
             className={cn(
-              "w-full rounded-lg border border-[#e8e8ed] bg-white px-2 py-1.5 text-[11px]",
+              "w-full rounded-lg border border-[var(--ecom-divider)] bg-white px-2 py-1.5 text-[11px]",
               (!l2Value || l3Options.length === 0) && "opacity-60",
             )}
             disabled={disabled || !l2Value || l3Options.length === 0}

@@ -1050,7 +1050,7 @@ export function MediaDecomposeReplicaPanel({
     <>
       <section className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold text-[#1d1d1f]">
+          <h2 className="text-sm font-semibold text-[var(--ecom-ink)]">
             {isImageReplica ? "拆图复刻 · 精细成片" : "方案② · 精细成片"}
           </h2>
           <div className="flex flex-wrap gap-2">
@@ -1125,7 +1125,7 @@ export function MediaDecomposeReplicaPanel({
             </EcomButtonSecondary>
           </div>
         </div>
-        <p className="text-[11px] leading-relaxed text-[#6e6e73]">
+        <p className="text-[11px] leading-relaxed text-[var(--ecom-muted)]">
           {isImageReplica
             ? "每镜两行：先生成分镜图，或直接用视频 Prompt 生成分镜视频（有分镜图时自动带入首帧）。"
             : "推荐顺序：① 勾选后「生成 (N)」→ ② 含口播「批量 TTS (N)」→ ③ 就绪镜头「合成成片 (N)」。"}
@@ -1133,11 +1133,11 @@ export function MediaDecomposeReplicaPanel({
 
         {anyGenerating ? (
           <div
-            className="flex flex-wrap items-center gap-3 rounded-xl border border-[var(--ecom-outline-border)] bg-[#f0f6ff] px-3 py-2.5"
+            className="flex flex-wrap items-center gap-3 rounded-xl border border-[var(--ecom-outline-border)] bg-[var(--ecom-content-selected-bg)] px-3 py-2.5"
             role="status"
             aria-live="polite"
           >
-            <Loader2 className="h-4 w-4 shrink-0 animate-spin text-[#0071e3]" />
+            <Loader2 className="h-4 w-4 shrink-0 animate-spin text-[var(--ecom-primary)]" />
             <span className="min-w-0 flex-1 text-xs leading-relaxed text-[#0058c7]">
               {generatingStatusLabel}
             </span>
@@ -1222,9 +1222,9 @@ export function MediaDecomposeReplicaPanel({
         )}
 
         {finalUrl ? (
-          <div className="space-y-2 border-t border-[#e8e8ed] pt-4">
-            <h3 className="text-sm font-semibold text-[#1d1d1f]">成片视频</h3>
-            <p className="text-[11px] text-[#6e6e73]">
+          <div className="space-y-2 border-t border-[var(--ecom-divider)] pt-4">
+            <h3 className="text-sm font-semibold text-[var(--ecom-ink)]">成片视频</h3>
+            <p className="text-[11px] text-[var(--ecom-muted)]">
               逐镜合成已完成，可预览或保存到「我的资产」。
             </p>
             <EcomDeliverableVideoPreview
@@ -1345,11 +1345,11 @@ export function MediaDecomposeReplicaLaunch({
   onStart: () => void;
 }) {
   return (
-    <section className="rounded-xl border border-[#e8e8ed] bg-white p-4 shadow-[0_8px_30px_rgba(0,0,0,0.08)]">
+    <section className="rounded-xl border border-[var(--ecom-divider)] bg-white p-4 shadow-[0_8px_30px_rgba(0,0,0,0.08)]">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-sm font-semibold text-[#1d1d1f]">一键复刻</h2>
-          <p className="mt-0.5 text-[11px] leading-relaxed text-[#6e6e73]">
+          <h2 className="text-sm font-semibold text-[var(--ecom-ink)]">一键复刻</h2>
+          <p className="mt-0.5 text-[11px] leading-relaxed text-[var(--ecom-muted)]">
             把拆出的生图 Prompt 或分镜脚本，按种草视频精细成片流程生成视频。
           </p>
         </div>

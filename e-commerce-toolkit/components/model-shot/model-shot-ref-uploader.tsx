@@ -304,10 +304,10 @@ export function ModelShotRefUploader({
             })}
       >
         <div className="flex items-center justify-between gap-2">
-          <span className="text-xs font-medium uppercase tracking-wide text-[#6e6e73]">
+          <span className="text-xs font-medium uppercase tracking-wide text-[var(--ecom-muted)]">
             素材图
           </span>
-          <span className="text-[10px] text-[#86868b]">
+          <span className="text-[10px] text-[var(--ecom-subtle)]">
             {IMAGE_UPLOAD_DROP_HINT}
             {sectionPasteReady ? " · 粘贴至当前选中项" : ""}
           </span>
@@ -434,7 +434,7 @@ export function ModelShotRefUploader({
                 }
               />
               {aiDesc ? (
-                <p className="mt-1 line-clamp-2 rounded-md bg-[#f5f5f7] px-2 py-1.5 text-[10px] leading-relaxed text-[#424245]">
+                <p className="mt-1 line-clamp-2 rounded-md bg-[var(--ecom-parchment)] px-2 py-1.5 text-[10px] leading-relaxed text-[#424245]">
                   Prompt：{aiDesc}
                 </p>
               ) : null}

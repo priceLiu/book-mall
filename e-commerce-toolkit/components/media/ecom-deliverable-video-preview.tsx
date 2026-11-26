@@ -42,14 +42,14 @@ export function EcomDeliverableVideoPreview({
   return (
     <div
       className={cn(
-        "relative isolate w-full overflow-hidden rounded-xl border border-[#e8e8ed]",
+        "relative isolate w-full overflow-hidden rounded-xl border border-[var(--ecom-divider)]",
         STORYBOARD_PREVIEW_MIN_H,
         usePreviewFrame
           ? cn(
               storyboardPreviewAspectClass(aspectRatio),
-              hasVideo || busy ? "bg-black" : "bg-[#f5f5f7]",
+              hasVideo || busy ? "bg-black" : "bg-[var(--ecom-parchment)]",
             )
-          : "bg-[#f5f5f7]",
+          : "bg-[var(--ecom-parchment)]",
         frameClassName,
         className,
       )}
@@ -65,7 +65,7 @@ export function EcomDeliverableVideoPreview({
       ) : (
         <div className="flex h-full min-h-[200px] flex-col items-center justify-center gap-2 px-3 text-center">
           {emptyHint ? (
-            <p className="text-xs text-[#86868b]">{emptyHint}</p>
+            <p className="text-xs text-[var(--ecom-subtle)]">{emptyHint}</p>
           ) : null}
           {emptyActions}
         </div>

@@ -69,11 +69,11 @@ export function OutfitVideoMediaInput({
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-xs font-medium uppercase tracking-wide text-[#6e6e73]">
+        <span className="text-xs font-medium uppercase tracking-wide text-[var(--ecom-muted)]">
           素材输入
           <span className="ml-1 font-normal normal-case text-[#ff3b30]">（必传 · 建议 9:16）</span>
         </span>
-        <span className="text-[10px] text-[#86868b]">
+        <span className="text-[10px] text-[var(--ecom-subtle)]">
           {items.length}/1 · {IMAGE_UPLOAD_DROP_HINT}
         </span>
       </div>
@@ -117,7 +117,7 @@ export function OutfitVideoMediaInput({
             value={urlDraft}
             disabled={busy}
             placeholder="https:// 公网视频地址"
-            className="min-w-0 flex-1 rounded-lg border border-[#d2d2d7] px-3 py-2 text-sm outline-none focus:border-[var(--ecom-outline-border)] focus:ring-2 focus:ring-[#1d1d1f]/15"
+            className="min-w-0 flex-1 rounded-lg border border-[var(--ecom-border-soft)] px-3 py-2 text-sm outline-none focus:border-[var(--ecom-outline-border)] focus:ring-2 focus:ring-[var(--ecom-ink)]/15"
             onChange={(e) => setUrlDraft(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter") void handleUrlSubmit();
@@ -135,7 +135,7 @@ export function OutfitVideoMediaInput({
       ) : null}
 
       {referenceVideoLocked && referenceVideo?.ossUrl ? (
-        <p className="text-[10px] leading-relaxed text-[#6e6e73]">
+        <p className="text-[10px] leading-relaxed text-[var(--ecom-muted)]">
           已拆解，参考视频已锁定。如需换源视频请先新建项目；调整切点请点「重新拆解」。
         </p>
       ) : null}
@@ -145,7 +145,7 @@ export function OutfitVideoMediaInput({
           <div className="ecom-upload-progress ecom-upload-progress-indeterminate">
             <span />
           </div>
-          <p className="text-[10px] text-[#0071e3]">正在处理视频…</p>
+          <p className="text-[10px] text-[var(--ecom-primary)]">正在处理视频…</p>
         </div>
       ) : null}
 

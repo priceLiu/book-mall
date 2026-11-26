@@ -104,14 +104,14 @@ export function FashionStoryboardSheetWorkspace({
 
   return (
     <div className="space-y-3">
-      <div className="rounded-xl border border-[#e8e8ed] bg-[#fafafa] p-3">
-        <p className="text-xs font-semibold text-[#1d1d1f]">成片设置（生图前必选）</p>
+      <div className="rounded-xl border border-[var(--ecom-divider)] bg-[#fafafa] p-3">
+        <p className="text-xs font-semibold text-[var(--ecom-ink)]">成片设置（生图前必选）</p>
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <EcomButtonSecondary
             type="button"
             size="sm"
             disabled={setupLocked || batchImageBusy}
-            className={characterMode === "ai" ? "bg-[#f0f6ff]" : undefined}
+            className={characterMode === "ai" ? "bg-[var(--ecom-content-selected-bg)]" : undefined}
             onClick={() => onCharacterModeChange("ai")}
           >
             {charGenBusy ? (
@@ -127,7 +127,7 @@ export function FashionStoryboardSheetWorkspace({
             type="button"
             size="sm"
             disabled={setupLocked || batchImageBusy}
-            className={characterMode === "upload" ? "bg-[#f0f6ff]" : undefined}
+            className={characterMode === "upload" ? "bg-[var(--ecom-content-selected-bg)]" : undefined}
             onClick={() => onCharacterModeChange("upload")}
           >
             上传模特图
@@ -143,7 +143,7 @@ export function FashionStoryboardSheetWorkspace({
             </EcomButtonSecondary>
           ) : null}
         </div>
-        <p className="mt-2 text-[11px] leading-relaxed text-[#6e6e73]">
+        <p className="mt-2 text-[11px] leading-relaxed text-[var(--ecom-muted)]">
           当前：模特 {charModeLabel}。
           {!setupReady
             ? " 点击「生成分镜图」时会先选择模特参考方式，再选择生图模型。"
@@ -152,7 +152,7 @@ export function FashionStoryboardSheetWorkspace({
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-[11px] leading-relaxed text-[#6e6e73]">
+        <p className="text-[11px] leading-relaxed text-[var(--ecom-muted)]">
           各镜下方为分镜脚本；勾选后可「生成选中镜」。
           {onSubmitStoryboardVideo
             ? allPanelsHaveImages
@@ -222,7 +222,7 @@ export function FashionStoryboardSheetWorkspace({
         </div>
       </div>
 
-      <div className="ecom-scrollbar-thin overflow-x-auto rounded-xl border border-[#e8e8ed] bg-white p-2">
+      <div className="ecom-scrollbar-thin overflow-x-auto rounded-xl border border-[var(--ecom-divider)] bg-white p-2">
         <StoryboardProSheetView
           sheet={sheet}
           references={references}

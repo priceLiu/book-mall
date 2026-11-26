@@ -13,14 +13,14 @@ export default function StoryTheaterCatalogPage() {
   return (
     <EcomWorkspaceLayout fullWidth>
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-        <header className="shrink-0 border-b border-[#e8e8ed] bg-white px-4 py-4 sm:px-6 sm:py-5">
+        <header className="shrink-0 border-b border-[var(--ecom-divider)] bg-white px-4 py-4 sm:px-6 sm:py-5">
           <div className="mx-auto flex max-w-5xl flex-wrap items-start justify-between gap-3">
             <EcomWorkspaceTitleHeading
               heading="h1"
-              titleClassName="text-xl font-semibold text-[#1d1d1f]"
+              titleClassName="text-xl font-semibold text-[var(--ecom-ink)]"
               title="剧情故事"
             >
-              <p className="mt-1 max-w-xl text-sm text-[#6e6e73]">
+              <p className="mt-1 max-w-xl text-sm text-[var(--ecom-muted)]">
                 故事剧场模式的选题库：系统推荐只读；可在「我的」区自建故事主题，助手选题时会与平台库一起随机抽取。
               </p>
             </EcomWorkspaceTitleHeading>

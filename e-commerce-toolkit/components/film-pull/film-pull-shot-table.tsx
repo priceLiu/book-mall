@@ -255,7 +255,7 @@ function CellEditor({
     return <span className="block whitespace-pre-wrap break-words">{text}</span>;
   }
   const className =
-    "w-full rounded border border-[#d2d2d7] px-1.5 py-1 text-xs outline-none focus:border-[var(--ecom-outline-border)] focus:ring-1 focus:ring-[#1d1d1f]/15";
+    "w-full rounded border border-[var(--ecom-border-soft)] px-1.5 py-1 text-xs outline-none focus:border-[var(--ecom-outline-border)] focus:ring-1 focus:ring-[var(--ecom-ink)]/15";
   if (multiline) {
     return (
       <textarea className={className} rows={2} value={value} onChange={(e) => onChange(e.target.value)} />
@@ -279,16 +279,16 @@ export function FilmPullShotTable({
     onChange(next);
   };
 
-  const wrapClass = embedded && readOnly ? ecomDataTableWrapClass : "overflow-x-auto rounded-lg border border-[#e8e8ed]";
+  const wrapClass = embedded && readOnly ? ecomDataTableWrapClass : "overflow-x-auto rounded-lg border border-[var(--ecom-divider)]";
   const tableClass = cn("min-w-[3200px] w-full", embedded && readOnly ? ecomDataTableClass : "border-collapse text-left text-xs");
   const headRowClass =
     embedded && readOnly
       ? ecomDataTableHeadRowClass
       : embedded
-        ? "bg-[#f5f5f7] text-[#6e6e73]"
-        : "sticky top-0 z-10 bg-[#1d1d1f] text-white";
-  const thClass = embedded && readOnly ? cn("whitespace-nowrap", ecomDataTableThClass) : "border-b border-[#e8e8ed] px-2 py-2 align-top font-medium whitespace-nowrap";
-  const bodyRowClass = embedded && readOnly ? ecomDataTableBodyRowClass : "border-b border-[#e8e8ed] align-top";
+        ? "bg-[var(--ecom-parchment)] text-[var(--ecom-muted)]"
+        : "sticky top-0 z-10 bg-[var(--ecom-ink)] text-white";
+  const thClass = embedded && readOnly ? cn("whitespace-nowrap", ecomDataTableThClass) : "border-b border-[var(--ecom-divider)] px-2 py-2 align-top font-medium whitespace-nowrap";
+  const bodyRowClass = embedded && readOnly ? ecomDataTableBodyRowClass : "border-b border-[var(--ecom-divider)] align-top";
   const tdClass = embedded && readOnly ? ecomDataTableTdClass : "px-2 py-2 align-top";
 
   return (

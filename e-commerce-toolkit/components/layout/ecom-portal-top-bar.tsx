@@ -43,7 +43,7 @@ export function EcomPortalTopBar({ authed = true, bookOrigin = null }: Props) {
               </a>
               <a
                 href={buildEcomRegisterUrl("/")}
-                className="rounded-full bg-[var(--ecom-primary)] px-3 py-1.5 text-xs font-medium text-white transition hover:opacity-90"
+                className="rounded-full bg-[var(--ecom-btn-fill)] px-3 py-1.5 text-xs font-medium text-white transition hover:opacity-90"
               >
                 免费注册
               </a>

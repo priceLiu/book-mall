@@ -38,14 +38,14 @@ const VARIANT_CLASS: Record<
   },
   "ecom-light": {
     wrap: "space-y-2",
-    label: "text-xs text-[#6e6e73]",
-    fieldLabel: "text-xs text-[#86868b] shrink-0",
+    label: "text-xs text-[var(--ecom-muted)]",
+    fieldLabel: "text-xs text-[var(--ecom-subtle)] shrink-0",
     select:
-      "h-8 rounded-lg border border-[#d2d2d7] bg-white px-2 text-xs text-[#1d1d1f] disabled:opacity-40",
-    radioGroup: "mt-1.5 space-y-1 border-0 p-0 pl-5 text-xs text-[#6e6e73]",
+      "h-8 rounded-lg border border-[var(--ecom-border-soft)] bg-white px-2 text-xs text-[var(--ecom-ink)] disabled:opacity-40",
+    radioGroup: "mt-1.5 space-y-1 border-0 p-0 pl-5 text-xs text-[var(--ecom-muted)]",
     radioLabel: "flex items-center gap-1.5",
     numberInput:
-      "h-8 w-[68px] rounded-lg border border-[#d2d2d7] bg-white px-2 text-xs text-[#1d1d1f] disabled:opacity-40",
+      "h-8 w-[68px] rounded-lg border border-[var(--ecom-border-soft)] bg-white px-2 text-xs text-[var(--ecom-ink)] disabled:opacity-40",
   },
   "book-account": {
     wrap: "space-y-2",

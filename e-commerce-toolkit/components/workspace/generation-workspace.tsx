@@ -197,22 +197,22 @@ export function GenerationWorkspace({ module }: { module: EcomModuleDef }) {
             <EcomWorkspaceTitleHeading
               heading="h1"
               guideModuleId={module.id}
-              titleClassName="text-lg font-semibold text-[#1d1d1f]"
+              titleClassName="text-lg font-semibold text-[var(--ecom-ink)]"
               title={module.title}
             >
-              <p className="mt-1 text-xs text-[#6e6e73]">{module.tagline}</p>
+              <p className="mt-1 text-xs text-[var(--ecom-muted)]">{module.tagline}</p>
             </EcomWorkspaceTitleHeading>
-            <p className="mt-2 text-xs text-[#86868b]">{billingHint}</p>
+            <p className="mt-2 text-xs text-[var(--ecom-subtle)]">{billingHint}</p>
           </>
         }
         assistant={
           <div className="flex h-full flex-col bg-[var(--ecom-assistant-surface)] p-4">
-            <label className="text-sm font-semibold text-[#1d1d1f]">创作描述</label>
+            <label className="text-sm font-semibold text-[var(--ecom-ink)]">创作描述</label>
             <textarea
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
               rows={8}
-              className="mt-2 min-h-0 flex-1 resize-none rounded-xl border border-[var(--ecom-assistant-input-border)] bg-[var(--ecom-assistant-input-bg)] p-3 text-sm text-[#1d1d1f] outline-none placeholder:text-[#86868b] focus:border-[var(--ecom-outline-border)]"
+              className="mt-2 min-h-0 flex-1 resize-none rounded-xl border border-[var(--ecom-assistant-input-border)] bg-[var(--ecom-assistant-input-bg)] p-3 text-sm text-[var(--ecom-ink)] outline-none placeholder:text-[var(--ecom-subtle)] focus:border-[var(--ecom-outline-border)]"
               placeholder="描述商品、风格、镜头与卖点…"
             />
             {error ? (
@@ -234,11 +234,11 @@ export function GenerationWorkspace({ module }: { module: EcomModuleDef }) {
         }
       >
         <div className="ecom-scrollbar-thin min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-6">
-          <h2 className="text-xl font-semibold text-[#1d1d1f]">本模块资产</h2>
+          <h2 className="text-xl font-semibold text-[var(--ecom-ink)]">本模块资产</h2>
           {assetsLoading ? (
-            <p className="mt-4 text-sm text-[#6e6e73]">加载中…</p>
+            <p className="mt-4 text-sm text-[var(--ecom-muted)]">加载中…</p>
           ) : assets.length === 0 ? (
-            <p className="mt-4 text-sm text-[#6e6e73]">
+            <p className="mt-4 text-sm text-[var(--ecom-muted)]">
               暂无作品，生成后将显示在这里。
             </p>
           ) : (

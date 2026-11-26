@@ -34,8 +34,8 @@ export function ProductImageSetRefUploader({ references, busy, onUpload, onRemov
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-xs font-semibold text-[#1d1d1f]">商品原图</span>
-        <span className="text-[10px] text-[#86868b]">
+        <span className="text-xs font-semibold text-[var(--ecom-ink)]">商品原图</span>
+        <span className="text-[10px] text-[var(--ecom-subtle)]">
           {references.length}/{maxCount} · 首张为主参考 · {IMAGE_UPLOAD_DROP_HINT}
         </span>
       </div>

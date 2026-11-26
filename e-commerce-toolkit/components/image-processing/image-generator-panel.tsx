@@ -28,13 +28,13 @@ import { cn } from "@/lib/utils";
 const FEATURES = [
   {
     icon: Palette,
-    color: "text-[#0071e3]",
+    color: "text-[var(--ecom-primary)]",
     title: "多种模型",
     desc: "Seedream、NanoBanana Pro、Gemini 2.5 Flash Image 等经 Gateway 统一调用。",
   },
   {
     icon: PenLine,
-    color: "text-[#0071e3]",
+    color: "text-[var(--ecom-primary)]",
     title: "9 种艺术风格",
     desc: "摄影、数字艺术、动漫、3D、素描、水彩、油画、像素艺术等。",
   },
@@ -153,26 +153,26 @@ export function ImageGeneratorPanel({
   return (
     <div className="mt-6 space-y-4 sm:mt-8 sm:space-y-6">
       <div className="rounded-2xl border border-[#e5e5ea] bg-white p-4 shadow-sm sm:p-6">
-        <h2 className="text-lg font-semibold text-[#1d1d1f]">AI 图像生成器</h2>
+        <h2 className="text-lg font-semibold text-[var(--ecom-ink)]">AI 图像生成器</h2>
 
-        <label className="mt-4 block text-sm font-medium text-[#1d1d1f]">
+        <label className="mt-4 block text-sm font-medium text-[var(--ecom-ink)]">
           描述你的图片
           <textarea
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
             rows={4}
             placeholder="夕阳西下，金色的光芒洒在雄伟的山峦上……"
-            className="mt-1 w-full resize-y rounded-xl border border-[#d2d2d7] px-4 py-3 text-sm font-normal"
+            className="mt-1 w-full resize-y rounded-xl border border-[var(--ecom-border-soft)] px-4 py-3 text-sm font-normal"
           />
         </label>
 
         <div className="mt-4 grid gap-4 sm:grid-cols-3">
           <div>
-            <label className="text-sm font-medium text-[#1d1d1f]">模型</label>
+            <label className="text-sm font-medium text-[var(--ecom-ink)]">模型</label>
             <select
               value={generativeModel}
               onChange={(e) => setGenerativeModel(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-[#d2d2d7] bg-white px-3 py-2.5 text-sm"
+              className="mt-1 w-full rounded-lg border border-[var(--ecom-border-soft)] bg-white px-3 py-2.5 text-sm"
             >
               {T2I_MODEL_OPTIONS.map((o) => (
                 <option key={o.id} value={o.id}>
@@ -182,11 +182,11 @@ export function ImageGeneratorPanel({
             </select>
           </div>
           <div>
-            <label className="text-sm font-medium text-[#1d1d1f]">长宽比</label>
+            <label className="text-sm font-medium text-[var(--ecom-ink)]">长宽比</label>
             <select
               value={aspect}
               onChange={(e) => setAspect(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-[#d2d2d7] bg-white px-3 py-2.5 text-sm"
+              className="mt-1 w-full rounded-lg border border-[var(--ecom-border-soft)] bg-white px-3 py-2.5 text-sm"
             >
               {IMAGE_GENERATOR_ASPECT_OPTIONS.map((o) => (
                 <option key={o.id} value={o.id}>
@@ -196,11 +196,11 @@ export function ImageGeneratorPanel({
             </select>
           </div>
           <div>
-            <label className="text-sm font-medium text-[#1d1d1f]">风格</label>
+            <label className="text-sm font-medium text-[var(--ecom-ink)]">风格</label>
             <select
               value={styleId}
               onChange={(e) => setStyleId(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-[#d2d2d7] bg-white px-3 py-2.5 text-sm"
+              className="mt-1 w-full rounded-lg border border-[var(--ecom-border-soft)] bg-white px-3 py-2.5 text-sm"
             >
               {IMAGE_GENERATOR_STYLE_OPTIONS.map((o) => (
                 <option key={o.id} value={o.id}>
@@ -214,30 +214,30 @@ export function ImageGeneratorPanel({
         <button
           type="button"
           onClick={() => setAdvancedOpen((v) => !v)}
-          className="mt-4 text-sm text-[#0071e3]"
+          className="mt-4 text-sm text-[var(--ecom-primary)]"
         >
           {advancedOpen ? "收起高级选项" : "高级选项"}
         </button>
 
         {advancedOpen ? (
           <div className="mt-3 space-y-4 rounded-xl border border-[#e5e5ea] bg-[#fafafa] p-4">
-            <label className="block text-sm font-medium text-[#1d1d1f]">
+            <label className="block text-sm font-medium text-[var(--ecom-ink)]">
               否定提示（可选）
               <input
                 type="text"
                 value={negativePrompt}
                 onChange={(e) => setNegativePrompt(e.target.value)}
                 placeholder={DEFAULT_NEGATIVE_PROMPT_PLACEHOLDER}
-                className="mt-1 w-full rounded-lg border border-[#d2d2d7] bg-white px-3 py-2.5 text-sm font-normal"
+                className="mt-1 w-full rounded-lg border border-[var(--ecom-border-soft)] bg-white px-3 py-2.5 text-sm font-normal"
               />
             </label>
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
-                <label className="text-sm font-medium text-[#1d1d1f]">图片数量</label>
+                <label className="text-sm font-medium text-[var(--ecom-ink)]">图片数量</label>
                 <select
                   value={imageCount}
                   onChange={(e) => setImageCount(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-[#d2d2d7] bg-white px-3 py-2.5 text-sm"
+                  className="mt-1 w-full rounded-lg border border-[var(--ecom-border-soft)] bg-white px-3 py-2.5 text-sm"
                 >
                   {GENERATIVE_IMAGE_COUNT_OPTIONS.map((o) => (
                     <option key={o.id} value={o.id}>
@@ -247,22 +247,22 @@ export function ImageGeneratorPanel({
                 </select>
               </div>
               <div>
-                <label className="text-sm font-medium text-[#1d1d1f]">种子（可选）</label>
+                <label className="text-sm font-medium text-[var(--ecom-ink)]">种子（可选）</label>
                 <input
                   type="text"
                   placeholder="随机的"
                   value={seed}
                   onChange={(e) => setSeed(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-[#d2d2d7] bg-white px-3 py-2.5 text-sm"
+                  className="mt-1 w-full rounded-lg border border-[var(--ecom-border-soft)] bg-white px-3 py-2.5 text-sm"
                 />
               </div>
             </div>
             <div>
               <div className="flex items-center justify-between gap-2">
-                <label className="text-sm font-medium text-[#1d1d1f]">
+                <label className="text-sm font-medium text-[var(--ecom-ink)]">
                   样式参考（可选）
                 </label>
-                <span className="rounded bg-[#0071e3]/10 px-2 py-0.5 text-xs text-[#0071e3]">
+                <span className="rounded bg-[var(--ecom-primary)]/10 px-2 py-0.5 text-xs text-[var(--ecom-primary)]">
                   风格参考图
                 </span>
               </div>
@@ -276,7 +276,7 @@ export function ImageGeneratorPanel({
               </div>
             </div>
             <div>
-              <label className="text-sm font-medium text-[#1d1d1f]">
+              <label className="text-sm font-medium text-[var(--ecom-ink)]">
                 风格强度 {strength.toFixed(1)}
               </label>
               <input
@@ -286,7 +286,7 @@ export function ImageGeneratorPanel({
                 step={0.05}
                 value={strength}
                 onChange={(e) => setStrength(Number(e.target.value))}
-                className="mt-2 w-full accent-[#0071e3]"
+                className="mt-2 w-full accent-[var(--ecom-primary)]"
               />
             </div>
           </div>
@@ -314,7 +314,7 @@ export function ImageGeneratorPanel({
       </div>
 
       <section className="rounded-2xl border border-[#e5e5ea] bg-white p-4 sm:p-6">
-        <h3 className="text-lg font-semibold text-[#1d1d1f]">你可以创造什么</h3>
+        <h3 className="text-lg font-semibold text-[var(--ecom-ink)]">你可以创造什么</h3>
         <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {FEATURES.map((f) => (
             <div
@@ -322,7 +322,7 @@ export function ImageGeneratorPanel({
               className="rounded-xl border border-[#e5e5ea] bg-[#fafafa] p-4"
             >
               <f.icon className={cn("mb-2 h-5 w-5", f.color)} />
-              <p className="text-sm font-semibold text-[#1d1d1f]">{f.title}</p>
+              <p className="text-sm font-semibold text-[var(--ecom-ink)]">{f.title}</p>
               <p className="mt-1 text-xs leading-relaxed text-[#7a7a7a]">{f.desc}</p>
             </div>
           ))}
@@ -330,13 +330,13 @@ export function ImageGeneratorPanel({
       </section>
 
       <section className="rounded-2xl border border-[#e5e5ea] bg-white p-4 sm:p-6">
-        <h3 className="text-lg font-semibold text-[#1d1d1f]">如何使用</h3>
+        <h3 className="text-lg font-semibold text-[var(--ecom-ink)]">如何使用</h3>
         <ol className="mt-4 space-y-4">
           {STEPS.map((s, i) => (
             <li key={s.title} className="flex gap-3">
               <span className={ipStepNumberClass}>{i + 1}</span>
               <div>
-                <p className="text-sm font-semibold text-[#1d1d1f]">{s.title}</p>
+                <p className="text-sm font-semibold text-[var(--ecom-ink)]">{s.title}</p>
                 <p className="mt-0.5 text-xs leading-relaxed text-[#7a7a7a]">{s.desc}</p>
               </div>
             </li>

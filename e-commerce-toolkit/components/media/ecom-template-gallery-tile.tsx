@@ -24,7 +24,7 @@ export function EcomTemplateGalleryTile({ entry, onPreview }: Props) {
     (kind === "video" ? entry.ossUrl : undefined);
 
   return (
-    <div className="group relative overflow-hidden rounded-lg border border-[#e8e8ed] bg-[#f5f5f7]">
+    <div className="group relative overflow-hidden rounded-lg border border-[var(--ecom-divider)] bg-[var(--ecom-parchment)]">
       <EcomMediaLibraryTile
         kind={kind}
         src={entry.ossUrl}
