@@ -486,7 +486,7 @@ function ComposeClipFilmstripTimeline({
                 <button
                   key={`${f.atSec}-${i}`}
                   type="button"
-                  className="h-full shrink-0 overflow-hidden border-r border-white/5 p-0 last:border-r-0 hover:ring-1 hover:ring-inset hover:ring-[var(--ecom-primary)]/50"
+                  className="h-full shrink-0 overflow-hidden border-r border-white/5 p-0 last:border-r-0 hover:ring-1 hover:ring-inset hover:ring-[#0071e3]/50"
                   style={{ width: FILMSTRIP_THUMB_PX }}
                   title={formatTimeSec(f.atSec)}
                   onClick={(e) => {
@@ -2190,7 +2190,7 @@ export function ComposeSequenceTrack({
             {reorderInsertBefore != null ? (
               <div
                 className={cn(
-                  "pointer-events-none absolute z-[45] w-0.5 bg-[var(--ecom-primary)] shadow-[0_0_8px_rgba(0,113,227,0.85)]",
+                  "pointer-events-none absolute z-[45] w-0.5 bg-[#0071e3] shadow-[0_0_8px_rgba(0,113,227,0.85)]",
                   playheadInsetInClipLane ? "bottom-2.5 top-2" : "inset-y-0",
                 )}
                 style={{
@@ -2612,7 +2612,7 @@ function ComposeClipStrip({
 
   if (clips.length === 0) {
     return (
-      <p className={cn("text-[10px]", variant === "dark" ? "text-white/45" : "text-[var(--ecom-subtle)]")}>
+      <p className={cn("text-[10px]", variant === "dark" ? "text-white/45" : "text-[#86868b]")}>
         暂无片段，请先生成步骤 ② 视频片段。
       </p>
     );
@@ -2635,10 +2635,10 @@ function ComposeClipStrip({
           className={cn(
             "relative w-[72px] shrink-0 cursor-grab active:cursor-grabbing overflow-hidden rounded-md border",
             selectedId === clip.id
-              ? "border-[var(--ecom-primary)] ring-1 ring-[var(--ecom-primary)]/40"
+              ? "border-[#0071e3] ring-1 ring-[#0071e3]/40"
               : variant === "dark"
                 ? "border-white/15"
-                : "border-[var(--ecom-divider)]",
+                : "border-[#e8e8ed]",
           )}
           onClick={() => onSelect?.(clip.id)}
         >
@@ -2658,7 +2658,7 @@ function ComposeClipStrip({
           <span
             className={cn(
               "absolute bottom-0 left-0 right-0 truncate px-1 py-0.5 text-[9px]",
-              variant === "dark" ? "bg-black/70 text-white/80" : "bg-white/90 text-[var(--ecom-muted)]",
+              variant === "dark" ? "bg-black/70 text-white/80" : "bg-white/90 text-[#6e6e73]",
             )}
           >
             {clip.label ?? `片段 ${index + 1}`}
@@ -3053,7 +3053,7 @@ export function ComposeMiniTimelinePanel({
         type="button"
         aria-label="关闭"
         title="关闭"
-        className="absolute right-2 top-2 z-50 flex size-7 cursor-pointer items-center justify-center rounded-full bg-white text-[var(--ecom-ink)] shadow-md ring-1 ring-black/10 transition hover:bg-[var(--ecom-parchment)]"
+        className="absolute right-2 top-2 z-50 flex size-7 cursor-pointer items-center justify-center rounded-full bg-white text-[#1d1d1f] shadow-md ring-1 ring-black/10 transition hover:bg-[#f5f5f7]"
         onPointerDown={(e) => e.stopPropagation()}
         onClick={onClose}
       >
@@ -4262,7 +4262,7 @@ function AssetGrid({
             type="button"
             className={cn(
               "relative overflow-hidden rounded border text-left",
-              selectedId === c.id ? "border-[var(--ecom-primary)]" : "border-white/15",
+              selectedId === c.id ? "border-[#0071e3]" : "border-white/15",
             )}
             title={c.label?.trim() || undefined}
             onClick={() => onPick(c.id)}

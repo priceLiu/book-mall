@@ -9,7 +9,7 @@ type CatalogMediaItem = Pick<
 export const GLOBAL_ASSET_SCENE_CATALOG_PLACEHOLDER =
   "data:image/svg+xml;charset=utf-8," +
   encodeURIComponent(
-    '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="160" viewBox="0 0 120 160"><rect width="120" height="160" fill="#ebebed"/><text x="60" y="72" text-anchor="middle" fill="#86868b" font-size="11" font-family="sans-serif">场景</text><text x="60" y="92" text-anchor="middle" fill="#aeaeb2" font-size="9" font-family="sans-serif">参考</text></svg>',
+    '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="160" viewBox="0 0 120 160"><rect width="120" height="160" fill="#ebebed"/><text x="60" y="72" text-anchor="middle" fill="#8a8178" font-size="11" font-family="sans-serif">场景</text><text x="60" y="92" text-anchor="middle" fill="#aeaeb2" font-size="9" font-family="sans-serif">参考</text></svg>',
   );
 
 export function isSceneCatalogItem(item: Pick<GlobalAssetPickItem, "catalogKind">): boolean {

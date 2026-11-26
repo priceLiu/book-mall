@@ -172,7 +172,7 @@ export function SaveToCatalogDialog({
       >
         <div
           className={`flex min-h-[200px] shrink-0 items-center justify-center border-b p-4 sm:min-h-0 sm:w-[40%] sm:max-w-[320px] sm:border-b-0 sm:border-r ${theme.border} ${
-            variant === "dark" ? "bg-black/30" : "bg-[#f5f5f7]"
+            variant === "dark" ? "bg-black/30" : "bg-[var(--ecom-parchment)]"
           }`}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}

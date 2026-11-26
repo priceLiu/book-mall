@@ -176,7 +176,7 @@ export function GlobalAssetTile({
           <div className="pointer-events-none absolute inset-0 z-[1] flex items-center justify-center bg-black/0 opacity-0 transition duration-150 group-hover:bg-black/40 group-hover:opacity-100">
             <button
               type="button"
-              className="pointer-events-auto flex h-8 w-8 items-center justify-center rounded-full bg-white/95 text-[#1d1d1f] shadow-md transition hover:scale-105 hover:bg-white"
+              className="pointer-events-auto flex h-8 w-8 items-center justify-center rounded-full bg-white/95 text-[var(--ecom-ink)] shadow-md transition hover:scale-105 hover:bg-white"
               aria-label="放大预览"
               title="放大预览"
               onClick={(e) => {
