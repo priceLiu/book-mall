@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 
-import { Check, Hash, Minus, Plus, RotateCw, SquareSplitHorizontal, Trash2, X } from "lucide-react";
+import { Check, Hand, Hash, Layers, Minus, Plus, RotateCw, SquareSplitHorizontal, Trash2, X } from "lucide-react";
 
 import {
   ImageEditorFrameHandles,
@@ -22,7 +22,7 @@ import {
 } from "@/lib/image-editor-crop-rect";
 import { normalizeRotateDeg } from "@/lib/image-editor-transform";
 import { ImageEditorTextOverlay } from "@/components/image-editor/image-editor-text-overlay";
-import type { ImageEditorTextLayerExtras } from "@/lib/image-editor-text";
+import { IMAGE_EDITOR_TEXT_PLACEHOLDER, type ImageEditorTextLayerExtras } from "@/lib/image-editor-text";
 import type { ImageEditorShapeMaskId } from "@/lib/image-editor-types";
 import type { EcomCopyOverlay, EcomCopyOverlayLayer } from "@private/ecom-copy-overlay";
 import { cn } from "@/lib/utils";
@@ -94,6 +94,86 @@ type Props = {
   onTextCopyStyle?: (id: string) => void;
   onTextAiFlower?: (id: string) => void;
 };
+
+type LayerPanelRow = {
+  key: string;
+  label: string;
+  selectId: string | null;
+  active: boolean;
+  imageSrc?: string;
+  color?: string;
+  bg?: string;
+};
+
+function layerPieceLabel(layer: EcomCopyOverlayLayer, extras?: ImageEditorTextLayerExtras): string {
+  const text = layer.text.trim();
+  const named = text && text !== IMAGE_EDITOR_TEXT_PLACEHOLDER ? text : "";
+  if (extras?.posterSrc) return named || "图片";
+  if (extras?.role === "decor") return named || "装饰";
+  return named || text || "文字";
+}
+
+function buildLayerPanelRows(
+  layers: EcomCopyOverlayLayer[],
+  extras: Record<string, ImageEditorTextLayerExtras>,
+  selectedIds: string[],
+  baseSrc: string | null,
+): LayerPanelRow[] {
+  const selected = new Set(selectedIds);
+  const seen = new Set<string>();
+  const rows: LayerPanelRow[] = [];
+  for (let i = layers.length - 1; i >= 0; i -= 1) {
+    const layer = layers[i];
+    if (!layer || seen.has(layer.id)) continue;
+    const extra = extras[layer.id];
+    const grouped = Boolean(extra?.groupId) && extra?.grouped !== false;
+    if (grouped && extra?.groupId) {
+      const members = layers.filter((item) => {
+        const itemExtra = extras[item.id];
+        return itemExtra?.groupId === extra.groupId && itemExtra.grouped !== false;
+      });
+      for (const member of members) seen.add(member.id);
+      const labelLayer =
+        members.find((item) => extras[item.id]?.role === "label" && item.text.trim()) ??
+        members.find((item) => item.text.trim() && item.text.trim() !== IMAGE_EDITOR_TEXT_PLACEHOLDER && !extras[item.id]?.posterSrc) ??
+        members[0];
+      const poster = [...members].reverse().find((item) => extras[item.id]?.posterSrc);
+      if (!labelLayer) continue;
+      rows.push({
+        key: extra.groupId,
+        label: layerPieceLabel(labelLayer, extras[labelLayer.id]),
+        selectId: labelLayer.id,
+        active: members.some((item) => selected.has(item.id)),
+        imageSrc: poster ? extras[poster.id]?.posterSrc : undefined,
+        color: labelLayer.color,
+        bg: labelLayer.textBgEnabled ? labelLayer.textBgColor : undefined,
+      });
+      continue;
+    }
+    seen.add(layer.id);
+    rows.push({
+      key: layer.id,
+      label: layerPieceLabel(layer, extra),
+      selectId: layer.id,
+      active: selected.has(layer.id),
+      imageSrc: extra?.posterSrc,
+      color: layer.color,
+      bg: layer.textBgEnabled ? layer.textBgColor : undefined,
+    });
+  }
+  if (baseSrc) {
+    rows.push({
+      key: "base-image",
+      label: "主图",
+      selectId: null,
+      active: selectedIds.length === 0,
+      imageSrc: baseSrc,
+    });
+  }
+  return rows;
+}
+
+const ZOOM_PRESETS = [400, 300, 200, 175, 150, 125, 100, 75, 50, 25, 15] as const;
 
 function composeFrameImageStyle(base: string, correction?: string, filter?: string) {
   const transform = [base, correction].filter(Boolean).join(" ");
@@ -167,6 +247,15 @@ export function ImageEditorCanvasStage({
   const [guideMenu, setGuideMenu] = useState(false);
   const [comparing, setComparing] = useState(false);
   const [compareHint, setCompareHint] = useState(false);
+  const [zoomMenu, setZoomMenu] = useState(false);
+  const [zoomHint, setZoomHint] = useState(false);
+  const [layerPanel, setLayerPanel] = useState(false);
+  const [layerHint, setLayerHint] = useState(false);
+  const [hand, setHand] = useState(false);
+  const [panning, setPanning] = useState(false);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const zoomBoxRef = useRef<HTMLDivElement>(null);
+  const panDragRef = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null);
   const guideSeq = useRef(1);
   const compareTimer = useRef<number | null>(null);
   const liveCorrection = comparing ? "" : correctionCss;
@@ -307,27 +396,45 @@ export function ImageEditorCanvasStage({
       const avail = Math.max(1, wellBox.w - 48);
       const base = fitAvail > 0 ? fitAvail : avail;
       const shown = Math.round((z * avail) / base);
-      const next = Math.min(400, Math.max(25, shown + delta));
+      const next = Math.min(400, Math.max(15, shown + delta));
       return (next * base) / avail;
     });
   };
 
+  useEffect(() => {
+    if (!zoomMenu) return;
+    const onDown = (e: PointerEvent) => {
+      if (!zoomBoxRef.current?.contains(e.target as Node)) setZoomMenu(false);
+    };
+    document.addEventListener("pointerdown", onDown);
+    return () => document.removeEventListener("pointerdown", onDown);
+  }, [zoomMenu]);
+
   const applyShownZoom = (shown: number) => {
     const avail = Math.max(1, wellBox.w - 48);
     const base = fitAvail > 0 ? fitAvail : avail;
-    setZoom((shown * base) / avail);
+    setZoom((Math.min(400, Math.max(15, shown)) * base) / avail);
   };
 
-  const toggleFitZoom = () => {
-    const shown = frameLayout.shownZoom;
-    if (shown > 102) {
-      savedShownRef.current = shown;
-      applyShownZoom(100);
-      return;
-    }
-    const saved = savedShownRef.current;
-    if (saved != null && saved > 102) applyShownZoom(saved);
+  const fitToScreen = () => {
+    const padX = 48;
+    const tallChrome = frameInteract || resizeInteract || correctionInteract;
+    const padY = tallChrome ? 136 : 88;
+    const availW = Math.max(1, wellBox.w - padX);
+    const availH = Math.max(1, wellBox.h - padY);
+    const aspect = stageAspect > 0 ? stageAspect : 1;
+    const fitW = Math.min(availW, availH * aspect);
+    const base = fitAvail > 0 ? fitAvail : availW;
+    applyShownZoom((fitW / base) * 100);
+    setZoomMenu(false);
   };
+
+  const canvasSizeLabel =
+    canvasWidth > 0 && canvasHeight > 0
+      ? `${Math.round(canvasWidth)} x ${Math.round(canvasHeight)}px`
+      : naturalWidth > 0 && naturalHeight > 0
+        ? `${Math.round(naturalWidth)} x ${Math.round(naturalHeight)}px`
+        : "";
 
   const stagePx = useMemo(() => {
     if (measuredFrame.w < 8 || measuredFrame.h < 8) {
@@ -347,6 +454,14 @@ export function ImageEditorCanvasStage({
   const backdrop = baseDisplayUrl ?? displayUrl ?? imageUrl;
   const showCropResult = frameInteract && !cropDragging && Boolean(cropPreviewUrl);
 
+  const layerRows = useMemo(() => {
+    const selected = selectedTextLayerIds?.length
+      ? selectedTextLayerIds
+      : selectedTextLayerId
+        ? [selectedTextLayerId]
+        : [];
+    return buildLayerPanelRows(textOverlay?.layers ?? [], textExtras ?? {}, selected, imageUrl ?? backdrop);
+  }, [backdrop, imageUrl, selectedTextLayerId, selectedTextLayerIds, textExtras, textOverlay?.layers]);
   const onMoveCropDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (!cropRect || !onCropRect || busy) return;
     if ((e.target as HTMLElement).closest("button")) return;
@@ -449,6 +564,25 @@ export function ImageEditorCanvasStage({
     document.addEventListener("pointercancel", end);
   };
 
+  const onPanDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!hand) return;
+    event.preventDefault();
+    panDragRef.current = { x: event.clientX, y: event.clientY, panX: pan.x, panY: pan.y };
+    setPanning(true);
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const onPanMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const drag = panDragRef.current;
+    if (!drag) return;
+    setPan({ x: drag.panX + event.clientX - drag.x, y: drag.panY + event.clientY - drag.y });
+  };
+
+  const onPanUp = () => {
+    panDragRef.current = null;
+    setPanning(false);
+  };
+
   return (
     <div
       className={cn(
@@ -479,6 +613,7 @@ export function ImageEditorCanvasStage({
         ) : null}
 
         {backdrop ? (
+          <>
           <div
             ref={wellRef}
             className="ecom-scrollbar-thin absolute inset-0 overflow-auto [scrollbar-gutter:stable]"
@@ -488,6 +623,7 @@ export function ImageEditorCanvasStage({
                 "flex min-h-full w-max min-w-full items-center justify-center px-6 pb-16 pt-6",
                 (frameInteract || resizeInteract || correctionInteract) && "pb-20 pt-14",
               )}
+              style={pan.x || pan.y ? { transform: `translate(${pan.x}px, ${pan.y}px)` } : undefined}
             >
             <div
               ref={frameRef}
@@ -816,6 +952,19 @@ export function ImageEditorCanvasStage({
             </div>
             </div>
           </div>
+          {hand ? (
+            <div
+              className="absolute inset-0 z-[55] touch-none"
+              role="region"
+              aria-label="拖动整张图"
+              style={{ cursor: panning ? "grabbing" : "grab" }}
+              onPointerDown={onPanDown}
+              onPointerMove={onPanMove}
+              onPointerUp={onPanUp}
+              onPointerCancel={onPanUp}
+            />
+          ) : null}
+          </>
         ) : (
           <div
             className={cn(
@@ -888,11 +1037,124 @@ export function ImageEditorCanvasStage({
               aria-label="参考线"
               aria-expanded={guideMenu}
               className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--ie-border-soft)] bg-[var(--ie-cream)] text-[var(--ie-ink)] shadow-sm"
-              onClick={() => setGuideMenu((v) => !v)}
+              onClick={() => {
+                setLayerPanel(false);
+                setZoomMenu(false);
+                setGuideMenu((v) => !v);
+              }}
             >
               <Hash className="h-3.5 w-3.5" aria-hidden />
             </button>
           </div>
+          <div
+            className="relative"
+            onMouseEnter={() => setLayerHint(true)}
+            onMouseLeave={() => setLayerHint(false)}
+          >
+            {layerPanel ? (
+              <div
+                role="dialog"
+                aria-label="图层管理"
+                className="absolute bottom-[calc(100%+10px)] left-1/2 z-[80] w-[280px] -translate-x-1/2 rounded-2xl border border-[var(--ie-border-soft)] bg-[var(--ie-cream)] p-3 shadow-lg"
+              >
+                <div className="mb-2.5 flex items-center justify-between">
+                  <span className="text-sm font-medium text-[var(--ie-ink)]">图层管理</span>
+                  <button
+                    type="button"
+                    aria-label="关闭图层"
+                    className="inline-flex h-6 w-6 items-center justify-center rounded-md text-[var(--ie-muted)] hover:bg-[var(--ie-cream-muted)] hover:text-[var(--ie-ink)]"
+                    onClick={() => setLayerPanel(false)}
+                  >
+                    <X className="h-3.5 w-3.5" aria-hidden />
+                  </button>
+                </div>
+                <ul className="ecom-scrollbar-thin max-h-[min(320px,46vh)] space-y-2 overflow-y-auto">
+                  {layerRows.map((row) => (
+                    <li key={row.key}>
+                      <button
+                        type="button"
+                        title={row.label}
+                        className={cn(
+                          "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left",
+                          row.active
+                            ? "bg-[var(--ie-cream)] ring-1 ring-[var(--ie-border)]"
+                            : "bg-[var(--ie-cream-deep)] hover:bg-[var(--ie-cream-muted)]",
+                        )}
+                        onClick={() => onSelectTextLayer?.(row.selectId)}
+                      >
+                        {row.imageSrc ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={row.imageSrc}
+                            alt=""
+                            className="h-12 w-12 shrink-0 rounded-md bg-[var(--ie-cream)] object-cover"
+                            draggable={false}
+                          />
+                        ) : (
+                          <span
+                            aria-hidden
+                            className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-md px-1 text-center text-[10px] font-medium leading-tight"
+                            style={{
+                              color: row.color || "var(--ie-ink)",
+                              background: row.bg || "var(--ie-cream)",
+                            }}
+                          >
+                            {row.label.slice(0, 4)}
+                          </span>
+                        )}
+                        <span className="min-w-0 flex-1 truncate text-sm text-[var(--ie-ink)]">{row.label}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+            {layerHint && !layerPanel ? (
+              <div className="pointer-events-none absolute bottom-[calc(100%+8px)] left-1/2 z-[81] -translate-x-1/2 whitespace-nowrap rounded-md bg-[var(--ie-ink)] px-2.5 py-1 text-[11px] text-[var(--ie-cream)] shadow-md">
+                图层
+                <span className="absolute left-1/2 top-full -translate-x-1/2 border-x-[5px] border-t-[5px] border-x-transparent border-t-[var(--ie-ink)]" />
+              </div>
+            ) : null}
+            <button
+              type="button"
+              aria-label="图层"
+              aria-expanded={layerPanel}
+              title="图层"
+              className={cn(
+                "inline-flex h-8 w-8 items-center justify-center rounded-lg border shadow-sm",
+                layerPanel
+                  ? "border-[var(--ie-border)] bg-[var(--ie-ink)] text-[var(--ie-cream)]"
+                  : "border-[var(--ie-border-soft)] bg-[var(--ie-cream)] text-[var(--ie-ink)]",
+              )}
+              onClick={() => {
+                setGuideMenu(false);
+                setZoomMenu(false);
+                setLayerPanel((v) => !v);
+              }}
+            >
+              <Layers className="h-3.5 w-3.5" aria-hidden />
+            </button>
+          </div>
+          <button
+            type="button"
+            aria-label="移动画布"
+            aria-pressed={hand}
+            title="移动画布"
+            className={cn(
+              "inline-flex h-8 w-8 items-center justify-center rounded-lg border shadow-sm",
+              hand
+                ? "border-[#0071e3] bg-[var(--ie-cream)] text-[#0071e3]"
+                : "border-[var(--ie-border-soft)] bg-[var(--ie-cream)] text-[var(--ie-ink)]",
+            )}
+            onClick={() => {
+              setGuideMenu(false);
+              setZoomMenu(false);
+              setLayerPanel(false);
+              setHand((value) => !value);
+            }}
+          >
+            <Hand className="h-3.5 w-3.5" aria-hidden />
+          </button>
           <div className="inline-flex h-8 items-center rounded-lg border border-[var(--ie-border-soft)] bg-[var(--ie-cream)] text-[11px] text-[var(--ie-ink)] shadow-sm">
             <button
               type="button"
@@ -902,15 +1164,67 @@ export function ImageEditorCanvasStage({
             >
               <Minus className="h-3.5 w-3.5" aria-hidden />
             </button>
-            <button
-              type="button"
-              className="min-w-10 px-1 text-center"
-              aria-label={frameLayout.shownZoom > 102 ? "回到 100%" : "恢复放大"}
-              title={frameLayout.shownZoom > 102 ? "回到 100%" : "恢复放大"}
-              onClick={toggleFitZoom}
+            <div
+              ref={zoomBoxRef}
+              className="relative"
+              onMouseEnter={() => setZoomHint(true)}
+              onMouseLeave={() => setZoomHint(false)}
             >
-              {frameLayout.shownZoom}%
-            </button>
+              {zoomMenu ? (
+                <div
+                  role="menu"
+                  aria-label="缩放"
+                  className="absolute bottom-[calc(100%+46px)] left-1/2 z-[82] w-[88px] -translate-x-1/2 rounded-2xl bg-black/55 py-2 text-center text-[13px] leading-none text-white shadow-lg backdrop-blur-md"
+                >
+                  {ZOOM_PRESETS.map((value) => (
+                    <button
+                      key={value}
+                      type="button"
+                      role="menuitem"
+                      className="block w-full py-[7px] hover:bg-white/15"
+                      onClick={() => {
+                        applyShownZoom(value);
+                        setZoomMenu(false);
+                      }}
+                    >
+                      {value}%
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="block w-full py-[7px] hover:bg-white/15"
+                    onClick={fitToScreen}
+                  >
+                    适应屏幕
+                  </button>
+                </div>
+              ) : null}
+              {zoomHint ? (
+                <div className="pointer-events-none absolute bottom-[calc(100%+8px)] left-1/2 z-[83] -translate-x-1/2 whitespace-nowrap rounded-lg bg-black/70 px-3 py-1.5 text-center text-white shadow-md">
+                  <div className="text-[12px] leading-4">实际大小</div>
+                  {canvasSizeLabel ? (
+                    <div className="text-[10px] leading-4 text-white/85">画布尺寸: {canvasSizeLabel}</div>
+                  ) : null}
+                </div>
+              ) : null}
+              <button
+                type="button"
+                className={cn(
+                  "min-w-10 px-1 text-center tabular-nums",
+                  (zoomMenu || zoomHint) && "text-[#0071e3]",
+                )}
+                aria-expanded={zoomMenu}
+                aria-label="缩放比例"
+                onClick={() => {
+                  setGuideMenu(false);
+                  setLayerPanel(false);
+                  setZoomMenu((open) => !open);
+                }}
+              >
+                {frameLayout.shownZoom}%
+              </button>
+            </div>
             <button
               type="button"
               aria-label="放大"

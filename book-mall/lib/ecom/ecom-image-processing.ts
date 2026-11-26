@@ -21,6 +21,7 @@ import {
   buildRealisticPrompt,
   buildRestorePrompt,
 } from "@/lib/ecom/ecom-image-processing-presets";
+import { compositeOriginalCutout, knockOutFakeBackdrop } from "@/lib/ecom/ecom-background-replace";
 import {
   buildOutpaintApiParameters,
   DEFAULT_ENHANCE_PROMPT,
@@ -49,6 +50,21 @@ import {
   ecomGwVolcengineImageEdit,
 } from "@/lib/gateway/ecom-tool-gateway-client";
 import { prisma } from "@/lib/prisma";
+
+async function readCutoutSource(image: string): Promise<Buffer | null> {
+  try {
+    const trimmed = image.trim();
+    if (trimmed.startsWith("data:")) return parseDataUrl(trimmed).buf;
+    if (/^https?:\/\//i.test(trimmed)) {
+      const res = await fetch(trimmed);
+      if (!res.ok) return null;
+      return Buffer.from(await res.arrayBuffer());
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
 
 function parseDataUrl(dataUrl: string): { buf: Buffer; contentType: string; ext: string } {
   const m = /^data:([^;]+);base64,([\s\S]+)$/.exec(dataUrl.trim());
@@ -173,16 +189,22 @@ async function downloadToOss(opts: {
   mode: ImageProcessingMode;
   logId: string;
   meta?: Record<string, unknown>;
+  transformBuffer?: (buf: Buffer) => Promise<Buffer>;
 }) {
   const res = await fetch(opts.url);
   if (!res.ok) throw new Error(`下载生成图失败 HTTP ${res.status}`);
-  const buf = Buffer.from(await res.arrayBuffer());
-  const contentType = res.headers.get("content-type") ?? "image/png";
-  const ext = contentType.includes("jpeg")
+  let buf = Buffer.from(await res.arrayBuffer());
+  let contentType = res.headers.get("content-type") ?? "image/png";
+  let ext = contentType.includes("jpeg")
     ? "jpg"
     : contentType.includes("webp")
       ? "webp"
       : "png";
+  if (opts.transformBuffer) {
+    buf = await opts.transformBuffer(buf);
+    contentType = "image/png";
+    ext = "png";
+  }
   const ossUrl = await uploadCanvasUserBuffer({
     userId: opts.userId,
     ext,
@@ -216,6 +238,7 @@ async function persistGatewayImageUrls(opts: {
   model: string;
   mode: ImageProcessingMode;
   logId: string;
+  transformBuffer?: (buf: Buffer) => Promise<Buffer>;
 }) {
   const results = [];
   for (const url of opts.imageUrls) {
@@ -227,6 +250,7 @@ async function persistGatewayImageUrls(opts: {
       model: opts.model,
       mode: opts.mode,
       logId: opts.logId,
+      transformBuffer: opts.transformBuffer,
     });
     results.push(row);
   }
@@ -258,6 +282,7 @@ async function runQwenEdit(opts: {
   maskImageDataUrl?: string;
   parameters?: Record<string, unknown>;
   mode: ImageProcessingMode;
+  transformBuffer?: (buf: Buffer) => Promise<Buffer>;
 }) {
   const workspaceId = randomUUID().slice(0, 8);
   const clientPage = buildImageProcessingClientPage(
@@ -283,6 +308,7 @@ async function runQwenEdit(opts: {
     model: opts.model,
     mode: opts.mode,
     logId,
+    transformBuffer: opts.transformBuffer,
   });
   return { results, logId };
 }
@@ -352,13 +378,23 @@ export async function ecomImageProcessingEnhancer(opts: {
   parameters?: Record<string, unknown>;
 }) {
   await assertImageProcessingGatewayAccess(opts.userId);
-  if (!isQwenEditModelKey(opts.model)) {
-    throw new Error("图像增强仅支持 Qwen 图像编辑模型");
-  }
   const prompt =
     opts.prompt?.trim() ||
     buildEnhancerPrompt(opts.enhancerStyle ?? "standard") ||
     DEFAULT_ENHANCE_PROMPT;
+  if (isSeedreamEditorModelKey(opts.model)) {
+    return runSeedreamSingleImage({
+      userId: opts.userId,
+      model: opts.model,
+      prompt,
+      sourceImageDataUrl: opts.sourceImageDataUrl,
+      parameters: buildGenerativeParameters(opts.parameters),
+      mode: "enhancer",
+    });
+  }
+  if (!isQwenEditModelKey(opts.model)) {
+    throw new Error("图像增强仅支持 Qwen 或 Seedream 图像模型");
+  }
   return runQwenEdit({
     userId: opts.userId,
     model: opts.model,
@@ -376,6 +412,7 @@ async function runSeedreamSingleImage(opts: {
   sourceImageDataUrl: string;
   parameters?: Record<string, unknown>;
   mode: ImageProcessingMode;
+  transformBuffer?: (buf: Buffer) => Promise<Buffer>;
 }) {
   const workspaceId = randomUUID().slice(0, 8);
   const clientPage = buildImageProcessingClientPage(
@@ -397,7 +434,8 @@ async function runSeedreamSingleImage(opts: {
   for (const img of volcImages) {
     let url = img.url;
     if (!url && img.b64) {
-      const buf = Buffer.from(img.b64, "base64");
+      let buf = Buffer.from(img.b64, "base64");
+      if (opts.transformBuffer) buf = await opts.transformBuffer(buf);
       const ossUrl = await uploadCanvasUserBuffer({
         userId: opts.userId,
         ext: "png",
@@ -428,6 +466,7 @@ async function runSeedreamSingleImage(opts: {
       model: opts.model,
       mode: opts.mode,
       logId,
+      transformBuffer: opts.transformBuffer,
     });
     results.push(row);
   }
@@ -726,6 +765,7 @@ export async function ecomImageProcessingBgRemove(opts: {
   edgeQuality?: string;
   outputFormat?: string;
   customColor?: string;
+  cutoutSubject?: string;
   styleImageDataUrl?: string;
   parameters?: Record<string, unknown>;
 }) {
@@ -734,10 +774,26 @@ export async function ecomImageProcessingBgRemove(opts: {
     bgMode: opts.bgMode ?? "transparent",
     edgeQuality: opts.edgeQuality ?? "auto",
     customColor: opts.customColor,
+    cutoutSubject: opts.cutoutSubject,
   });
   const model =
     opts.generativeModel?.trim() || opts.model?.trim() || "qwen-image-edit-max";
   const params = buildGenerativeParameters(opts.parameters);
+  const transparent = (opts.bgMode ?? "transparent") === "transparent";
+  if (transparent && params.output_format == null) params.output_format = "png";
+  // Seedream 5.5 文档：图生透明图必须同时传 background=transparent 与 output_format=png。
+  // 只传 png 时模型仍会把房间画成不透明底，选区和预览都会留下背景。
+  if (transparent && /seedream-5[.-]5/i.test(model)) {
+    params.background = "transparent";
+    params.output_format = "png";
+  }
+  const transformBuffer = transparent
+    ? async (buf: Buffer) => {
+        const sourceBuf = await readCutoutSource(opts.sourceImageDataUrl);
+        if (!sourceBuf) return knockOutFakeBackdrop(buf);
+        return compositeOriginalCutout(sourceBuf, buf);
+      }
+    : undefined;
   const images = [opts.sourceImageDataUrl];
   if (opts.styleImageDataUrl?.trim()) {
     images.push(opts.styleImageDataUrl.trim());
@@ -751,6 +807,7 @@ export async function ecomImageProcessingBgRemove(opts: {
       prompt,
       parameters: params,
       mode: "bg-remove",
+      transformBuffer,
     });
   }
 
@@ -765,6 +822,7 @@ export async function ecomImageProcessingBgRemove(opts: {
     sourceImageDataUrl: opts.sourceImageDataUrl,
     parameters: params,
     mode: "bg-remove",
+    transformBuffer,
   });
 }
 

@@ -13,15 +13,13 @@ import { ImageEditorAiFlowerPanel } from "@/components/image-editor/image-editor
 import { ImageEditorTextInspector } from "@/components/image-editor/image-editor-text-inspector";
 import { ImageEditorTextPanel } from "@/components/image-editor/image-editor-text-panel";
 import { ImageEditorHeader } from "@/components/image-editor/image-editor-header";
+import { ImageEditorCutoutWorkspace } from "@/components/image-editor/image-editor-cutout-workspace";
 import { ImageEditorToolRail } from "@/components/image-editor/image-editor-tool-rail";
 import "@/components/image-editor/image-editor-theme.css";
 import { EcomWorkspaceLayout } from "@/components/layout/ecom-workspace-layout";
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
 import { IMAGE_UPLOAD_ACCEPT } from "@/lib/image-upload-utils";
-import {
-  fetchImageProcessingModels,
-  submitImageProcessingEdit,
-} from "@/lib/ecom-image-processing-api";
+import { submitImageProcessingEdit } from "@/lib/ecom-image-processing-api";
 import {
   readImageEditorCustomPresets,
   writeImageEditorCustomPresets,
@@ -29,6 +27,7 @@ import {
 import {
   persistableImageUrl,
   readImageEditorSession,
+  sessionCutoutResultUrl,
   writeImageEditorSession,
   type ImageEditorSessionSnapshot,
 } from "@/lib/image-editor-persist";
@@ -104,6 +103,7 @@ function loadImage(src: string): Promise<HTMLImageElement> {
 type HistoryEntry = { url: string; canvasW: number; canvasH: number };
 
 const DEFAULT_CANVAS = 2048;
+const CUTOUT_SUBJECT_IDS = new Set(["off", "portrait", "product", "icon", "apparel"]);
 
 export function ImageEditorStudio() {
   const { alert, confirm, toast } = useDialogs();
@@ -127,9 +127,12 @@ export function ImageEditorStudio() {
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [historyIdx, setHistoryIdx] = useState(-1);
   const [modelsLoaded, setModelsLoaded] = useState(false);
-  const [bgModel, setBgModel] = useState("");
-  const [enhancerModel, setEnhancerModel] = useState("");
   const [erasePrompt, setErasePrompt] = useState("移除画面中的干扰物体");
+  const [cutoutOpen, setCutoutOpen] = useState(false);
+  const [cutoutSubject, setCutoutSubject] = useState("portrait");
+  const [cutoutResultUrl, setCutoutResultUrl] = useState<string | null>(null);
+  const [cutoutSaveRequest, setCutoutSaveRequest] = useState(0);
+  const imageEditorModel = "doubao-seedream-5-5";
 
   const [brightness, setBrightness] = useState(100);
   const [contrast, setContrast] = useState(100);
@@ -147,6 +150,7 @@ export function ImageEditorStudio() {
   const cropDraftRef = useRef<ImageEditorCropRect | null>(null);
   cropRectRef.current = cropRect;
   const hydratedRef = useRef(false);
+  const keepCutoutRef = useRef(false);
   const persistImageUrlRef = useRef<string | null>(null);
   const [sessionPersistUrl, setSessionPersistUrl] = useState<string | null>(null);
   const adjustDraftRef = useRef<{ w: number; h: number; rotateDeg: number; flipH: boolean; flipV: boolean } | null>(
@@ -188,6 +192,11 @@ export function ImageEditorStudio() {
 
   const applyUrl = useCallback(
     (url: string, w?: number, h?: number) => {
+      if (!keepCutoutRef.current) {
+        setCutoutOpen(false);
+        setCutoutResultUrl(null);
+        setCutoutSubject("portrait");
+      }
       setImageUrl(url);
       setDisplayUrl(url);
       void loadImage(url).then((img) => {
@@ -248,6 +257,10 @@ export function ImageEditorStudio() {
       setContrast(snap.contrast);
       setSaturate(snap.saturate);
       setErasePrompt(snap.erasePrompt);
+      const cutoutSubjectOk = CUTOUT_SUBJECT_IDS.has(snap.cutoutSubject ?? "");
+      setCutoutSubject(cutoutSubjectOk ? snap.cutoutSubject! : "portrait");
+      setCutoutResultUrl(cutoutSubjectOk ? sessionCutoutResultUrl(snap.cutoutResultUrl) : null);
+      if (snap.cutoutOpen && snap.imageUrl) setCutoutOpen(true);
       if (snap.textOverlayJson) {
         try {
           const overlay = JSON.parse(snap.textOverlayJson) as ImageEditorTextDocument["overlay"];
@@ -269,11 +282,13 @@ export function ImageEditorStudio() {
       } else if (snap.imageUrl) {
         persistImageUrlRef.current = snap.imageUrl;
         setSessionPersistUrl(snap.imageUrl);
+        keepCutoutRef.current = true;
         applyUrl(
           snap.imageUrl,
           snapCanvasOk ? snap.canvasW : undefined,
           snapCanvasOk ? snap.canvasH : undefined,
         );
+        keepCutoutRef.current = false;
       }
       return;
     }
@@ -746,6 +761,9 @@ export function ImageEditorStudio() {
     setEditingTextLayerId(null);
     persistImageUrlRef.current = null;
     setSessionPersistUrl(null);
+    setCutoutOpen(false);
+    setCutoutSubject("portrait");
+    setCutoutResultUrl(null);
     writeImageEditorSession({
       v: 1,
       tool,
@@ -768,6 +786,9 @@ export function ImageEditorStudio() {
       correctCenter: correction.center,
       correctRotate: correction.rotate,
       imageUrl: null,
+      cutoutOpen: false,
+      cutoutSubject: "portrait",
+      cutoutResultUrl: null,
     });
     toast({ title: "已移除图片", variant: "success" });
   }, [
@@ -813,6 +834,9 @@ export function ImageEditorStudio() {
       selectedTextLayerId,
       imageUrl: sessionPersistUrl ?? (imageUrl?.startsWith("http") || imageUrl?.startsWith("data:") ? imageUrl : null),
       imageOmitted: Boolean(imageUrl) && !sessionPersistUrl && !imageUrl?.startsWith("http") && !imageUrl?.startsWith("data:") ? true : undefined,
+      cutoutOpen,
+      cutoutSubject,
+      cutoutResultUrl: sessionCutoutResultUrl(cutoutResultUrl),
     };
     const t = window.setTimeout(() => writeImageEditorSession(snapshot), 500);
     return () => window.clearTimeout(t);
@@ -837,19 +861,14 @@ export function ImageEditorStudio() {
     correction,
     textDoc,
     selectedTextLayerId,
+    cutoutOpen,
+    cutoutSubject,
+    cutoutResultUrl,
   ]);
 
-  useEffect(() => {
-    void (async () => {
-      try {
-        const m = await fetchImageProcessingModels();
-        setBgModel(m.defaults.bgRemove ?? m.defaults.editor ?? "");
-        setEnhancerModel(m.defaults.enhancer ?? "");
-        setModelsLoaded(true);
-      } catch {
-        setModelsLoaded(true);
-      }
-    })();
+  const onCutoutSession = useCallback((subject: string, resultUrl: string | null) => {
+    setCutoutSubject(subject);
+    setCutoutResultUrl(resultUrl);
   }, []);
 
   const onFile = async (file: File) => {
@@ -1070,7 +1089,8 @@ export function ImageEditorStudio() {
       const res = await submitImageProcessingEdit({
         mode: "bg-remove",
         model: bgModel || undefined,
-        sourceImageDataUrl: dataUrl,
+        model: imageEditorModel,
+        generativeModel: imageEditorModel,
       });
       const next = res.imageUrls[0];
       if (!next) throw new Error("未返回结果");
@@ -1095,7 +1115,8 @@ export function ImageEditorStudio() {
       const res = await submitImageProcessingEdit({
         mode: "enhancer",
         model: enhancerModel || undefined,
-        sourceImageDataUrl: dataUrl,
+        model: imageEditorModel,
+        generativeModel: imageEditorModel,
       });
       const next = res.imageUrls[0];
       if (!next) throw new Error("未返回结果");
@@ -1120,6 +1141,7 @@ export function ImageEditorStudio() {
       const res = await submitImageProcessingEdit({
         mode: "editor",
         prompt: erasePrompt.trim(),
+        model: imageEditorModel,
         sourceImageDataUrl: dataUrl,
       });
       const next = res.imageUrls[0];
@@ -1162,6 +1184,10 @@ export function ImageEditorStudio() {
   };
 
   const download = () => {
+    if (cutoutOpen) {
+      setCutoutSaveRequest((n) => n + 1);
+      return;
+    }
     const src = displayUrl ?? imageUrl;
     if (!src) return;
     const a = document.createElement("a");
@@ -1332,7 +1358,7 @@ export function ImageEditorStudio() {
           <div className="space-y-3">
             <p className="text-[11px] text-[var(--ie-subtle)]">智能抠图，移除背景保留主体（走 Gateway 图像处理）。</p>
             {!modelsLoaded ? <p className="text-[10px] text-[var(--ie-subtle)]">加载模型…</p> : null}
-            <EcomButtonPrimary type="button" className="w-full" disabled={!imageUrl || busy} onClick={() => void runBgRemove()}>
+            <EcomButtonPrimary type="button" className="w-full" disabled={!imageUrl || busy} onClick={() => void openCutout()}>
               一键抠图
             </EcomButtonPrimary>
           </div>
@@ -1401,9 +1427,21 @@ export function ImageEditorStudio() {
     }
   })();
 
+  const openCutout = async () => {
+    if (!imageUrl) {
+      await alert({ title: "无法抠图", message: "请先打开一张图片。" });
+      return;
+    }
+    if (textDoc.overlay.layers.length > 0) {
+      await alert({ title: "先合并图层", message: "先合并图层，才能抠图。" });
+      return;
+    }
+    setCutoutOpen(true);
+  };
+
   return (
-  <>
-    <EcomWorkspaceLayout fullWidth contentClassName="min-h-0 !bg-[#f5efe6]">
+    <>
+      <EcomWorkspaceLayout fullWidth contentClassName="min-h-0 !bg-[#f5efe6]">
       <div data-image-editor-theme className="flex h-full min-h-0 flex-col bg-[var(--ie-cream-deep)]">
         <ImageEditorHeader
           canUndo={historyIdx > 0}
@@ -1417,23 +1455,49 @@ export function ImageEditorStudio() {
           leftCollapsed={!leftPanelOpen}
           rightCollapsed={!rightPanelOpen}
           onToggleLeft={() => setLeftPanelOpen((open) => !open)}
+          panelsDisabled={cutoutOpen}
           onToggleRight={() => setRightPanelOpen((open) => !open)}
         />
 
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row lg:gap-2 lg:p-2">
           <div className="flex max-h-[50vh] min-h-0 w-full shrink-0 flex-row overflow-hidden lg:max-h-none lg:w-auto">
-            <ImageEditorToolRail active={tool} disabled={busy} onSelect={setTool} />
-            {leftPanelOpen ? (
+            <ImageEditorToolRail
+              active={tool}
+              disabled={busy || cutoutOpen}
+              onSelect={(id) => {
+                if (id === "cutout") {
+                  void openCutout();
+                  return;
+                }
+                setTool(id);
+              }}
+            />
+            {leftPanelOpen && !cutoutOpen ? (
               <aside className="ecom-scrollbar-thin flex min-h-0 w-[min(100%,320px)] flex-1 flex-col overflow-y-auto bg-transparent p-2 pt-0 lg:w-[332px] lg:shrink-0">
                 {toolPanel}
               </aside>
             ) : null}
           </div>
 
+          {cutoutOpen && imageUrl ? (
+            <ImageEditorCutoutWorkspace
+              imageUrl={imageUrl}
+              saveRequest={cutoutSaveRequest}
+              initialSubject={cutoutSubject}
+              initialResultUrl={cutoutResultUrl}
+              onSessionChange={onCutoutSession}
+              onCancel={() => setCutoutOpen(false)}
+              onApply={(url) => {
+                applyUrl(url);
+                setCutoutOpen(false);
+              }}
+            />
+          ) : null}
           <div
             className={cn(
               "flex min-h-0 min-w-0 flex-1 lg:rounded-xl lg:border lg:border-[var(--ie-border-soft)] lg:bg-[var(--ie-canvas-well)]",
               canvasFrameInteract || resizeInteract ? "overflow-visible" : "overflow-hidden",
+              cutoutOpen && "hidden",
             )}
           >
             <ImageEditorCanvasStage
@@ -1509,7 +1573,7 @@ export function ImageEditorStudio() {
           <div
             className={cn(
               "flex min-h-0 w-full shrink-0 flex-col overflow-hidden border-t border-[var(--ie-border-soft)] lg:h-full lg:w-[300px] lg:self-stretch lg:border-l lg:border-t-0",
-              !rightPanelOpen && "hidden",
+              (!rightPanelOpen || cutoutOpen) && "hidden",
             )}
           >
             {tool === "text" ? (

@@ -705,6 +705,171 @@ export async function knockOutNearWhiteBackdrop(buf: Buffer): Promise<Buffer> {
   return knockOutFakeBackdrop(buf);
 }
 
+/** 只有接近纯白才当背景。米黄衣服、米色裤子的亮度也会很高，不能按亮度一刀切。 */
+function isCutoutBackdropWhite(r: number, g: number, b: number): boolean {
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  return min >= 246 && max - min <= 14;
+}
+
+function punchEdgeWhite(data: Buffer, width: number, height: number, channels: number) {
+  const seen = new Uint8Array(width * height);
+  const queue: number[] = [];
+  const consider = (x: number, y: number) => {
+    if (x < 0 || y < 0 || x >= width || y >= height) return;
+    const idx = y * width + x;
+    if (seen[idx]) return;
+    const i = idx * channels;
+    const alpha = data[i + 3] ?? 255;
+    if (alpha < 16) {
+      seen[idx] = 1;
+      queue.push(idx);
+      return;
+    }
+    if (!isCutoutBackdropWhite(data[i] ?? 0, data[i + 1] ?? 0, data[i + 2] ?? 0)) return;
+    seen[idx] = 1;
+    data[i + 3] = 0;
+    queue.push(idx);
+  };
+  for (let x = 0; x < width; x += 1) {
+    consider(x, 0);
+    consider(x, height - 1);
+  }
+  for (let y = 1; y < height - 1; y += 1) {
+    consider(0, y);
+    consider(width - 1, y);
+  }
+  let head = 0;
+  while (head < queue.length) {
+    const idx = queue[head]!;
+    head += 1;
+    const x = idx % width;
+    const y = Math.floor(idx / width);
+    consider(x + 1, y);
+    consider(x - 1, y);
+    consider(x, y + 1);
+    consider(x, y - 1);
+  }
+}
+
+/** 主体内部被打穿的洞补回不透明。连到画面边缘的背景保持透明。 */
+function fillEnclosedTransparent(data: Buffer, width: number, height: number, channels: number) {
+  const total = width * height;
+  const seen = new Uint8Array(total);
+  const queue: number[] = [];
+  const consider = (x: number, y: number) => {
+    if (x < 0 || y < 0 || x >= width || y >= height) return;
+    const idx = y * width + x;
+    if (seen[idx]) return;
+    if ((data[idx * channels + 3] ?? 255) >= 250) return;
+    seen[idx] = 1;
+    queue.push(idx);
+  };
+  for (let x = 0; x < width; x += 1) {
+    consider(x, 0);
+    consider(x, height - 1);
+  }
+  for (let y = 1; y < height - 1; y += 1) {
+    consider(0, y);
+    consider(width - 1, y);
+  }
+  let head = 0;
+  while (head < queue.length) {
+    const idx = queue[head]!;
+    head += 1;
+    const x = idx % width;
+    const y = Math.floor(idx / width);
+    consider(x + 1, y);
+    consider(x - 1, y);
+    consider(x, y + 1);
+    consider(x, y - 1);
+  }
+  for (let i = 0; i < total; i += 1) {
+    const alphaAt = i * channels + 3;
+    if ((data[alphaAt] ?? 255) < 250 && !seen[i]) data[alphaAt] = 255;
+  }
+}
+
+/**
+ * 抠图预览用原图像素，只借用模型结果的透明区域。
+ * 只打穿连到边缘的纯白，浅色衣服留在主体里。
+ */
+/** 边缘已经有成片透明，说明模型按官方透明通道返回了抠图，直接用这张 alpha。 */
+async function cutoutAlphaIsReal(buf: Buffer): Promise<boolean> {
+  const { data, info } = await sharp(buf, { failOn: "none" })
+    .rotate()
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const width = info.width ?? 0;
+  const height = info.height ?? 0;
+  if (!width || !height) return false;
+  const step = Math.max(1, Math.floor(Math.max(width, height) / 80));
+  let sampled = 0;
+  let clear = 0;
+  const sample = (x: number, y: number) => {
+    sampled += 1;
+    if ((data[(y * width + x) * 4 + 3] ?? 255) < 20) clear += 1;
+  };
+  for (let x = 0; x < width; x += step) {
+    sample(x, 0);
+    sample(x, height - 1);
+  }
+  for (let y = 0; y < height; y += step) {
+    sample(0, y);
+    sample(width - 1, y);
+  }
+  return sampled > 0 && clear / sampled >= 0.15;
+}
+
+export async function compositeOriginalCutout(source: Buffer, generated: Buffer): Promise<Buffer> {
+  const knocked = (await cutoutAlphaIsReal(generated)) ? generated : await knockOutCutoutSubject(generated);
+  const meta = await sharp(source, { failOn: "none" }).rotate().metadata();
+  const width = meta.width ?? 0;
+  const height = meta.height ?? 0;
+  if (!width || !height) return knocked;
+
+  const original = await sharp(source, { failOn: "none" })
+    .rotate()
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  const channels = original.info.channels ?? 4;
+  const genMeta = await sharp(knocked, { failOn: "none" }).metadata();
+  const genW = genMeta.width ?? width;
+  const genH = genMeta.height ?? height;
+  const aspectClose = Math.abs(width / height - genW / genH) / (width / height) < 0.04;
+  const maskRaw = await sharp(knocked, { failOn: "none" })
+    .resize(width, height, {
+      fit: aspectClose ? "fill" : "contain",
+      background: { r: 0, g: 0, b: 0, alpha: 0 },
+    })
+    .ensureAlpha()
+    .raw()
+    .toBuffer();
+
+  const out = Buffer.from(original.data);
+  const pixels = width * height;
+  for (let p = 0; p < pixels; p += 1) {
+    out[p * channels + 3] = maskRaw[p * 4 + 3] ?? 255;
+  }
+  return sharp(out, { raw: { width, height, channels: 4 } }).png().toBuffer();
+}
+
+async function knockOutCutoutSubject(generated: Buffer): Promise<Buffer> {
+  const base = sharp(generated, { failOn: "none" }).rotate().ensureAlpha();
+  const meta = await base.clone().metadata();
+  const width = meta.width ?? 0;
+  const height = meta.height ?? 0;
+  if (!width || !height) return generated;
+  const { data, info } = await base.raw().toBuffer({ resolveWithObject: true });
+  const channels = info.channels ?? 4;
+  const pixels = Buffer.from(data);
+  punchEdgeWhite(pixels, width, height, channels);
+  fillEnclosedTransparent(pixels, width, height, channels);
+  return sharp(pixels, { raw: { width, height, channels } }).png().toBuffer();
+}
+
 export const BACKGROUND_REPLACE_EDGE_MAX = 10;
 export const BACKGROUND_REPLACE_N_MAX = 4;
 

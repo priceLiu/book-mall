@@ -18,6 +18,7 @@ type Props = {
   onOpenNewTab: () => void;
   leftCollapsed: boolean;
   rightCollapsed: boolean;
+  panelsDisabled?: boolean;
   onToggleLeft: () => void;
   onToggleRight: () => void;
 };
@@ -35,6 +36,7 @@ export function ImageEditorHeader({
   rightCollapsed,
   onToggleLeft,
   onToggleRight,
+  panelsDisabled = false,
 }: Props) {
   const [fileOpen, setFileOpen] = useState(false);
 
@@ -45,6 +47,7 @@ export function ImageEditorHeader({
         rightCollapsed={rightCollapsed}
         onToggleLeft={onToggleLeft}
         onToggleRight={onToggleRight}
+        disabled={panelsDisabled}
       />
       <div className="flex min-w-0 items-center gap-2.5">
         <span className="text-[13px] font-semibold text-[var(--ie-ink)]">电商设计室</span>
@@ -82,7 +85,11 @@ export function ImageEditorHeader({
             />
             <div className="absolute right-0 top-full z-[90] mt-1 min-w-[10rem] rounded-xl border border-[var(--ie-border-soft)] bg-[var(--ie-cream)] py-1 shadow-lg">
               <FileMenuItem label="打开图片…" onClick={() => { setFileOpen(false); onOpenFile(); }} />
-              <FileMenuItem label="下载 PNG" disabled={!canDownload} onClick={() => { setFileOpen(false); onDownload(); }} />
+              <FileMenuItem
+                label={panelsDisabled ? "保存抠图" : "下载 PNG"}
+                disabled={!canDownload}
+                onClick={() => { setFileOpen(false); onDownload(); }}
+              />
               <FileMenuItem label="新标签页打开" onClick={() => { setFileOpen(false); onOpenNewTab(); }} />
             </div>
           </>
@@ -113,9 +120,11 @@ function PanelSideSwitch({
   rightCollapsed,
   onToggleLeft,
   onToggleRight,
+  disabled = false,
 }: {
   leftCollapsed: boolean;
   rightCollapsed: boolean;
+  disabled?: boolean;
   onToggleLeft: () => void;
   onToggleRight: () => void;
 }) {
@@ -129,6 +138,7 @@ function PanelSideSwitch({
         pressed={leftCollapsed}
         label={leftCollapsed ? "展开左栏" : "收起左栏"}
         icon={PanelLeft}
+        disabled={disabled}
         onClick={onToggleLeft}
       />
       <span className="w-px self-stretch bg-[var(--ie-border-soft)]" aria-hidden />
@@ -136,6 +146,7 @@ function PanelSideSwitch({
         pressed={rightCollapsed}
         label={rightCollapsed ? "展开右栏" : "收起右栏"}
         icon={PanelRight}
+        disabled={disabled}
         onClick={onToggleRight}
       />
     </div>
@@ -146,9 +157,11 @@ function SideSwitchButton({
   pressed,
   label,
   icon: Icon,
+  disabled = false,
   onClick,
 }: {
   pressed: boolean;
+  disabled?: boolean;
   label: string;
   icon: typeof PanelLeft;
   onClick: () => void;
@@ -159,13 +172,15 @@ function SideSwitchButton({
       aria-pressed={pressed}
       aria-label={label}
       title={label}
+      disabled={disabled}
       className={cn(
         "inline-flex h-8 w-11 items-center justify-center transition-colors",
+        disabled && "cursor-not-allowed opacity-40",
         pressed
           ? "bg-[var(--ie-ink)] text-[var(--ie-cream)] shadow-[inset_0_2px_4px_rgba(0,0,0,0.35)]"
           : "bg-[var(--ie-cream)] text-[var(--ie-ink)] shadow-[inset_0_1px_0_#fff] hover:bg-[var(--ie-cream-muted)]",
+        disabled && !pressed && "hover:bg-[var(--ie-cream)]",
       )}
-      onClick={onClick}
     >
       <Icon className="h-4 w-4" aria-hidden />
     </button>

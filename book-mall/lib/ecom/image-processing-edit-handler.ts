@@ -25,6 +25,7 @@ import {
   ECOM_SEEDREAM_EDITOR_MODEL_KEY,
   ECOM_WANX_PAINTING_MODEL_KEY,
   isQwenEditModelKey,
+  isSeedreamEditorModelKey,
 } from "@/lib/ecom/ecom-image-processing-models";
 import { LOCAL_EDIT_WAN27_MODEL_KEY } from "@/lib/image-local-edit/model-capabilities";
 import { verifyToolsBearer } from "@/lib/sso-tools-bearer";
@@ -129,7 +130,7 @@ export async function handleImageProcessingEditPost(req: Request) {
           : "";
       const enhancerStyle =
         typeof body.enhancerStyle === "string" ? body.enhancerStyle.trim() : "standard";
-      if (!isQwenEditModelKey(model)) {
+      if (!isQwenEditModelKey(model) && !isSeedreamEditorModelKey(model)) {
         return ecomJson({ error: "无效增强模型" }, { status: 400 });
       }
       if (!sourceImageDataUrl) {
@@ -303,6 +304,8 @@ export async function handleImageProcessingEditPost(req: Request) {
           typeof body.outputFormat === "string" ? body.outputFormat.trim() : "png",
         customColor:
           typeof body.customColor === "string" ? body.customColor.trim() : undefined,
+        cutoutSubject:
+          typeof body.cutoutSubject === "string" ? body.cutoutSubject.trim() : undefined,
         styleImageDataUrl: styleFromParams,
         parameters,
       });

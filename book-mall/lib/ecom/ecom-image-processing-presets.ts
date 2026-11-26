@@ -135,6 +135,8 @@ export function buildBgRemovePrompt(opts: {
   bgMode: string;
   edgeQuality: string;
   customColor?: string;
+  /** 图片编辑自动抠图的主体。空表示不额外指定。 */
+  cutoutSubject?: string;
 }): string {
   const edge =
     opts.edgeQuality === "high"
@@ -154,12 +156,30 @@ export function buildBgRemovePrompt(opts: {
             ? `Replace background with solid color ${opts.customColor}.`
             : "Remove background completely, output clean cutout with transparent background.";
 
+  const subject =
+    opts.cutoutSubject === "portrait"
+      ? "人物和宠物，包括头发、衣服和身体"
+      : opts.cutoutSubject === "product"
+        ? "商品货物"
+        : opts.cutoutSubject === "icon"
+          ? "图标、印章和标志"
+          : opts.cutoutSubject === "apparel"
+            ? "服饰以及穿着服饰的人"
+            : "";
+
+  if (subject && opts.bgMode !== "white" && opts.bgMode !== "black" && opts.bgMode !== "blur" && opts.bgMode !== "custom") {
+    return `提取参考图里的${subject}。去掉房间、墙面、家具、花草装饰和其余全部背景，贴着主体边缘的背景也要去掉。保持主体原来的位置、比例和样子，不要重绘。输出透明背景。`;
+  }
+
   return [
     "Remove the background from this image.",
     bg,
     edge,
-    "Keep the main subject intact with natural edges. Do not alter the subject.",
-  ].join(" ");
+    subject,
+    "Keep the main subject intact with natural edges. Do not alter the subject. Output a PNG with a transparent background.",
+  ]
+    .filter(Boolean)
+    .join(" ");
 }
 
 export function buildObjectRemovePrompt(opts: {

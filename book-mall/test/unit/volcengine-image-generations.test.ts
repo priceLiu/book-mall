@@ -83,6 +83,18 @@ describe("buildVolcengineImageGenerationsBody", () => {
     expect(body.output_format).toBe("jpeg");
     expect(body.layer_decomposition).toBe(true);
   });
+
+  it("sends Seedream 5.5 transparent background for cutout", () => {
+    const body = buildVolcengineImageGenerationsBody({
+      model: "doubao-seedream-5-5",
+      prompt: "提取参考图里的人物和宠物。输出透明背景。",
+      image: "https://cdn.example/in.jpg",
+      parameters: { output_format: "png", background: "transparent" },
+    });
+    expect(body.output_format).toBe("png");
+    expect(body.background).toBe("transparent");
+    expect(body).not.toHaveProperty("sequential_image_generation");
+  });
 });
 
 describe("buildVolcengineImageLogResultSummary", () => {

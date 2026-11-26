@@ -79,6 +79,7 @@ export async function submitImageProcessingEdit(body: {
   edgeQuality?: string;
   outputFormat?: string;
   customColor?: string;
+  cutoutSubject?: string;
   removalMode?: string;
   blurType?: string;
   sharpenStrength?: string;

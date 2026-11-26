@@ -52,10 +52,11 @@ export function ImageEditorToolRail({ active, disabled, onSelect }: Props) {
             title={tool.label}
             className={cn(
               "flex w-[60px] flex-col items-center gap-1 rounded-lg px-1 py-2 text-[10px] transition-colors",
-              selected
-                ? "bg-[var(--ie-cream-muted)] font-semibold text-[var(--ie-ink)] ring-1 ring-[var(--ie-border)]"
-                : "text-[var(--ie-muted)] hover:bg-[var(--ie-cream-muted)] hover:text-[var(--ie-ink)]",
-              disabled && "opacity-40",
+              disabled
+                ? "text-[var(--ie-muted)] opacity-40"
+                : selected
+                  ? "bg-[var(--ie-cream-muted)] font-semibold text-[var(--ie-ink)] ring-1 ring-[var(--ie-border)]"
+                  : "text-[var(--ie-muted)] hover:bg-[var(--ie-cream-muted)] hover:text-[var(--ie-ink)]",
             )}
             onClick={() => onSelect(tool.id)}
           >

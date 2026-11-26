@@ -30,7 +30,18 @@ export type ImageEditorSessionSnapshot = {
   textOverlayJson?: string | null;
   textExtrasJson?: string | null;
   selectedTextLayerId?: string | null;
+  /** 抠图页是否开着。刷新后回到上次的抠图结果，不再重新请求。 */
+  cutoutOpen?: boolean;
+  cutoutSubject?: string;
+  cutoutResultUrl?: string | null;
 };
+
+export function sessionCutoutResultUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  if (url.startsWith("http://") || url.startsWith("https://")) return url;
+  if (url.startsWith("data:") && url.length <= IMAGE_EDITOR_SESSION_IMAGE_MAX) return url;
+  return null;
+}
 
 export function readImageEditorSession(): ImageEditorSessionSnapshot | null {
   if (typeof sessionStorage === "undefined") return null;

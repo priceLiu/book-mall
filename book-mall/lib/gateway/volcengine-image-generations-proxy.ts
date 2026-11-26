@@ -18,6 +18,11 @@ export type VolcengineImageGenerationsParams = {
   output_format?: "png" | "jpeg";
   /** Seedream 5.0 Pro 图层拆分模式；`size: auto` 仅在此模式下合法 */
   layer_decomposition?: boolean;
+  /**
+   * Seedream 5.5 原生透明通道。`transparent` 时输出必须是 png。
+   * 不传则默认 auto，模型常把房间画成不透明底。
+   */
+  background?: "auto" | "transparent" | "opaque";
 };
 
 export type SeedreamLayerBbox = {
@@ -296,6 +301,9 @@ export function buildVolcengineImageGenerationsBody(
   }
   if (p.layer_decomposition === true) {
     body.layer_decomposition = true;
+  }
+  if (p.background === "auto" || p.background === "transparent" || p.background === "opaque") {
+    body.background = p.background;
   }
   return body;
 }

@@ -8,6 +8,7 @@ import {
   detectFakeBackdropKind,
   fillTransparentHolesFromNeighbors,
   hasMeaningfulTransparency,
+  compositeOriginalCutout,
   knockOutFakeBackdrop,
   knockOutNearWhiteBackdrop,
   resolveBackgroundReplaceModel,
@@ -387,6 +388,133 @@ describe("toRgbaPngBuffer", () => {
       .toBuffer();
     const out = await knockOutNearWhiteBackdrop(png);
     expect(await hasMeaningfulTransparency(out)).toBe(true);
+  });
+});
+
+describe("compositeOriginalCutout", () => {
+  it("keeps the original subject and clears the white backdrop", async () => {
+    const source = await sharp({
+      create: {
+        width: 20,
+        height: 20,
+        channels: 3,
+        background: { r: 200, g: 10, b: 10 },
+      },
+    })
+      .png()
+      .toBuffer();
+    const generated = await sharp({
+      create: {
+        width: 20,
+        height: 20,
+        channels: 3,
+        background: { r: 255, g: 255, b: 255 },
+      },
+    })
+      .composite([
+        {
+          input: await sharp({
+            create: {
+              width: 8,
+              height: 8,
+              channels: 3,
+              background: { r: 20, g: 20, b: 80 },
+            },
+          })
+            .png()
+            .toBuffer(),
+          left: 6,
+          top: 6,
+        },
+      ])
+      .png()
+      .toBuffer();
+
+    const out = await compositeOriginalCutout(source, generated);
+    const { data, info } = await sharp(out).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+    expect(data[3]).toBe(0);
+    const i = (10 * info.width + 10) * 4;
+    expect(data[i]).toBe(200);
+    expect(data[i + 1]).toBe(10);
+    expect(data[i + 3]).toBe(255);
+  });
+
+  it("keeps light clothing and fills holes inside the subject", async () => {
+    const source = await sharp({
+      create: { width: 24, height: 24, channels: 3, background: { r: 180, g: 20, b: 20 } },
+    })
+      .png()
+      .toBuffer();
+    const cream = await sharp({
+      create: { width: 24, height: 6, channels: 3, background: { r: 232, g: 214, b: 186 } },
+    })
+      .png()
+      .toBuffer();
+    const body = await sharp({
+      create: { width: 14, height: 14, channels: 3, background: { r: 40, g: 50, b: 120 } },
+    })
+      .png()
+      .toBuffer();
+    const hole = await sharp({
+      create: { width: 4, height: 4, channels: 3, background: { r: 255, g: 255, b: 255 } },
+    })
+      .png()
+      .toBuffer();
+    const generated = await sharp({
+      create: { width: 24, height: 24, channels: 3, background: { r: 255, g: 255, b: 255 } },
+    })
+      .composite([
+        { input: cream, left: 0, top: 18 },
+        { input: body, left: 5, top: 4 },
+        { input: hole, left: 10, top: 9 },
+      ])
+      .png()
+      .toBuffer();
+
+    const out = await compositeOriginalCutout(source, generated);
+    const { data, info } = await sharp(out).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+    const at = (x: number, y: number) => data[(y * info.width + x) * 4 + 3];
+    expect(at(0, 0)).toBe(0);
+    expect(at(4, 20)).toBe(255);
+    expect(at(12, 11)).toBe(255);
+  });
+
+  it("keeps a real transparent alpha instead of punching light subject pixels", async () => {
+    const source = await sharp({
+      create: { width: 20, height: 20, channels: 3, background: { r: 10, g: 180, b: 40 } },
+    })
+      .png()
+      .toBuffer();
+    const raw = Buffer.alloc(20 * 20 * 4, 0);
+    for (let i = 0; i < raw.length; i += 4) {
+      raw[i] = 210;
+      raw[i + 1] = 190;
+      raw[i + 2] = 160;
+      raw[i + 3] = 0;
+    }
+    const subject = (x: number, y: number, r: number, g: number, b: number) => {
+      const i = (y * 20 + x) * 4;
+      raw[i] = r;
+      raw[i + 1] = g;
+      raw[i + 2] = b;
+      raw[i + 3] = 255;
+    };
+    subject(0, 0, 255, 255, 255);
+    for (let y = 6; y < 14; y += 1) {
+      for (let x = 6; x < 14; x += 1) subject(x, y, 40, 50, 120);
+    }
+    const generated = await sharp(raw, { raw: { width: 20, height: 20, channels: 4 } }).png().toBuffer();
+    const out = await compositeOriginalCutout(source, generated);
+    const { data, info } = await sharp(out).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+    const at = (x: number, y: number) => {
+      const i = (y * info.width + x) * 4;
+      return { r: data[i], g: data[i + 1], a: data[i + 3] };
+    };
+    expect(at(0, 0).a).toBe(255);
+    expect(at(0, 0).r).toBe(10);
+    expect(at(0, 0).g).toBe(180);
+    expect(at(10, 10).a).toBe(255);
+    expect(at(19, 19).a).toBe(0);
   });
 });
 

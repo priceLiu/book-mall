@@ -6,7 +6,11 @@
 import sharp from "sharp";
 
 import { uploadCanvasUserBuffer } from "@/lib/canvas/canvas-oss";
-import { decomposeImageLayer, type ImageLayerStackItem } from "@/lib/ecom/ecom-image-layer-service";
+import {
+  decomposeImageLayer,
+  ECOM_IMAGE_LAYER_MODEL_55,
+  type ImageLayerStackItem,
+} from "@/lib/ecom/ecom-image-layer-service";
 import { prisma } from "@/lib/prisma";
 
 export const SELLING_DECOMPOSE_PROMPT =
