@@ -1,7 +1,7 @@
 /**
  * Gateway Models Market · 目录与展示层
  */
-import type { ModelMediaKind } from "@prisma/client";
+import { Prisma, type GatewayProviderKind, type ModelMediaKind } from "@prisma/client";
 
 import marketPresentation from "@/config/gateway-market-presentation.json";
 import { resolveSourceLabel } from "@/lib/gateway/model-source-label";
@@ -11,12 +11,11 @@ import {
   marketTaskTagsForModel,
   type MarketTaskTag,
 } from "@/lib/gateway/gateway-model-capabilities";
+import { listActiveRoutes } from "@/lib/gateway/model-registry";
 import {
-  dedupeByModelKey,
-  listActiveRoutes,
-  type RegistryModelRow,
-} from "@/lib/gateway/model-registry";
-import { isGatewayProviderBound } from "@/lib/gateway/gateway-credential-match";
+  gatewayCredentialSubstitutes,
+  isGatewayProviderBound,
+} from "@/lib/gateway/gateway-credential-match";
 import { PLATFORM_MEDIA_KIND_LABEL, canonicalByKey } from "@/lib/platform-model/canonical-registry";
 import { showcaseCoverUrlFor } from "@/lib/gateway/market-showcase-covers";
 import { prisma } from "@/lib/prisma";
@@ -167,6 +166,315 @@ export function showcaseDisplayNameFor(displayName: string): string {
   return stripped || trimmed;
 }
 
+const MARKET_TASKS: MarketTaskTag[] = [
+  "text-to-image",
+  "image-to-image",
+  "image-to-video",
+  "video-to-video",
+  "motion-control",
+  "video-upscale",
+  "text-to-music",
+  "text-to-speech",
+  "chat",
+];
+
+const MEDIA_KIND_VALUES = new Set<ModelMediaKind>([
+  "TEXT_TO_IMAGE",
+  "IMAGE_TO_VIDEO",
+  "VIDEO_TO_VIDEO",
+  "TEXT_LLM",
+]);
+
+type MarketRouteRow = {
+  canonicalKey: string;
+  modelKey: string;
+  vendor: string;
+  providerKind: string;
+  displayName: string;
+  role: string | null;
+  requestKind: string | null;
+  mediaKind: string | null;
+  sourceLabel: string | null;
+};
+
+function sqlAnd(parts: Prisma.Sql[]): Prisma.Sql {
+  if (parts.length === 0) return Prisma.sql`TRUE`;
+  return parts.slice(1).reduce((acc, part) => Prisma.sql`${acc} AND ${part}`, parts[0]!);
+}
+
+function likeContains(raw: string): string {
+  return `%${raw.replace(/[\\%_]/g, (ch) => `\\${ch}`)}%`;
+}
+
+function presentationKeysForTask(task: MarketTaskTag): { matched: string[]; any: string[] } {
+  const matched: string[] = [];
+  const any: string[] = [];
+  for (const [key, meta] of Object.entries(PRESENTATION.models ?? {})) {
+    const tags = (meta.taskTags ?? [])
+      .map((raw) => raw.trim().toLowerCase().replace(/\s+/g, "-"))
+      .map((s) => (s === "text-to-video" ? "image-to-video" : s));
+    if (tags.length === 0) continue;
+    any.push(key);
+    if (tags.includes(task)) matched.push(key);
+  }
+  return { matched, any };
+}
+
+function marketTaskFilterSql(task: MarketTaskTag): Prisma.Sql {
+  const key = Prisma.sql`lower(r."modelKey")`;
+  const llm = Prisma.sql`(c."requestKind"::text = 'CHAT' OR c."role"::text = 'LLM')`;
+  const notLlm = Prisma.sql`NOT ${llm}`;
+  const notMotion = Prisma.sql`${key} NOT LIKE '%motion-control%'`;
+  const notUpscale = Prisma.sql`${key} NOT LIKE '%topaz%' AND ${key} NOT LIKE '%upscale%' AND ${key} NOT LIKE '%minimax-h3-regeneration%'`;
+  const i2iOnly = Prisma.sql`(
+    ${key} = 'google/nano-banana-edit'
+    OR ${key} LIKE 'qwen-image-edit%'
+  )`;
+  const bothImage = Prisma.sql`${key} IN ('wan2.6-image', 'wan2.7-image-pro', 'google/nano-banana', '4o-image', 'nano-banana-2')`;
+  const i2vNamed = Prisma.sql`(
+    ${key} IN ('wan3.0-video', 'wan3.0-video-prime', 'bytedance/seedance-2', 'bytedance/seedance-2-mini', 'veo3', 'veo3.1', 'veo3_fast')
+    OR (${key} LIKE '%hailuo%' AND ${key} LIKE '%image-to-video%')
+    OR ${key} LIKE '%minimax-h3-t2v%'
+    OR ${key} LIKE '%minimax-h3-i2v%'
+    OR ${key} LIKE '%minimax-h3-fl2v%'
+    OR ${key} LIKE '%minimax-h3-r2v%'
+    OR ${key} LIKE '%minimax-h3-s2v%'
+    OR ${key} LIKE '%kling/v2-5-turbo-image-to-video%'
+    OR ${key} LIKE '%kling/v2-5-turbo-text-to-video%'
+  )`;
+  const openForMedia = Prisma.sql`${notLlm} AND ${notMotion} AND ${notUpscale} AND NOT ${i2iOnly} AND NOT ${bothImage} AND NOT ${i2vNamed} AND ${key} NOT LIKE '%minimax-h3-context-ir%'`;
+
+  let heuristic: Prisma.Sql;
+  switch (task) {
+    case "chat":
+      heuristic = Prisma.sql`(
+        (${llm} AND ${key} NOT LIKE '%suno%' AND ${key} NOT LIKE 'elevenlabs/%')
+        OR (${notLlm} AND ${notMotion} AND ${notUpscale} AND NOT ${i2iOnly} AND NOT ${bothImage} AND NOT ${i2vNamed} AND ${key} LIKE '%minimax-h3-context-ir%')
+      )`;
+      break;
+    case "text-to-music":
+      heuristic = Prisma.sql`${llm} AND ${key} LIKE '%suno%'`;
+      break;
+    case "text-to-speech":
+      heuristic = Prisma.sql`${llm} AND ${key} LIKE 'elevenlabs/%'`;
+      break;
+    case "motion-control":
+      heuristic = Prisma.sql`${notLlm} AND ${key} LIKE '%motion-control%'`;
+      break;
+    case "video-upscale":
+      heuristic = Prisma.sql`${notLlm} AND ${notMotion} AND (${key} LIKE '%topaz%' OR ${key} LIKE '%upscale%' OR ${key} LIKE '%minimax-h3-regeneration%')`;
+      break;
+    case "text-to-image":
+      heuristic = Prisma.sql`${notLlm} AND ${notMotion} AND ${notUpscale} AND (
+        ${bothImage}
+        OR (${openForMedia} AND c."mediaKind"::text = 'TEXT_TO_IMAGE')
+      )`;
+      break;
+    case "image-to-image":
+      heuristic = Prisma.sql`${notLlm} AND ${notMotion} AND ${notUpscale} AND (
+        ${i2iOnly}
+        OR ${bothImage}
+        OR (
+          ${openForMedia}
+          AND c."mediaKind"::text = 'TEXT_TO_IMAGE'
+          AND (
+            ${key} LIKE '%gpt-image%'
+            OR ${key} LIKE '%flux%'
+            OR ${key} LIKE '%seedream%'
+            OR ${key} LIKE '%nano%'
+            OR ${key} LIKE '%4o-image%'
+            OR ${key} LIKE '%edit%'
+          )
+        )
+      )`;
+      break;
+    case "video-to-video":
+      heuristic = Prisma.sql`${notLlm} AND ${notMotion} AND ${notUpscale} AND NOT ${i2iOnly} AND NOT ${bothImage} AND (
+        ${key} IN ('bytedance/seedance-2', 'bytedance/seedance-2-mini', 'veo3', 'veo3.1', 'veo3_fast')
+        OR (
+          NOT ${i2vNamed}
+          AND ${key} NOT LIKE '%minimax-h3-context-ir%'
+          AND (c."mediaKind"::text = 'VIDEO_TO_VIDEO' OR ${key} LIKE '%video-to-video%')
+        )
+      )`;
+      break;
+    case "image-to-video":
+      heuristic = Prisma.sql`${notLlm} AND ${notMotion} AND ${notUpscale} AND NOT ${i2iOnly} AND NOT ${bothImage} AND ${key} NOT LIKE '%minimax-h3-context-ir%' AND (
+        ${i2vNamed}
+        OR c."mediaKind"::text = 'IMAGE_TO_VIDEO'
+        OR ${key} LIKE '%i2v%'
+        OR ${key} LIKE '%image-to-video%'
+      )`;
+      break;
+    default:
+      heuristic = Prisma.sql`FALSE`;
+  }
+
+  const preset = presentationKeysForTask(task);
+  const presetHit =
+    preset.matched.length > 0
+      ? Prisma.sql`r."canonicalModelKey" IN (${Prisma.join(preset.matched)})`
+      : Prisma.sql`FALSE`;
+  const presetSkip =
+    preset.any.length > 0
+      ? Prisma.sql`r."canonicalModelKey" NOT IN (${Prisma.join(preset.any)})`
+      : Prisma.sql`TRUE`;
+  return Prisma.sql`(${presetHit} OR (${presetSkip} AND ${heuristic}))`;
+}
+
+function marketWhere(input: {
+  q?: string;
+  provider?: string;
+  task?: MarketTaskTag;
+  canonicalKey?: string;
+  boundKinds: GatewayProviderKind[] | null;
+}): Prisma.Sql {
+  const parts: Prisma.Sql[] = [
+    Prisma.sql`r.active = true`,
+    Prisma.sql`c.active = true`,
+    Prisma.sql`c."gatewayPublished" = true`,
+  ];
+  if (input.boundKinds) {
+    parts.push(
+      Prisma.sql`r."providerKind"::text IN (${Prisma.join(input.boundKinds)})`,
+    );
+  }
+  const canonicalKey = input.canonicalKey?.trim();
+  if (canonicalKey) {
+    parts.push(Prisma.sql`r."canonicalModelKey" = ${canonicalKey}`);
+  }
+  const provider = input.provider?.trim().toLowerCase();
+  if (provider && provider !== "all") {
+    parts.push(Prisma.sql`(
+      lower(btrim(COALESCE(c."sourceLabel", ''))) = ${provider}
+      OR lower(r.vendor) = ${provider}
+      OR lower(r."providerKind"::text) = ${provider}
+    )`);
+  }
+  const q = input.q?.trim();
+  if (q) {
+    const like = likeContains(q);
+    parts.push(Prisma.sql`(
+      r."canonicalModelKey" ILIKE ${like} ESCAPE '\\'
+      OR r."modelKey" ILIKE ${like} ESCAPE '\\'
+      OR c."displayName" ILIKE ${like} ESCAPE '\\'
+      OR COALESCE(c."sourceLabel", '') ILIKE ${like} ESCAPE '\\'
+      OR r.vendor ILIKE ${like} ESCAPE '\\'
+      OR COALESCE(c.note, '') ILIKE ${like} ESCAPE '\\'
+    )`);
+  }
+  if (input.task) parts.push(marketTaskFilterSql(input.task));
+  return sqlAnd(parts);
+}
+
+const MARKET_ROUTE_SELECT = Prisma.sql`
+  SELECT DISTINCT ON (r."canonicalModelKey")
+    r."canonicalModelKey" AS "canonicalKey",
+    r."modelKey" AS "modelKey",
+    r.vendor AS vendor,
+    r."providerKind"::text AS "providerKind",
+    c."displayName" AS "displayName",
+    c."role"::text AS role,
+    c."requestKind"::text AS "requestKind",
+    c."mediaKind"::text AS "mediaKind",
+    c."sourceLabel" AS "sourceLabel"
+  FROM "GatewayModelRoute" r
+  INNER JOIN "ModelCatalog" c ON c."canonicalKey" = r."canonicalModelKey"
+`;
+
+function asMediaKind(value: string | null): ModelMediaKind | null {
+  if (value && MEDIA_KIND_VALUES.has(value as ModelMediaKind)) {
+    return value as ModelMediaKind;
+  }
+  return null;
+}
+
+function cardsFromRoutes(
+  rows: MarketRouteRow[],
+  priceMap: Map<string, number>,
+  boundKinds: GatewayProviderKind[],
+  billingPersona: "PLATFORM_CREDIT" | "BYOK" | null,
+): MarketModelCard[] {
+  return rows.map((row) => {
+    const mediaKind = asMediaKind(row.mediaKind);
+    const providerKind = row.providerKind as GatewayProviderKind;
+    const role = row.role ?? "LLM";
+    const requestKind = row.requestKind ?? "OTHER";
+    const description = canonicalByKey(row.canonicalKey)?.description ?? "";
+    const displayName = gatewayRouteDisplayName(
+      { displayName: row.displayName, canonicalKey: row.canonicalKey },
+      row.modelKey,
+    );
+    const taskTags = marketTaskTagsForModel({
+      canonicalKey: row.canonicalKey,
+      mediaKind,
+      requestKind,
+      role,
+      modelKey: row.modelKey,
+    }).map((tag) => tag.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()));
+    return {
+      canonicalKey: row.canonicalKey,
+      displayName,
+      description,
+      vendor: row.vendor,
+      providerLabel: providerLabelFor(row.canonicalKey, row.vendor, {
+        providerKind,
+        catalogSourceLabel: row.sourceLabel,
+      }),
+      providerKind: row.providerKind,
+      mediaKind,
+      mediaKindLabel: mediaKind ? PLATFORM_MEDIA_KIND_LABEL[mediaKind] : null,
+      requestKind,
+      role,
+      activeModelKey: row.modelKey,
+      taskTags,
+      coverUrl: coverUrlFor(row.canonicalKey),
+      creditsPerUnit: resolveOfferingCredits(row.canonicalKey, priceMap, null),
+      platformOffering: billingPersona !== "BYOK",
+      runnable:
+        billingPersona === "PLATFORM_CREDIT" ||
+        isGatewayProviderBound(boundKinds, providerKind),
+      readme: readmeFor(row.canonicalKey, description),
+    };
+  });
+}
+
+async function pricesForKeys(keys: string[]): Promise<Map<string, number>> {
+  const lookup = [...new Set(keys)];
+  if (lookup.includes("lib-nano-pro")) lookup.push("lib-nano-pro-2k");
+  if (lookup.length === 0) return new Map();
+  const prices = await prisma.modelCreditPrice.findMany({
+    where: { active: true, canonicalModelKey: { in: lookup } },
+    select: { canonicalModelKey: true, creditsPerUnit: true },
+    orderBy: [{ canonicalModelKey: "asc" }, { tierRaw: "asc" }],
+  });
+  const map = new Map<string, number>();
+  for (const price of prices) {
+    if (!map.has(price.canonicalModelKey)) {
+      map.set(price.canonicalModelKey, Number(price.creditsPerUnit));
+    }
+  }
+  return map;
+}
+
+function emptyMarketList(pageSize: number) {
+  return {
+    models: [] as MarketModelCard[],
+    featured: [] as MarketModelCard[],
+    providers: [] as string[],
+    tasks: MARKET_TASKS,
+    total: 0,
+    page: 1,
+    pageSize,
+    totalPages: 1,
+  };
+}
+
+/**
+ * 模型市场按页读取已发布路由（ModelCatalog.gatewayPublished）。
+ * 不读取 AppModelOffering：自动发布会把未入选模型标成 DEPRECATED，ACTIVE 只剩极少数。
+ * 列表、计数、厂商筛选项和推荐位都带 LIMIT 或固定 key，不把全表装进内存。
+ */
 export async function listMarketModelsForGatewayUser(input: {
   gatewayUserId: string;
   bookUserId: string | null;
@@ -174,6 +482,7 @@ export async function listMarketModelsForGatewayUser(input: {
   q?: string;
   provider?: string;
   task?: MarketTaskTag;
+  canonicalKey?: string;
   page?: number;
   pageSize?: number;
 }): Promise<{
@@ -186,199 +495,99 @@ export async function listMarketModelsForGatewayUser(input: {
   pageSize: number;
   totalPages: number;
 }> {
+  const pageSize = Math.min(100, Math.max(1, input.pageSize ?? 20));
   const credentials = await listGatewayCredentials(input.gatewayUserId);
-  const boundKinds = [...new Set(credentials.map((c) => c.providerKind))];
-
-  const rows: RegistryModelRow[] = [];
-
-  if (input.billingPersona === "BYOK") {
-    const routes = await listActiveRoutes();
-    const seen = new Set<string>();
-    for (const { route, catalog } of routes) {
-      const dedupeKey = `${route.providerKind}:${route.modelKey}`;
-      if (seen.has(dedupeKey)) continue;
-      if (!isGatewayProviderBound(boundKinds, route.providerKind)) continue;
-      seen.add(dedupeKey);
-      const def = canonicalByKey(catalog.canonicalKey);
-      rows.push({
-        canonicalModelKey: catalog.canonicalKey,
-        modelKey: route.modelKey,
-        displayName: gatewayRouteDisplayName(
-          { displayName: catalog.displayName, canonicalKey: catalog.canonicalKey },
-          route.modelKey,
-        ),
-        description: def?.description ?? "",
-        role: catalog.role ?? "LLM",
-        requestKind: catalog.requestKind ?? "OTHER",
-        mediaKind: catalog.mediaKind,
-        mediaKindLabel: catalog.mediaKind
-          ? PLATFORM_MEDIA_KIND_LABEL[catalog.mediaKind]
-          : null,
-        providerKind: route.providerKind,
-        vendor: route.vendor,
-        credentialBound: true,
-        creditsPerUnit: null,
-        platformOffering: false,
-        sourceLabel: resolveSourceLabel({
-          canonicalModelKey: catalog.canonicalKey,
-          providerKind: route.providerKind,
-          vendor: route.vendor,
-        }),
-        sortOrder: 0,
-      });
-    }
-  } else {
-    const offerings = await prisma.appModelOffering.findMany({
-      where: { status: "ACTIVE", activeModelKey: { not: null } },
-    });
-    const prices = await prisma.modelCreditPrice.findMany({
-      where: { active: true },
-      select: { canonicalModelKey: true, creditsPerUnit: true },
-    });
-    const priceMap = new Map(prices.map((p) => [p.canonicalModelKey, Number(p.creditsPerUnit)]));
-
-    const routes = await listActiveRoutes();
-    const catalogByKey = new Map(routes.map((r) => [r.catalog.canonicalKey, r.catalog]));
-
-    for (const o of offerings) {
-      const catalog = catalogByKey.get(o.canonicalModelKey);
-      const price = resolveOfferingCredits(
-        o.canonicalModelKey,
-        priceMap,
-        o.publishedCreditsPerUnit,
-      );
-      if (!price || !o.activeModelKey) continue;
-      const def = canonicalByKey(o.canonicalModelKey);
-      rows.push({
-        canonicalModelKey: o.canonicalModelKey,
-        modelKey: o.activeModelKey,
-        displayName: o.displayName,
-        description: def?.description ?? "",
-        role: o.role,
-        requestKind: o.requestKind,
-        mediaKind: catalog?.mediaKind ?? null,
-        mediaKindLabel: catalog?.mediaKind
-          ? PLATFORM_MEDIA_KIND_LABEL[catalog.mediaKind]
-          : null,
-        providerKind: o.activeProviderKind ?? "KIE",
-        vendor: o.activeVendor ?? "kie",
-        credentialBound: isGatewayProviderBound(
-          boundKinds,
-          o.activeProviderKind ?? "KIE",
-        ),
-        creditsPerUnit: o.publishedCreditsPerUnit != null ? Number(o.publishedCreditsPerUnit) : price,
-        platformOffering: true,
-        sourceLabel: resolveSourceLabel({
-          canonicalModelKey: o.canonicalModelKey,
-          providerKind: o.activeProviderKind ?? "KIE",
-          vendor: o.activeVendor ?? "kie",
-        }),
-        sortOrder: 0,
-      });
-    }
+  const boundKinds = [
+    ...new Set(
+      credentials.filter((c) => c.active).flatMap((c) => gatewayCredentialSubstitutes(c.providerKind)),
+    ),
+  ];
+  if (input.billingPersona === "BYOK" && boundKinds.length === 0) {
+    return emptyMarketList(pageSize);
   }
 
-  const deduped = dedupeByModelKey(
-    rows.map((r) => ({ ...r, modelKey: r.modelKey })),
-  );
-  const cards: MarketModelCard[] = deduped.map((r) => {
-    const taskTags = marketTaskTagsForModel({
-      canonicalKey: r.canonicalModelKey,
-      mediaKind: r.mediaKind,
-      requestKind: r.requestKind,
-      role: r.role,
-      modelKey: r.modelKey,
-    }).map((t) => t.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()));
-    return {
-      canonicalKey: r.canonicalModelKey,
-      displayName: r.displayName,
-      description: r.description,
-      vendor: r.vendor,
-      providerLabel: providerLabelFor(r.canonicalModelKey, r.vendor, {
-        providerKind: r.providerKind as import("@prisma/client").GatewayProviderKind,
-      }),
-      providerKind: r.providerKind,
-      mediaKind: r.mediaKind,
-      mediaKindLabel: r.mediaKindLabel,
-      requestKind: r.requestKind,
-      role: r.role,
-      activeModelKey: r.modelKey,
-      taskTags,
-      coverUrl: coverUrlFor(r.canonicalModelKey),
-      creditsPerUnit: r.creditsPerUnit,
-      platformOffering: r.platformOffering,
-      runnable: r.credentialBound || input.billingPersona === "PLATFORM_CREDIT",
-      readme: readmeFor(r.canonicalModelKey, r.description),
-    };
+  const where = marketWhere({
+    q: input.q,
+    provider: input.provider,
+    task: input.task,
+    canonicalKey: input.canonicalKey,
+    boundKinds: input.billingPersona === "BYOK" ? boundKinds : null,
   });
+  const featuredKeys = input.canonicalKey ? [] : (PRESENTATION.featuredCanonicalKeys ?? []);
 
-  const q = input.q?.trim().toLowerCase();
-  const provider = input.provider?.trim().toLowerCase();
-  const task = input.task;
-
-  const filtered = cards.filter((m) => {
-    if (provider && provider !== "all") {
-      const pl = m.providerLabel.toLowerCase();
-      const vk = m.vendor.toLowerCase();
-      const pk = m.providerKind.toLowerCase();
-      if (!pl.includes(provider) && !vk.includes(provider) && !pk.includes(provider)) {
-        return false;
-      }
-    }
-    if (task) {
-      const normalizedTags = marketTaskTagsForModel({
-        canonicalKey: m.canonicalKey,
-        mediaKind: m.mediaKind,
-        requestKind: m.requestKind,
-        role: m.role,
-        modelKey: m.activeModelKey,
-      });
-      if (!normalizedTags.includes(task)) return false;
-    }
-    if (!q) return true;
-    const hay = [
-      m.canonicalKey,
-      m.displayName,
-      m.description,
-      m.activeModelKey,
-      m.providerLabel,
-      ...m.taskTags,
-    ]
-      .join(" ")
-      .toLowerCase();
-    return hay.includes(q);
-  });
-
-  const featuredKeys = PRESENTATION.featuredCanonicalKeys ?? [];
-  const featured = featuredKeys
-    .map((k) => filtered.find((m) => m.canonicalKey === k))
-    .filter((m): m is MarketModelCard => Boolean(m));
-
-  const providers = [
-    ...new Set(filtered.map((m) => m.providerLabel)),
-  ].sort((a, b) => a.localeCompare(b));
-
-  const tasks: MarketTaskTag[] = [
-    "text-to-image",
-    "image-to-image",
-    "image-to-video",
-    "video-to-video",
-    "motion-control",
-    "video-upscale",
-    "text-to-music",
-    "text-to-speech",
-    "chat",
-  ];
-
-  const total = filtered.length;
-  const pageSize = input.pageSize != null ? Math.min(100, Math.max(1, input.pageSize)) : total || 1;
+  const countRows = await prisma.$queryRaw<Array<{ n: number }>>`
+    SELECT COUNT(*)::int AS n FROM (
+      SELECT DISTINCT r."canonicalModelKey"
+      FROM "GatewayModelRoute" r
+      INNER JOIN "ModelCatalog" c ON c."canonicalKey" = r."canonicalModelKey"
+      WHERE ${where}
+    ) picked
+  `;
+  const total = countRows[0]?.n ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const page = Math.min(Math.max(1, input.page ?? 1), totalPages);
-  const start = (page - 1) * pageSize;
-  const models =
-    input.pageSize != null ? filtered.slice(start, start + pageSize) : filtered;
+  if (total === 0) {
+    return { ...emptyMarketList(pageSize), page, totalPages };
+  }
 
-  return { models, featured, providers, tasks, total, page, pageSize, totalPages };
+  const offset = (page - 1) * pageSize;
+  const [pageRows, featuredRows, providerRows] = await Promise.all([
+    prisma.$queryRaw<MarketRouteRow[]>`
+      SELECT * FROM (
+        ${MARKET_ROUTE_SELECT}
+        WHERE ${where}
+        ORDER BY r."canonicalModelKey" ASC, r."sortOrder" ASC, r."modelKey" ASC
+      ) picked
+      ORDER BY picked."displayName" ASC, picked."canonicalKey" ASC
+      LIMIT ${pageSize} OFFSET ${offset}
+    `,
+    featuredKeys.length
+      ? prisma.$queryRaw<MarketRouteRow[]>`
+          SELECT * FROM (
+            ${MARKET_ROUTE_SELECT}
+            WHERE ${where}
+              AND r."canonicalModelKey" IN (${Prisma.join(featuredKeys)})
+            ORDER BY r."canonicalModelKey" ASC, r."sortOrder" ASC, r."modelKey" ASC
+          ) picked
+        `
+      : Promise.resolve([] as MarketRouteRow[]),
+    input.canonicalKey
+      ? Promise.resolve([] as Array<{ label: string }>)
+      : prisma.$queryRaw<Array<{ label: string }>>`
+          SELECT DISTINCT btrim(c."sourceLabel") AS label
+          FROM "GatewayModelRoute" r
+          INNER JOIN "ModelCatalog" c ON c."canonicalKey" = r."canonicalModelKey"
+          WHERE ${where}
+            AND NULLIF(btrim(COALESCE(c."sourceLabel", '')), '') IS NOT NULL
+          ORDER BY 1
+        `,
+  ]);
+
+  const priceMap = await pricesForKeys([
+    ...pageRows.map((row) => row.canonicalKey),
+    ...featuredRows.map((row) => row.canonicalKey),
+  ]);
+  const models = cardsFromRoutes(pageRows, priceMap, boundKinds, input.billingPersona);
+  const featuredByKey = new Map(
+    cardsFromRoutes(featuredRows, priceMap, boundKinds, input.billingPersona).map((card) => [
+      card.canonicalKey,
+      card,
+    ]),
+  );
+  const featured = featuredKeys
+    .map((key) => featuredByKey.get(key))
+    .filter((card): card is MarketModelCard => Boolean(card));
+
+  return {
+    models,
+    featured,
+    providers: providerRows.map((row) => row.label).filter(Boolean),
+    tasks: MARKET_TASKS,
+    total,
+    page,
+    pageSize,
+    totalPages,
+  };
 }
 
 export async function getMarketModelDetail(
@@ -390,8 +599,11 @@ export async function getMarketModelDetail(
     gatewayUserId,
     bookUserId: null,
     billingPersona,
+    canonicalKey,
+    page: 1,
+    pageSize: 1,
   });
-  return list.models.find((m) => m.canonicalKey === canonicalKey) ?? null;
+  return list.models[0] ?? null;
 }
 
 export function featuredHeroSlides(): Array<{ canonicalKey: string; heroUrl: string }> {

@@ -341,7 +341,7 @@ export function MarketListClient({ initial }: Props) {
 
       {(data.models ?? []).length === 0 ? (
         <div className="gw-card text-center text-sm text-[var(--gw-muted)]">
-          没有匹配的模型。平台代付用户仅展示已上架且有定价的模型；BYOK 用户需先绑定对应厂商凭证。
+          没有匹配的模型。BYOK 账号只显示已绑定厂商凭证的模型。
         </div>
       ) : (
         <>
