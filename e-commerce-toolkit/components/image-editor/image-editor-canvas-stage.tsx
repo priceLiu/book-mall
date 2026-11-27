@@ -93,6 +93,7 @@ type Props = {
   onTextDelete?: (id: string) => void;
   onTextCopyStyle?: (id: string) => void;
   onTextAiFlower?: (id: string) => void;
+  eraseOverlay?: ReactNode;
 };
 
 type LayerPanelRow = {
@@ -238,6 +239,7 @@ export function ImageEditorCanvasStage({
   onTextDelete,
   onTextCopyStyle,
   onTextAiFlower,
+  eraseOverlay,
 }: Props) {
   const frameInteract = Boolean(shapeMaskInteract || canvasCropInteract);
   const empty = !imageUrl && !displayUrl;
@@ -947,6 +949,8 @@ export function ImageEditorCanvasStage({
                   onAiFlower={onTextAiFlower}
                 />
               ) : null}
+
+              {eraseOverlay}
 
               {busy ? <EcomMediaGeneratingBusy background="light" /> : null}
             </div>
