@@ -15,6 +15,12 @@ import { ImageEditorTextPanel } from "@/components/image-editor/image-editor-tex
 import { ImageEditorHeader } from "@/components/image-editor/image-editor-header";
 import { ImageEditorEraseLayer, type ImageEditorEraseLayerHandle } from "@/components/image-editor/image-editor-erase-layer";
 import { ERASE_TARGETS, ImageEditorErasePanel, type EraseSelectTool, type EraseTargetId } from "@/components/image-editor/image-editor-erase-panel";
+import {
+  ImageEditorHdPanel,
+  imageEditorHdModeLabel,
+  imageEditorHdPrompt,
+  type ImageEditorHdMode,
+} from "@/components/image-editor/image-editor-hd-panel";
 import { ImageEditorCutoutWorkspace } from "@/components/image-editor/image-editor-cutout-workspace";
 import { ImageEditorToolRail } from "@/components/image-editor/image-editor-tool-rail";
 import "@/components/image-editor/image-editor-theme.css";
@@ -241,6 +247,8 @@ export function ImageEditorStudio() {
   const [cutoutResultUrl, setCutoutResultUrl] = useState<string | null>(null);
   const [cutoutSaveRequest, setCutoutSaveRequest] = useState(0);
   const imageEditorModel = "doubao-seedream-5-5";
+  const [hdMode, setHdMode] = useState<ImageEditorHdMode>("hd");
+  const [hdKeepSize, setHdKeepSize] = useState(false);
 
   const [brightness, setBrightness] = useState(100);
   const [contrast, setContrast] = useState(100);
@@ -1434,12 +1442,16 @@ export function ImageEditorStudio() {
   };
 
   const runEnhance = async () => {
-    if (!imageUrl) return;
+    if (!imageUrl) {
+      await alert({ title: "无法变清晰", message: "请先打开一张图片。" });
+      return;
+    }
     setBusy(true);
     try {
       const dataUrl = await urlToDataUrl(imageUrl);
       const res = await submitImageProcessingEdit({
         mode: "enhancer",
+        prompt: imageEditorHdPrompt(hdMode, hdKeepSize),
         model: imageEditorModel,
         generativeModel: imageEditorModel,
         sourceImageDataUrl: dataUrl,
@@ -1447,7 +1459,7 @@ export function ImageEditorStudio() {
       const next = res.imageUrls[0];
       if (!next) throw new Error("未返回结果");
       applyUrl(next, canvasW, canvasH);
-      toast({ title: "变清晰完成", variant: "success" });
+      toast({ title: `${imageEditorHdModeLabel(hdMode)}完成`, variant: "success" });
     } catch (e) {
       await alert({
         title: "处理失败",
@@ -1910,14 +1922,15 @@ export function ImageEditorStudio() {
         );
       case "hd":
         return (
-          <ToolPanelCard title="变清晰">
-          <div className="space-y-3">
-            <p className="text-[11px] text-[var(--ie-subtle)]">图像增强 / 变清晰，适合模糊主图急救。</p>
-            <EcomButtonPrimary type="button" className="w-full" disabled={!imageUrl || busy} onClick={() => void runEnhance()}>
-              变清晰
-            </EcomButtonPrimary>
-          </div>
-          </ToolPanelCard>
+          <ImageEditorHdPanel
+            mode={hdMode}
+            keepOriginalSize={hdKeepSize}
+            busy={busy}
+            disabled={!imageUrl || busy}
+            onMode={setHdMode}
+            onKeepOriginalSize={setHdKeepSize}
+            onStart={() => void runEnhance()}
+          />
         );
       case "color":
         return (
