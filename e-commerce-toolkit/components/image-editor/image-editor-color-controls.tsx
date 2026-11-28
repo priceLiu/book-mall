@@ -7,7 +7,6 @@ import type { ColorAdjust, ColorAdjustStroke } from "@/lib/image-editor-color-ad
 import {
   filterSectionByKey,
   IMAGE_EDITOR_FILTER_BASIC_QUICK,
-  IMAGE_EDITOR_FILTER_BASIC_SHEET_EXTRA,
   IMAGE_EDITOR_FILTER_SECTIONS,
 } from "@/lib/image-editor-filter-catalog";
 import { cn } from "@/lib/utils";
@@ -143,16 +142,6 @@ const FILTER_BASE: GradePick[] = IMAGE_EDITOR_FILTER_BASIC_QUICK.map((item) => (
   label: item.label,
   preview: item.preview,
 }));
-
-const FILTER_BASIC_EXTRA: GradePick[] = [
-  { id: "grayscale", label: "黑白色", preview: "grayscale(1)" },
-  ...IMAGE_EDITOR_FILTER_BASIC_SHEET_EXTRA.filter((item) => item.id !== "invert" && item.id !== "grayscale").map((item) => ({
-    id: item.id,
-    label: item.label,
-    preview: item.preview,
-  })),
-  { id: "invert", label: "反色", preview: "invert(1)" },
-];
 
 const FILTER_PREVIEW_COUNT = 6;
 
@@ -610,47 +599,7 @@ export function ImageEditorColorGroupBody({
   }
 
   if (group === "filter") {
-    const filterSheet = filterSheetKey && filterSheetKey !== "basic" ? filterSectionByKey(filterSheetKey) : null;
-    if (filterSheetKey === "basic") {
-      return (
-        <div className="space-y-2 px-3 pb-3">
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              aria-label="返回滤镜列表"
-              className="grid h-8 w-8 shrink-0 place-items-center rounded-md text-[var(--ie-ink)] hover:bg-[var(--ie-cream-muted)]"
-              onClick={() => setFilterSheetKey(null)}
-            >
-              <ChevronLeft className="h-5 w-5" aria-hidden />
-            </button>
-            <p className="text-[13px] font-medium text-[var(--ie-ink)]">基础</p>
-          </div>
-          <div className="grid grid-cols-3 gap-2">
-            <button
-              type="button"
-              disabled={disabled || !imageUrl}
-              className={cn(
-                "overflow-hidden rounded-lg border bg-white text-left disabled:opacity-50",
-                !selectedId ? "border-[var(--ie-ink)]" : "border-[var(--ie-border-soft)]",
-              )}
-              onClick={onRestore}
-            >
-              <span className="grid aspect-square place-items-center bg-[var(--ie-cream-muted)] text-[var(--ie-muted)]">
-                <Ban className="h-7 w-7" aria-hidden />
-              </span>
-              <span className="block truncate px-1 py-1 text-center text-[12px] text-[var(--ie-ink)]">无滤镜</span>
-            </button>
-            {FILTER_BASE.map((item) => (
-              <FilterTile key={item.id} item={item} imageUrl={imageUrl} selected={selectedId === item.id} disabled={disabled || !imageUrl} onPick={onPick} />
-            ))}
-            {FILTER_BASIC_EXTRA.map((item) => (
-              <FilterTile key={item.id} item={item} imageUrl={imageUrl} selected={selectedId === item.id} disabled={disabled || !imageUrl} onPick={onPick} />
-            ))}
-          </div>
-          <p className="py-2 text-center text-[12px] text-[var(--ie-muted)]">没有更多了</p>
-        </div>
-      );
-    }
+    const filterSheet = filterSheetKey ? filterSectionByKey(filterSheetKey) : null;
     if (filterSheet) {
       return (
         <div className="space-y-2 px-3 pb-3">
@@ -666,6 +615,22 @@ export function ImageEditorColorGroupBody({
             <p className="text-[13px] font-medium text-[var(--ie-ink)]">{filterSheet.label}</p>
           </div>
           <div className="grid grid-cols-3 gap-2">
+            {filterSheet.sheetNoFilter ? (
+              <button
+                type="button"
+                disabled={disabled || !imageUrl}
+                className={cn(
+                  "overflow-hidden rounded-lg border bg-white text-left disabled:opacity-50",
+                  !selectedId ? "border-[var(--ie-ink)]" : "border-[var(--ie-border-soft)]",
+                )}
+                onClick={onRestore}
+              >
+                <span className="grid aspect-square place-items-center bg-[var(--ie-cream-muted)] text-[var(--ie-muted)]">
+                  <Ban className="h-7 w-7" aria-hidden />
+                </span>
+                <span className="block truncate px-1 py-1 text-center text-[12px] text-[var(--ie-ink)]">无滤镜</span>
+              </button>
+            ) : null}
             {filterSheet.items.map((item) => (
               <FilterTile key={item.id} item={item} imageUrl={imageUrl} selected={selectedId === item.id} disabled={disabled || !imageUrl} onPick={onPick} />
             ))}
