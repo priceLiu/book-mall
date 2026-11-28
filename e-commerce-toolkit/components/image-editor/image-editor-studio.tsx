@@ -14,7 +14,7 @@ import { ImageEditorTextInspector } from "@/components/image-editor/image-editor
 import { ImageEditorTextPanel } from "@/components/image-editor/image-editor-text-panel";
 import { ImageEditorHeader } from "@/components/image-editor/image-editor-header";
 import { ImageEditorEraseLayer, type ImageEditorEraseLayerHandle } from "@/components/image-editor/image-editor-erase-layer";
-import { ERASE_TARGETS, ImageEditorErasePanel, type EraseTargetId } from "@/components/image-editor/image-editor-erase-panel";
+import { ERASE_TARGETS, ImageEditorErasePanel, type EraseSelectTool, type EraseTargetId } from "@/components/image-editor/image-editor-erase-panel";
 import { ImageEditorCutoutWorkspace } from "@/components/image-editor/image-editor-cutout-workspace";
 import { ImageEditorToolRail } from "@/components/image-editor/image-editor-tool-rail";
 import "@/components/image-editor/image-editor-theme.css";
@@ -129,13 +129,16 @@ async function imagesNearlyUnchanged(before: string, after: string): Promise<boo
 }
 
 function loadImage(src: string): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error("图片加载失败"));
-    img.src = src;
-  });
+  const once = (cors: boolean) =>
+    new Promise<HTMLImageElement>((resolve, reject) => {
+      const img = new Image();
+      if (cors) img.crossOrigin = "anonymous";
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error("图片加载失败"));
+      img.src = src;
+    });
+  // 部分结果图没有跨域头。匿名加载失败时再按普通图片读尺寸，避免未处理的拒绝把页面打断。
+  return once(true).catch(() => once(false));
 }
 
 /** 从当前画面往回，最多保留 5 步。 */
@@ -227,6 +230,7 @@ export function ImageEditorStudio() {
   const [erasePrompt, setErasePrompt] = useState("移除画面中的干扰物体");
   const [eraseTab, setEraseTab] = useState<"manual" | "ai">("ai");
   const [eraseBrush, setEraseBrush] = useState(25);
+  const [eraseSelectTool, setEraseSelectTool] = useState<EraseSelectTool>("brush");
   const [eraseTargets, setEraseTargets] = useState<Record<string, boolean>>({});
   const [eraseRunning, setEraseRunning] = useState(false);
   const [eraseProgress, setEraseProgress] = useState(0);
@@ -405,6 +409,8 @@ export function ImageEditorStudio() {
           crop: { x: 0, y: 0, w: nw, h: nh },
           correction: IMAGE_EDITOR_CORRECTION_DEFAULT,
         });
+      }).catch(() => {
+        naturalSrcRef.current = url;
       });
       void persistableImageUrl(url).then(({ url: persisted, omitted }) => {
         if (omitted) {
@@ -1469,16 +1475,33 @@ export function ImageEditorStudio() {
   }, [eraseNotice]);
 
   const runManualErase = async () => {
-    if (!imageUrl || eraseRunning) return;
-    const mask = eraseLayerRef.current?.hasMarks()
-      ? eraseLayerRef.current.toMaskDataUrl(naturalW || canvasW, naturalH || canvasH)
+    if (eraseRunning) return;
+    if (!imageUrl) {
+      await alert({ title: "无法消除", message: "请先打开一张图片。" });
+      return;
+    }
+    const hasMarks = Boolean(eraseLayerRef.current?.hasMarks());
+    const mask = hasMarks
+      ? eraseLayerRef.current?.toMaskDataUrl(naturalW || canvasW, naturalH || canvasH) ?? null
       : null;
     eraseLayerRef.current?.clear();
-    if (!mask) return;
+    if (!mask) {
+      await alert({
+        title: hasMarks ? "选区无效" : "请先选择区域",
+        message: hasMarks
+          ? "这次选区几乎盖住了整张图，已取消，图片没有改动。"
+          : "用涂抹、框选或圈选标出要消除的地方，再开始消除。",
+      });
+      return;
+    }
     setEraseNotice(null);
     setEraseRunning(true);
     try {
-      const erased = await eraseImageLayerRegion({ sourceImageUrl: imageUrl, maskDataUrl: mask });
+      const sourceImageUrl =
+        imageUrl.startsWith("http://") || imageUrl.startsWith("https://") || imageUrl.startsWith("data:")
+          ? imageUrl
+          : await urlToDataUrl(imageUrl);
+      const erased = await eraseImageLayerRegion({ sourceImageUrl, maskDataUrl: mask });
       setEraseProgress(100);
       applyUrl(erased.imageUrl, canvasW, canvasH);
     } catch (e) {
@@ -1578,6 +1601,9 @@ export function ImageEditorStudio() {
         cropRectRef.current = next;
         setCropRect(next);
       }
+    }).catch(() => {
+      if (historyLoadRef.current !== token) return;
+      naturalSrcRef.current = entry.url;
     });
   };
 
@@ -1854,15 +1880,20 @@ export function ImageEditorStudio() {
               }
               void runAutoErase(id);
             }}
+            selectTool={eraseSelectTool}
+            onSelectTool={setEraseSelectTool}
             brushSize={eraseBrush}
             onBrushSize={setEraseBrush}
             busy={eraseRunning}
+            onClear={() => eraseLayerRef.current?.clear()}
             onReset={() => {
               setEraseTargets({});
               setEraseBrush(25);
+              setEraseSelectTool("brush");
               setEraseNotice(null);
               eraseLayerRef.current?.clear();
             }}
+            onStart={() => void runManualErase()}
           />
         );
       case "cutout":
@@ -2130,15 +2161,15 @@ export function ImageEditorStudio() {
               onTextCopyStyle={onCopyTextStyle}
               onTextAiFlower={onTextAiFlower}
               eraseOverlay={
-                tool === "erase" && eraseTab === "manual" && imageUrl ? (
+                tool === "erase" && imageUrl ? (
                   <ImageEditorEraseLayer
                     ref={eraseLayerRef}
-                    tool="brush"
+                    tool={eraseTab === "manual" ? "brush" : eraseSelectTool}
                     brushSize={eraseBrush}
                     disabled={eraseRunning}
                     imageWidth={naturalW || canvasW}
                     imageHeight={naturalH || canvasH}
-                    onStrokeEnd={() => void runManualErase()}
+                    onStrokeEnd={eraseTab === "manual" ? () => void runManualErase() : undefined}
                   />
                 ) : null
               }
