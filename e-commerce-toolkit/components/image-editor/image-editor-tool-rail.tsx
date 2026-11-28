@@ -1,7 +1,7 @@
 "use client";
 
 import {
-  Boxes,
+  Wrench,
   CircleDashed,
   Eraser,
   Plus,
@@ -26,7 +26,7 @@ const TOOLS: Array<{ id: ImageEditorToolId; label: string; icon: LucideIcon }> =
   { id: "hd", label: "变清晰", icon: Sparkles },
   { id: "color", label: "调色", icon: Wand2 },
   { id: "assets", label: "我的", icon: UserRound },
-  { id: "more", label: "更多", icon: Boxes },
+  { id: "more", label: "基础工具", icon: Wrench },
 ];
 
 type Props = {

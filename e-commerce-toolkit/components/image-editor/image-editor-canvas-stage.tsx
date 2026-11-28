@@ -674,7 +674,7 @@ export function ImageEditorCanvasStage({
         <button
           type="button"
           title="移除图片"
-          className="absolute right-3 top-3 z-[60] inline-flex items-center gap-1.5 rounded-lg border border-[var(--ie-border-soft)] bg-[var(--ie-cream)] px-2.5 py-1.5 text-[11px] text-[var(--ie-muted)] shadow-md hover:border-[var(--ie-border)] hover:text-[var(--ie-ink)] lg:right-4 lg:top-4"
+          className="absolute bottom-3 left-3 z-[70] inline-flex items-center gap-1.5 rounded-lg border border-[var(--ie-border-soft)] bg-[var(--ie-cream)] px-2.5 py-1.5 text-[11px] text-[var(--ie-muted)] shadow-md hover:border-[var(--ie-border)] hover:text-[var(--ie-ink)] lg:bottom-4 lg:left-4"
           onClick={(e) => {
             e.stopPropagation();
             onClearImage();

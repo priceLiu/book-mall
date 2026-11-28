@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
 import { Loader2, RotateCcw, ChevronUp, ChevronDown } from "lucide-react";
 
 import { useDialogs } from "@/components/dialogs/dialog-provider";
@@ -30,6 +29,8 @@ import { RecolorProtectLayer } from "@/components/image-editor/image-editor-colo
 import type { ColorAdjust, ColorAdjustStroke } from "@/lib/image-editor-color-adjust";
 import { colorAdjustPreviewCss } from "@/lib/image-editor-color-adjust";
 import { ImageEditorCutoutWorkspace } from "@/components/image-editor/image-editor-cutout-workspace";
+import { ImageEditorInpaintWorkspace } from "@/components/image-editor/image-editor-inpaint-workspace";
+import { ImageEditorBasicToolsPanel } from "@/components/image-editor/image-editor-basic-tools-panel";
 import { ImageEditorToolRail } from "@/components/image-editor/image-editor-tool-rail";
 import "@/components/image-editor/image-editor-theme.css";
 import { EcomWorkspaceLayout } from "@/components/layout/ecom-workspace-layout";
@@ -269,6 +270,8 @@ export function ImageEditorStudio() {
   const [eraseNotice, setEraseNotice] = useState<string | null>(null);
   const eraseLayerRef = useRef<ImageEditorEraseLayerHandle>(null);
   const [cutoutOpen, setCutoutOpen] = useState(false);
+  const [inpaintOpen, setInpaintOpen] = useState(false);
+  const toolBeforeCutoutRef = useRef<ImageEditorToolId>("adjust");
   const [cutoutSubject, setCutoutSubject] = useState("portrait");
   const [cutoutResultUrl, setCutoutResultUrl] = useState<string | null>(null);
   const [cutoutSaveRequest, setCutoutSaveRequest] = useState(0);
@@ -958,34 +961,6 @@ export function ImageEditorStudio() {
     });
   }, [canvasH, canvasW, losslessResize, naturalH, naturalW]);
 
-  const cancelResizeEdit = useCallback(() => {
-    const d = adjustDraftRef.current;
-    if (!d) return;
-    setCanvasW(d.w);
-    setCanvasH(d.h);
-    setRotateDeg(d.rotateDeg);
-    setFlipH(d.flipH);
-    setFlipV(d.flipV);
-    setFrameOffset({ x: d.offsetX ?? 0, y: d.offsetY ?? 0 });
-  }, []);
-
-  const cancelCropEdit = useCallback(() => {
-    const d = cropDraftRef.current;
-    if (!d) return;
-    const next = { ...d };
-    cropRectRef.current = next;
-    setCropRect(next);
-    setCanvasW(Math.max(1, Math.round(next.w)));
-    setCanvasH(Math.max(1, Math.round(next.h)));
-    setCropPreviewUrl(null);
-    const adjust = adjustDraftRef.current;
-    if (adjust) {
-      setRotateDeg(adjust.rotateDeg);
-      setFlipH(adjust.flipH);
-      setFlipV(adjust.flipV);
-    }
-  }, []);
-
   const onCanvasFrameResize = useCallback((w: number, h: number) => {
     setCanvasW(w);
     setCanvasH(h);
@@ -1264,18 +1239,6 @@ export function ImageEditorStudio() {
     },
     [canvasH, canvasW, captureShapeDraft, naturalH, naturalW, rememberStep],
   );
-
-  const cancelShapeMaskEdit = useCallback(() => {
-    const d = shapeDraftRef.current;
-    if (d) {
-      setCanvasW(d.w);
-      setCanvasH(d.h);
-      setShapeMask(d.shape);
-      setRotateDeg(d.rotateDeg);
-      setFlipH(d.flipH);
-      setFlipV(d.flipV);
-    }
-  }, []);
 
   const setTargetWidth = (w: number) => {
     const next = Math.min(8192, Math.max(1, Math.round(w)));
@@ -1860,6 +1823,12 @@ export function ImageEditorStudio() {
     cropDraftRef.current = null;
   };
 
+  const cancelAdjustInteraction = () => {
+    revertUncommitted();
+    setAdjustSectionOpen(false);
+    setCorrectionOpen(false);
+  };
+
   const undo = () => {
     window.clearTimeout(stepTimerRef.current);
     const stack = historyRef.current;
@@ -1907,6 +1876,58 @@ export function ImageEditorStudio() {
     if (typeof window === "undefined") return;
     window.open("/ecom/image-editor", "_blank", "noopener,noreferrer");
   };
+
+  const closeCutoutWorkspace = useCallback(() => {
+    setCutoutOpen(false);
+    setCutoutResultUrl(null);
+    setCutoutSubject("portrait");
+  }, []);
+
+  const closeInpaintWorkspace = useCallback(() => {
+    setInpaintOpen(false);
+  }, []);
+
+  const openInpaint = useCallback(async () => {
+    if (!imageUrl) {
+      await alert({ title: "无法重绘", message: "请先打开一张图片。" });
+      return;
+    }
+    if (textDoc.overlay.layers.length > 0) {
+      await alert({ title: "先合并图层", message: "先合并图层，才能局部重绘。" });
+      return;
+    }
+    if (cutoutOpen) closeCutoutWorkspace();
+    setInpaintOpen(true);
+  }, [alert, cutoutOpen, closeCutoutWorkspace, imageUrl, textDoc.overlay.layers.length]);
+
+  const openCutout = useCallback(async () => {
+    if (!imageUrl) {
+      await alert({ title: "无法抠图", message: "请先打开一张图片。" });
+      return;
+    }
+    if (textDoc.overlay.layers.length > 0) {
+      await alert({ title: "先合并图层", message: "先合并图层，才能抠图。" });
+      return;
+    }
+    if (inpaintOpen) closeInpaintWorkspace();
+    if (tool !== "cutout") {
+      toolBeforeCutoutRef.current = tool;
+    }
+    setCutoutOpen(true);
+    if (tool === "cutout") {
+      setTool(toolBeforeCutoutRef.current);
+    }
+  }, [alert, closeInpaintWorkspace, imageUrl, inpaintOpen, textDoc.overlay.layers.length, tool]);
+
+  useEffect(() => {
+    if (tool !== "cutout" || cutoutOpen || !imageUrl || busy) return;
+    void openCutout();
+  }, [tool, cutoutOpen, imageUrl, busy, openCutout]);
+
+  const goToInEditorTool = useCallback((id: ImageEditorToolId) => {
+    setLeftPanelOpen(true);
+    setTool(id);
+  }, []);
 
   const toolPanel = (() => {
     switch (tool) {
@@ -1993,11 +2014,7 @@ export function ImageEditorStudio() {
               setFlipV((v) => !v);
               rememberStep({ flipV: !flipV });
             }}
-            onCancel={() => {
-              revertUncommitted();
-              setAdjustSectionOpen(false);
-              setCorrectionOpen(false);
-            }}
+            onCancel={cancelAdjustInteraction}
             sectionOpen={adjustSectionOpen}
             onSectionOpenChange={(open) => {
               setAdjustSectionOpen(open);
@@ -2163,46 +2180,33 @@ export function ImageEditorStudio() {
         );
       case "more":
         return (
-          <ToolPanelCard title="更多能力">
-          <ul className="space-y-2 text-[11px]">
-            <li>
-              <Link className="text-[var(--ie-ink)] underline-offset-2 hover:underline" href="/ecom/image-processing">
-                图像处理全套小工具
-              </Link>
-            </li>
-            <li>
-              <Link className="text-[var(--ie-ink)] underline-offset-2 hover:underline" href="/ecom/image-layer">
-                图片处理 · 图层与擦除
-              </Link>
-            </li>
-            <li>
-              <button
-                type="button"
-                className="text-[var(--ie-ink)] underline-offset-2 hover:underline"
-                onClick={openInNewTab}
-              >
-                新标签页打开本编辑器
-              </button>
-            </li>
-          </ul>
-          </ToolPanelCard>
+          <ImageEditorBasicToolsPanel
+            disabled={busy}
+            onCutout={() => {
+              void openCutout();
+            }}
+            onEnhance={() => goToInEditorTool("hd")}
+            onInpaint={() => {
+              void openInpaint();
+            }}
+            onAiFlower={() => {
+              if (!imageUrl) return;
+              setTool("text");
+              if (selectedTextLayerId) {
+                setAiFlowerOpen(true);
+                return;
+              }
+              void alert({
+                title: "请先添加文字",
+                message: "在「文字」工具中添加文本图层后，可使用 AI 花字。",
+              });
+            }}
+          />
         );
       default:
         return null;
     }
   })();
-
-  const openCutout = async () => {
-    if (!imageUrl) {
-      await alert({ title: "无法抠图", message: "请先打开一张图片。" });
-      return;
-    }
-    if (textDoc.overlay.layers.length > 0) {
-      await alert({ title: "先合并图层", message: "先合并图层，才能抠图。" });
-      return;
-    }
-    setCutoutOpen(true);
-  };
 
   return (
     <>
@@ -2225,24 +2229,27 @@ export function ImageEditorStudio() {
           leftCollapsed={!leftPanelOpen}
           rightCollapsed={!rightPanelOpen}
           onToggleLeft={() => setLeftPanelOpen((open) => !open)}
-          panelsDisabled={cutoutOpen}
+          panelsDisabled={cutoutOpen || inpaintOpen}
           onToggleRight={() => setRightPanelOpen((open) => !open)}
         />
 
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row lg:gap-2 lg:p-2">
           <div className="flex max-h-[50vh] min-h-0 w-full shrink-0 flex-row overflow-hidden lg:max-h-none lg:w-auto">
             <ImageEditorToolRail
-              active={tool}
-              disabled={busy || cutoutOpen}
+              active={cutoutOpen ? "cutout" : inpaintOpen ? "more" : tool}
+              disabled={busy && !cutoutOpen && !inpaintOpen}
               onSelect={(id) => {
                 if (id === "cutout") {
+                  if (cutoutOpen) return;
                   void openCutout();
                   return;
                 }
+                if (cutoutOpen) closeCutoutWorkspace();
+                if (inpaintOpen) closeInpaintWorkspace();
                 setTool(id);
               }}
             />
-            {leftPanelOpen && !cutoutOpen ? (
+            {leftPanelOpen && !cutoutOpen && !inpaintOpen ? (
               <aside className="ecom-scrollbar-thin flex min-h-0 w-[min(100%,320px)] flex-1 flex-col overflow-y-auto bg-transparent p-2 pt-0 lg:w-[332px] lg:shrink-0">
                 {toolPanel}
               </aside>
@@ -2256,10 +2263,20 @@ export function ImageEditorStudio() {
               initialSubject={cutoutSubject}
               initialResultUrl={cutoutResultUrl}
               onSessionChange={onCutoutSession}
-              onCancel={() => setCutoutOpen(false)}
+              onCancel={closeCutoutWorkspace}
               onApply={(url) => {
                 applyUrl(url);
-                setCutoutOpen(false);
+                closeCutoutWorkspace();
+              }}
+            />
+          ) : null}
+          {inpaintOpen && imageUrl ? (
+            <ImageEditorInpaintWorkspace
+              imageUrl={imageUrl}
+              onCancel={closeInpaintWorkspace}
+              onApply={(url) => {
+                applyUrl(url);
+                closeInpaintWorkspace();
               }}
             />
           ) : null}
@@ -2267,7 +2284,7 @@ export function ImageEditorStudio() {
             className={cn(
               "flex min-h-0 min-w-0 flex-1 lg:rounded-xl lg:border lg:border-[var(--ie-border-soft)] lg:bg-[var(--ie-canvas-well)]",
               canvasFrameInteract || resizeInteract ? "overflow-visible" : "overflow-hidden",
-              cutoutOpen && "hidden",
+              (cutoutOpen || inpaintOpen) && "hidden",
               "relative",
             )}
           >
@@ -2343,15 +2360,7 @@ export function ImageEditorStudio() {
               onOpenFile={() => fileInputRef.current?.click()}
               onActivatePaste={canvasPaste.focusZone}
               shapeMaskInteract={false}
-              onShapeMaskCancel={
-                correctionInteract
-                  ? () => setCorrection(IMAGE_EDITOR_CORRECTION_DEFAULT)
-                  : resizeInteract
-                    ? cancelResizeEdit
-                    : canvasCropInteract
-                      ? cancelCropEdit
-                      : cancelShapeMaskEdit
-              }
+              onShapeMaskCancel={cancelAdjustInteraction}
               onShapeMaskConfirm={() => void commitExport()}
               onShapeMaskRotateDeg={setRotateDeg}
               onCanvasResize={onCanvasFrameResize}
@@ -2415,7 +2424,7 @@ export function ImageEditorStudio() {
           <div
             className={cn(
               "flex min-h-0 w-full shrink-0 flex-col overflow-hidden border-t border-[var(--ie-border-soft)] lg:h-full lg:w-[300px] lg:self-stretch lg:border-l lg:border-t-0",
-              (!rightPanelOpen || cutoutOpen) && "hidden",
+              (!rightPanelOpen || cutoutOpen || inpaintOpen) && "hidden",
             )}
           >
             {tool === "text" ? (

@@ -1,6 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 import {
   Ban,
   Check,
@@ -113,7 +120,14 @@ function handleStyle(handle: string): CSSProperties {
 }
 
 async function urlToDataUrl(url: string): Promise<string> {
-  const res = await fetch(url);
+  if (url.startsWith("data:")) return url;
+  let res: Response;
+  try {
+    res = await fetch(url);
+  } catch {
+    res = await fetch(ecomMediaFetchUrl(url), { credentials: "include" });
+  }
+  if (!res.ok) throw new Error("读取图片失败");
   const blob = await res.blob();
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -123,16 +137,30 @@ async function urlToDataUrl(url: string): Promise<string> {
   });
 }
 
+/** 与 image-editor-studio：云端 http(s) 直传 URL，本地/blob 转 data URL。 */
+async function cutoutSourceImage(url: string): Promise<string> {
+  if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("data:")) {
+    return url;
+  }
+  return urlToDataUrl(url);
+}
+
 function loadImage(src: string): Promise<HTMLImageElement> {
-  const once = (cors: boolean) =>
+  const once = (url: string, cors: boolean) =>
     new Promise<HTMLImageElement>((resolve, reject) => {
       const img = new Image();
       if (cors) img.crossOrigin = "anonymous";
       img.onload = () => resolve(img);
       img.onerror = () => reject(new Error("图片加载失败"));
-      img.src = src;
+      img.src = url;
     });
-  return once(true).catch(() => once(false));
+  if (src.startsWith("data:") || src.startsWith("blob:")) {
+    return once(src, true).catch(() => once(src, false));
+  }
+  const proxied = ecomMediaFetchUrl(src);
+  return once(proxied, true)
+    .catch(() => once(proxied, false))
+    .catch(() => once(src, true).catch(() => once(src, false)));
 }
 
 const HISTORY_LIMIT = 5;
@@ -180,29 +208,38 @@ type PaintStroke = {
 };
 
 /** 同域拉图。透明像素的颜色经常是黑的，颜色一律用原图，抠图结果只提供透明通道。 */
-async function fetchBitmap(src: string): Promise<ImageBitmap> {
-  const res = await fetch(ecomMediaFetchUrl(src), { credentials: "include" });
-  if (!res.ok) throw new Error("读取抠图结果失败");
-  return createImageBitmap(await res.blob());
-}
-
 async function loadEditableCanvas(
   cutoutSrc: string,
   originalSrc: string,
 ): Promise<{ color: HTMLCanvasElement; mask: HTMLCanvasElement }> {
-  const [cutout, original] = await Promise.all([fetchBitmap(cutoutSrc), fetchBitmap(originalSrc)]);
+  const [original, cutout] = await Promise.all([loadImage(originalSrc), loadImage(cutoutSrc)]);
+  const ow = original.naturalWidth;
+  const oh = original.naturalHeight;
+  const cw = cutout.naturalWidth;
+  const ch = cutout.naturalHeight;
+  if (!ow || !oh) throw new Error("无法读取原图尺寸");
   const color = document.createElement("canvas");
-  color.width = original.width;
-  color.height = original.height;
+  color.width = ow;
+  color.height = oh;
   const colorCtx = color.getContext("2d", { willReadFrequently: true });
   if (!colorCtx) throw new Error("无法编辑抠图");
-  colorCtx.drawImage(original, 0, 0);
+  colorCtx.drawImage(original, 0, 0, ow, oh);
   const mask = document.createElement("canvas");
-  mask.width = color.width;
-  mask.height = color.height;
+  mask.width = ow;
+  mask.height = oh;
   const maskCtx = mask.getContext("2d", { willReadFrequently: true });
   if (!maskCtx) throw new Error("无法编辑抠图");
-  maskCtx.drawImage(cutout, 0, 0, mask.width, mask.height);
+  maskCtx.clearRect(0, 0, ow, oh);
+  if (cw === ow && ch === oh) {
+    maskCtx.drawImage(cutout, 0, 0, ow, oh);
+  } else {
+    const fit = Math.min(ow / cw, oh / ch);
+    const dw = cw * fit;
+    const dh = ch * fit;
+    const dx = (ow - dw) / 2;
+    const dy = (oh - dh) / 2;
+    maskCtx.drawImage(cutout, dx, dy, dw, dh);
+  }
   const alpha = maskCtx.getImageData(0, 0, mask.width, mask.height);
   const white = maskCtx.createImageData(mask.width, mask.height);
   for (let i = 0; i < white.data.length; i += 4) {
@@ -212,8 +249,6 @@ async function loadEditableCanvas(
     white.data[i + 3] = alpha.data[i + 3] ?? 0;
   }
   maskCtx.putImageData(white, 0, 0);
-  cutout.close();
-  original.close();
   return { color, mask };
 }
 
@@ -354,6 +389,48 @@ function drainSmart(
   return i;
 }
 
+function intrinsicSourceSize(source: CanvasImageSource): { w: number; h: number } {
+  if (source instanceof HTMLCanvasElement) {
+    return { w: source.width, h: source.height };
+  }
+  if (source instanceof HTMLImageElement) {
+    return { w: source.naturalWidth, h: source.naturalHeight };
+  }
+  if (typeof ImageBitmap !== "undefined" && source instanceof ImageBitmap) {
+    return { w: source.width, h: source.height };
+  }
+  return { w: 0, h: 0 };
+}
+
+function mapContainToDisplay(
+  baseW: number,
+  baseH: number,
+  srcW: number,
+  srcH: number,
+  dx: number,
+  dy: number,
+  dw: number,
+  dh: number,
+) {
+  if (srcW <= 0 || srcH <= 0 || baseW <= 0 || baseH <= 0) {
+    return { x: dx, y: dy, w: dw, h: dh };
+  }
+  if (srcW === baseW && srcH === baseH) {
+    return { x: dx, y: dy, w: dw, h: dh };
+  }
+  const fit = Math.min(baseW / srcW, baseH / srcH);
+  const iw = srcW * fit;
+  const ih = srcH * fit;
+  const ox = (baseW - iw) / 2;
+  const oy = (baseH - ih) / 2;
+  return {
+    x: dx + (ox / baseW) * dw,
+    y: dy + (oy / baseH) * dh,
+    w: (iw / baseW) * dw,
+    h: (ih / baseH) * dh,
+  };
+}
+
 /** 左边：原图，抠完后只在主体像素上叠选区。框选时选区和右边预览都只留框内。 */
 function CutoutPane({
   src,
@@ -413,10 +490,10 @@ function CutoutPane({
         if (ticket !== seq) return;
         cacheRef.current = { src, img, maskSrc, mask };
       }
-      const source: CanvasImageSource = bitmap ?? img;
-      const sized = underlay ?? bitmap;
-      const sw = sized ? sized.width : img.naturalWidth;
-      const sh = sized ? sized.height : img.naturalHeight;
+      const source: CanvasImageSource = underlay ?? bitmap ?? img;
+      /** 左右对比必须用同一套原图宽高算 contain，不能用 underlay 画布尺寸（否则预览会矮一截）。 */
+      const sw = img.naturalWidth;
+      const sh = img.naturalHeight;
       if (!sw || !sh) return;
       const rect = wrap.getBoundingClientRect();
       const w = Math.max(1, rect.width);
@@ -445,8 +522,10 @@ function CutoutPane({
       if (underlay) {
         ctx.drawImage(underlay, dx, dy, dw, dh);
         if (maskSource) {
+          const { w: mw, h: mh } = intrinsicSourceSize(maskSource);
           ctx.globalCompositeOperation = "destination-in";
-          ctx.drawImage(maskSource, dx, dy, dw, dh);
+          const rect = mapContainToDisplay(sw, sh, mw, mh, dx, dy, dw, dh);
+          ctx.drawImage(maskSource, rect.x, rect.y, rect.w, rect.h);
         }
         ctx.restore();
         return;
@@ -462,7 +541,9 @@ function CutoutPane({
       octx.fillStyle = "rgba(90, 160, 255, 0.45)";
       octx.fillRect(0, 0, off.width, off.height);
       octx.globalCompositeOperation = "destination-in";
-      octx.drawImage(maskSource, 0, 0, off.width, off.height);
+      const { w: mw, h: mh } = intrinsicSourceSize(maskSource);
+      const maskRect = mapContainToDisplay(sw, sh, mw, mh, 0, 0, off.width, off.height);
+      octx.drawImage(maskSource, maskRect.x, maskRect.y, maskRect.w, maskRect.h);
       if (crop && clip === "selection" && crop.w > 0 && crop.h > 0) {
         octx.fillStyle = "#fff";
         octx.fillRect(crop.x * off.width, crop.y * off.height, crop.w * off.width, crop.h * off.height);
@@ -633,6 +714,25 @@ export function ImageEditorCutoutWorkspace({
 
   const current = SUBJECTS.find((item) => item.id === subject) ?? SUBJECTS[1]!;
 
+  const resetToInitialView = useCallback(() => {
+    requestId.current += 1;
+    setRunning(false);
+    setProgress(0);
+    setError(null);
+    setResultUrl(null);
+    setWorkCanvas(null);
+    setColorCanvas(null);
+    undoRef.current = [];
+    redoRef.current = [];
+    setHist({ undo: 0, redo: 0 });
+    setPaintRev((value) => value + 1);
+    setCropBox(null);
+    setTool(null);
+    setBoxSelect(false);
+    setShowPreview(false);
+    restoredKey.current = "";
+  }, []);
+
   useEffect(() => {
     if (!running) return;
     setProgress(8);
@@ -665,13 +765,13 @@ export function ImageEditorCutoutWorkspace({
     setResultUrl(null);
     void (async () => {
       try {
-        const dataUrl = await urlToDataUrl(imageUrl);
+        const sourceImage = await cutoutSourceImage(imageUrl);
         if (cancelled || id !== requestId.current) return;
         const res = await submitImageProcessingEdit({
           mode: "bg-remove",
           model: SEEDREAM_CUTOUT_MODEL,
           generativeModel: SEEDREAM_CUTOUT_MODEL,
-          sourceImageDataUrl: dataUrl,
+          sourceImageDataUrl: sourceImage,
           bgMode: "transparent",
           edgeQuality: "high",
           outputFormat: "png",
@@ -684,7 +784,8 @@ export function ImageEditorCutoutWorkspace({
         setProgress(100);
       } catch (e) {
         if (cancelled || id !== requestId.current) return;
-        setError(e instanceof Error ? e.message : "抠图失败");
+        const raw = e instanceof Error ? e.message : "抠图失败";
+        setError(raw === "Failed to fetch" ? "网络或图片读取失败，请确认已登录并重试" : raw);
       } finally {
         if (!cancelled && id === requestId.current) setRunning(false);
       }
@@ -1098,7 +1199,16 @@ export function ImageEditorCutoutWorkspace({
     <div className="flex min-h-0 min-w-0 flex-1 bg-[var(--ie-cream)]">
       <aside className="flex w-[260px] shrink-0 flex-col border-r border-[var(--ie-border-soft)]">
         <div className="flex items-center justify-between gap-2 px-3 pb-2 pt-3">
-          <div className="text-sm font-medium text-[var(--ie-ink)]">自动抠图</div>
+          <div className="flex min-w-0 items-center gap-2">
+            <div className="text-sm font-medium text-[var(--ie-ink)]">自动抠图</div>
+            <button
+              type="button"
+              className="shrink-0 text-[11px] text-[var(--ie-muted)] underline-offset-2 hover:underline"
+              onClick={onCancel}
+            >
+              返回编辑
+            </button>
+          </div>
           <button
             type="button"
             className="shrink-0 rounded-md border border-[var(--ie-border)] bg-[var(--ie-cream)] px-2 py-1 text-[12px] text-[var(--ie-ink)] hover:bg-[var(--ie-cream-muted)] disabled:opacity-40"
@@ -1213,7 +1323,7 @@ export function ImageEditorCutoutWorkspace({
         </div>
 
         <div className="flex gap-2 border-t border-[var(--ie-divider)] p-3">
-          <EcomButtonSecondary type="button" size="sm" className="flex-1" onClick={onCancel}>
+          <EcomButtonSecondary type="button" size="sm" className="flex-1" onClick={resetToInitialView}>
             取消
           </EcomButtonSecondary>
           <EcomButtonPrimary
@@ -1267,7 +1377,6 @@ export function ImageEditorCutoutWorkspace({
           <figure className="relative h-full min-h-0 overflow-hidden rounded-xl bg-white">
             <CutoutPane
               src={imageUrl}
-              selectionSrc={workCanvas ? null : resultUrl}
               maskCanvas={workCanvas}
               maskRev={paintRev}
               zoom={zoom}

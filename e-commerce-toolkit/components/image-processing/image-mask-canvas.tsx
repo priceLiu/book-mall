@@ -227,6 +227,7 @@ export const ImageMaskCanvas = forwardRef<ImageMaskCanvasHandle, Props>(
     const committedBboxesRef = useRef<DisplayRect[]>([]);
     committedBboxesRef.current = committedBboxes;
     const hydratedFromInitialRef = useRef<string | null>(null);
+    const [brushRing, setBrushRing] = useState<{ x: number; y: number } | null>(null);
 
     const setDraftBbox = useCallback((rect: DisplayRect | null) => {
       draftBboxRef.current = rect;
@@ -615,6 +616,14 @@ export const ImageMaskCanvas = forwardRef<ImageMaskCanvasHandle, Props>(
       [applyBboxPointer, commitDraftBbox, endStroke, mode],
     );
 
+    const syncBrushRing = useCallback((e: ReactPointerEvent<HTMLCanvasElement>) => {
+      if (mode !== "mask") return;
+      const wrap = wrapRef.current;
+      if (!wrap) return;
+      const box = wrap.getBoundingClientRect();
+      setBrushRing({ x: e.clientX - box.left, y: e.clientY - box.top });
+    }, [mode]);
+
     const contain = Boolean(maxCssSize && maxCssSize.w > 0 && maxCssSize.h > 0);
     const containStyle = contain
       ? {
@@ -657,12 +666,11 @@ export const ImageMaskCanvas = forwardRef<ImageMaskCanvasHandle, Props>(
             ref={displayCanvasRef}
             className={cn(
               "absolute inset-0 h-full w-full touch-none",
-              mode === "mask" && maskTool === "eraser"
-                ? "cursor-cell"
-                : "cursor-crosshair",
+              mode === "mask" ? "cursor-none" : "cursor-crosshair",
             )}
             onPointerDown={(e) => {
               e.preventDefault();
+              syncBrushRing(e);
               e.currentTarget.setPointerCapture(e.pointerId);
               drawingRef.current = true;
               if (mode === "bbox") {
@@ -672,6 +680,7 @@ export const ImageMaskCanvas = forwardRef<ImageMaskCanvasHandle, Props>(
               paintAt(e.clientX, e.clientY, true);
             }}
             onPointerMove={(e) => {
+              syncBrushRing(e);
               if (!drawingRef.current) return;
               e.preventDefault();
               if (mode === "bbox") {
@@ -682,7 +691,22 @@ export const ImageMaskCanvas = forwardRef<ImageMaskCanvasHandle, Props>(
             }}
             onPointerUp={finishPointer}
             onPointerCancel={finishPointer}
+            onPointerEnter={syncBrushRing}
+            onPointerLeave={() => setBrushRing(null)}
           />
+          {mode === "mask" && brushRing ? (
+            <div
+              className="pointer-events-none absolute z-10 rounded-full border border-white shadow-[0_0_0_1px_rgba(0,0,0,0.45)]"
+              style={{
+                left: brushRing.x,
+                top: brushRing.y,
+                width: brushSize,
+                height: brushSize,
+                transform: "translate(-50%, -50%)",
+              }}
+              aria-hidden
+            />
+          ) : null}
           <canvas ref={maskCanvasRef} className="hidden" aria-hidden />
         </div>
         {hideFooter ? null : (
