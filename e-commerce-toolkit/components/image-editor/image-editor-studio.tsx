@@ -29,7 +29,9 @@ import { RecolorProtectLayer } from "@/components/image-editor/image-editor-colo
 import type { ColorAdjust, ColorAdjustStroke } from "@/lib/image-editor-color-adjust";
 import { colorAdjustPreviewCss } from "@/lib/image-editor-color-adjust";
 import { ImageEditorCutoutWorkspace } from "@/components/image-editor/image-editor-cutout-workspace";
+import { ImageEditorAiGenWorkspace } from "@/components/image-editor/image-editor-ai-gen-workspace";
 import { ImageEditorInpaintWorkspace } from "@/components/image-editor/image-editor-inpaint-workspace";
+import { ImageEditorOutpaintWorkspace } from "@/components/image-editor/image-editor-outpaint-workspace";
 import { ImageEditorBasicToolsPanel } from "@/components/image-editor/image-editor-basic-tools-panel";
 import { ImageEditorToolRail } from "@/components/image-editor/image-editor-tool-rail";
 import "@/components/image-editor/image-editor-theme.css";
@@ -271,6 +273,8 @@ export function ImageEditorStudio() {
   const eraseLayerRef = useRef<ImageEditorEraseLayerHandle>(null);
   const [cutoutOpen, setCutoutOpen] = useState(false);
   const [inpaintOpen, setInpaintOpen] = useState(false);
+  const [outpaintOpen, setOutpaintOpen] = useState(false);
+  const [aiGenOpen, setAiGenOpen] = useState(false);
   const toolBeforeCutoutRef = useRef<ImageEditorToolId>("adjust");
   const [cutoutSubject, setCutoutSubject] = useState("portrait");
   const [cutoutResultUrl, setCutoutResultUrl] = useState<string | null>(null);
@@ -1887,6 +1891,46 @@ export function ImageEditorStudio() {
     setInpaintOpen(false);
   }, []);
 
+  const closeAiGenWorkspace = useCallback(() => {
+    setAiGenOpen(false);
+  }, []);
+
+  const closeOutpaintWorkspace = useCallback(() => {
+    setOutpaintOpen(false);
+  }, []);
+
+  const openAiGen = useCallback(() => {
+    if (cutoutOpen) closeCutoutWorkspace();
+    if (inpaintOpen) closeInpaintWorkspace();
+    if (outpaintOpen) closeOutpaintWorkspace();
+    setAiGenOpen(true);
+  }, [closeCutoutWorkspace, closeInpaintWorkspace, closeOutpaintWorkspace, cutoutOpen, inpaintOpen, outpaintOpen]);
+
+  const openOutpaint = useCallback(async () => {
+    if (!imageUrl) {
+      await alert({ title: "无法扩图", message: "请先打开一张图片。" });
+      return;
+    }
+    if (textDoc.overlay.layers.length > 0) {
+      await alert({ title: "先合并图层", message: "先合并图层，才能使用 AI 扩图。" });
+      return;
+    }
+    if (cutoutOpen) closeCutoutWorkspace();
+    if (inpaintOpen) closeInpaintWorkspace();
+    if (aiGenOpen) closeAiGenWorkspace();
+    setOutpaintOpen(true);
+  }, [
+    aiGenOpen,
+    alert,
+    closeAiGenWorkspace,
+    closeCutoutWorkspace,
+    closeInpaintWorkspace,
+    cutoutOpen,
+    imageUrl,
+    inpaintOpen,
+    textDoc.overlay.layers.length,
+  ]);
+
   const openInpaint = useCallback(async () => {
     if (!imageUrl) {
       await alert({ title: "无法重绘", message: "请先打开一张图片。" });
@@ -1897,8 +1941,20 @@ export function ImageEditorStudio() {
       return;
     }
     if (cutoutOpen) closeCutoutWorkspace();
+    if (aiGenOpen) closeAiGenWorkspace();
+    if (outpaintOpen) closeOutpaintWorkspace();
     setInpaintOpen(true);
-  }, [alert, cutoutOpen, closeCutoutWorkspace, imageUrl, textDoc.overlay.layers.length]);
+  }, [
+    aiGenOpen,
+    alert,
+    closeAiGenWorkspace,
+    closeCutoutWorkspace,
+    closeOutpaintWorkspace,
+    cutoutOpen,
+    imageUrl,
+    outpaintOpen,
+    textDoc.overlay.layers.length,
+  ]);
 
   const openCutout = useCallback(async () => {
     if (!imageUrl) {
@@ -1910,6 +1966,8 @@ export function ImageEditorStudio() {
       return;
     }
     if (inpaintOpen) closeInpaintWorkspace();
+    if (aiGenOpen) closeAiGenWorkspace();
+    if (outpaintOpen) closeOutpaintWorkspace();
     if (tool !== "cutout") {
       toolBeforeCutoutRef.current = tool;
     }
@@ -1917,7 +1975,18 @@ export function ImageEditorStudio() {
     if (tool === "cutout") {
       setTool(toolBeforeCutoutRef.current);
     }
-  }, [alert, closeInpaintWorkspace, imageUrl, inpaintOpen, textDoc.overlay.layers.length, tool]);
+  }, [
+    aiGenOpen,
+    alert,
+    closeAiGenWorkspace,
+    closeInpaintWorkspace,
+    closeOutpaintWorkspace,
+    imageUrl,
+    inpaintOpen,
+    outpaintOpen,
+    textDoc.overlay.layers.length,
+    tool,
+  ]);
 
   useEffect(() => {
     if (tool !== "cutout" || cutoutOpen || !imageUrl || busy) return;
@@ -2189,6 +2258,10 @@ export function ImageEditorStudio() {
             onInpaint={() => {
               void openInpaint();
             }}
+            onAiGenerate={openAiGen}
+            onOutpaint={() => {
+              void openOutpaint();
+            }}
             onAiFlower={() => {
               if (!imageUrl) return;
               setTool("text");
@@ -2229,15 +2302,17 @@ export function ImageEditorStudio() {
           leftCollapsed={!leftPanelOpen}
           rightCollapsed={!rightPanelOpen}
           onToggleLeft={() => setLeftPanelOpen((open) => !open)}
-          panelsDisabled={cutoutOpen || inpaintOpen}
+          panelsDisabled={cutoutOpen || inpaintOpen || outpaintOpen || aiGenOpen}
           onToggleRight={() => setRightPanelOpen((open) => !open)}
         />
 
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row lg:gap-2 lg:p-2">
           <div className="flex max-h-[50vh] min-h-0 w-full shrink-0 flex-row overflow-hidden lg:max-h-none lg:w-auto">
             <ImageEditorToolRail
-              active={cutoutOpen ? "cutout" : inpaintOpen ? "more" : tool}
-              disabled={busy && !cutoutOpen && !inpaintOpen}
+              active={
+                cutoutOpen ? "cutout" : inpaintOpen || outpaintOpen || aiGenOpen ? "more" : tool
+              }
+              disabled={busy && !cutoutOpen && !inpaintOpen && !outpaintOpen && !aiGenOpen}
               onSelect={(id) => {
                 if (id === "cutout") {
                   if (cutoutOpen) return;
@@ -2246,10 +2321,12 @@ export function ImageEditorStudio() {
                 }
                 if (cutoutOpen) closeCutoutWorkspace();
                 if (inpaintOpen) closeInpaintWorkspace();
+                if (outpaintOpen) closeOutpaintWorkspace();
+                if (aiGenOpen) closeAiGenWorkspace();
                 setTool(id);
               }}
             />
-            {leftPanelOpen && !cutoutOpen && !inpaintOpen ? (
+            {leftPanelOpen && !cutoutOpen && !inpaintOpen && !outpaintOpen && !aiGenOpen ? (
               <aside className="ecom-scrollbar-thin flex min-h-0 w-[min(100%,320px)] flex-1 flex-col overflow-y-auto bg-transparent p-2 pt-0 lg:w-[332px] lg:shrink-0">
                 {toolPanel}
               </aside>
@@ -2280,11 +2357,31 @@ export function ImageEditorStudio() {
               }}
             />
           ) : null}
+          {outpaintOpen && imageUrl ? (
+            <ImageEditorOutpaintWorkspace
+              imageUrl={imageUrl}
+              onCancel={closeOutpaintWorkspace}
+              onApply={(url) => {
+                applyUrl(url);
+                closeOutpaintWorkspace();
+              }}
+            />
+          ) : null}
+          {aiGenOpen ? (
+            <ImageEditorAiGenWorkspace
+              canvasImageUrl={imageUrl}
+              onCancel={closeAiGenWorkspace}
+              onApply={(url) => {
+                applyUrl(url);
+                closeAiGenWorkspace();
+              }}
+            />
+          ) : null}
           <div
             className={cn(
               "flex min-h-0 min-w-0 flex-1 lg:rounded-xl lg:border lg:border-[var(--ie-border-soft)] lg:bg-[var(--ie-canvas-well)]",
               canvasFrameInteract || resizeInteract ? "overflow-visible" : "overflow-hidden",
-              (cutoutOpen || inpaintOpen) && "hidden",
+              (cutoutOpen || inpaintOpen || outpaintOpen || aiGenOpen) && "hidden",
               "relative",
             )}
           >
@@ -2424,7 +2521,7 @@ export function ImageEditorStudio() {
           <div
             className={cn(
               "flex min-h-0 w-full shrink-0 flex-col overflow-hidden border-t border-[var(--ie-border-soft)] lg:h-full lg:w-[300px] lg:self-stretch lg:border-l lg:border-t-0",
-              (!rightPanelOpen || cutoutOpen || inpaintOpen) && "hidden",
+              (!rightPanelOpen || cutoutOpen || inpaintOpen || outpaintOpen || aiGenOpen) && "hidden",
             )}
           >
             {tool === "text" ? (

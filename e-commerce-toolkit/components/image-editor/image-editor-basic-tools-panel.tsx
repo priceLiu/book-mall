@@ -31,10 +31,16 @@ type Props = {
   onCutout: () => void;
   onEnhance: () => void;
   onInpaint: () => void;
+  onAiGenerate: () => void;
+  onOutpaint: () => void;
   onAiFlower: () => void;
 };
 
-const IMAGE_TOOLS: Array<Omit<ToolAction, "onClick"> & { action: "cutout" | "enhance" | "inpaint" | "link" }> = [
+const IMAGE_TOOLS: Array<
+  Omit<ToolAction, "onClick"> & {
+    action: "cutout" | "enhance" | "inpaint" | "aiGen" | "outpaint" | "link";
+  }
+> = [
   {
     id: "smart-cutout",
     title: "智能抠图",
@@ -70,16 +76,14 @@ const IMAGE_TOOLS: Array<Omit<ToolAction, "onClick"> & { action: "cutout" | "enh
     title: "AI扩图",
     description: "根据原图进行画面扩展，支持多种尺寸",
     icon: Expand,
-    action: "link",
-    href: "/ecom/image-processing",
+    action: "outpaint",
   },
   {
     id: "generate",
     title: "AI生图",
     description: "输入文字或参考图，AI生成描述的新素材",
     icon: Wand2,
-    action: "link",
-    href: "/ecom/image-processing",
+    action: "aiGen",
   },
   {
     id: "inpaint",
@@ -100,7 +104,15 @@ const TEXT_TOOLS: ToolAction[] = [
   },
 ];
 
-export function ImageEditorBasicToolsPanel({ disabled, onCutout, onEnhance, onInpaint, onAiFlower }: Props) {
+export function ImageEditorBasicToolsPanel({
+  disabled,
+  onCutout,
+  onEnhance,
+  onInpaint,
+  onAiGenerate,
+  onOutpaint,
+  onAiFlower,
+}: Props) {
   const blockLinks = disabled;
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-[var(--ie-border-soft)] bg-[var(--ie-cream)] shadow-sm">
@@ -119,7 +131,9 @@ export function ImageEditorBasicToolsPanel({ disabled, onCutout, onEnhance, onIn
                   : disabled &&
                     item.action !== "cutout" &&
                     item.action !== "enhance" &&
-                    item.action !== "inpaint"
+                    item.action !== "inpaint" &&
+                    item.action !== "aiGen" &&
+                    item.action !== "outpaint"
               }
               href={item.action === "link" ? item.href : undefined}
               onClick={
@@ -129,7 +143,11 @@ export function ImageEditorBasicToolsPanel({ disabled, onCutout, onEnhance, onIn
                     ? onEnhance
                     : item.action === "inpaint"
                       ? onInpaint
-                      : undefined
+                      : item.action === "aiGen"
+                        ? onAiGenerate
+                        : item.action === "outpaint"
+                          ? onOutpaint
+                          : undefined
               }
             />
           ))}
