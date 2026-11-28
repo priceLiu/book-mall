@@ -21,6 +21,14 @@ import {
   imageEditorHdPrompt,
   type ImageEditorHdMode,
 } from "@/components/image-editor/image-editor-hd-panel";
+import {
+  ImageEditorColorPanel,
+  imageEditorColorGrade,
+  type ImageEditorColorGroup,
+} from "@/components/image-editor/image-editor-color-panel";
+import { RecolorProtectLayer } from "@/components/image-editor/image-editor-color-controls";
+import type { ColorAdjust, ColorAdjustStroke } from "@/lib/image-editor-color-adjust";
+import { colorAdjustPreviewCss } from "@/lib/image-editor-color-adjust";
 import { ImageEditorCutoutWorkspace } from "@/components/image-editor/image-editor-cutout-workspace";
 import { ImageEditorToolRail } from "@/components/image-editor/image-editor-tool-rail";
 import "@/components/image-editor/image-editor-theme.css";
@@ -28,6 +36,7 @@ import { EcomWorkspaceLayout } from "@/components/layout/ecom-workspace-layout";
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
 import { IMAGE_UPLOAD_ACCEPT } from "@/lib/image-upload-utils";
 import { submitImageProcessingEdit } from "@/lib/ecom-image-processing-api";
+import { submitImageEditorLocalGrade } from "@/lib/image-editor-clear-grade-client";
 import { ecomMediaFetchUrl } from "@/lib/ecom-media-download";
 import { eraseImageLayerRegion } from "@/lib/ecom-image-layer-api";
 import {
@@ -91,7 +100,14 @@ import {
 import { ensureSellingPosterDecompose } from "@/lib/image-editor-selling-decompose-api";
 
 async function urlToDataUrl(url: string): Promise<string> {
-  const res = await fetch(url);
+  if (url.startsWith("data:")) return url;
+  let res: Response;
+  try {
+    res = await fetch(url);
+  } catch {
+    res = await fetch(ecomMediaFetchUrl(url), { credentials: "include" });
+  }
+  if (!res.ok) throw new Error("读取图片失败");
   const blob = await res.blob();
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -99,6 +115,14 @@ async function urlToDataUrl(url: string): Promise<string> {
     reader.onerror = () => reject(new Error("读取图片失败"));
     reader.readAsDataURL(blob);
   });
+}
+
+/** 云端地址直接交给模型。浏览器拉跨域图会 Failed to fetch，不能先转成 data URL。 */
+function imageEditSource(url: string): Promise<string> {
+  if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("data:")) {
+    return Promise.resolve(url);
+  }
+  return urlToDataUrl(url);
 }
 
 async function sampleImage(url: string): Promise<Uint8ClampedArray | null> {
@@ -240,6 +264,8 @@ export function ImageEditorStudio() {
   const [eraseTargets, setEraseTargets] = useState<Record<string, boolean>>({});
   const [eraseRunning, setEraseRunning] = useState(false);
   const [eraseProgress, setEraseProgress] = useState(0);
+  const [colorRunning, setColorRunning] = useState(false);
+  const [colorProgress, setColorProgress] = useState(0);
   const [eraseNotice, setEraseNotice] = useState<string | null>(null);
   const eraseLayerRef = useRef<ImageEditorEraseLayerHandle>(null);
   const [cutoutOpen, setCutoutOpen] = useState(false);
@@ -249,6 +275,21 @@ export function ImageEditorStudio() {
   const imageEditorModel = "doubao-seedream-5-5";
   const [hdMode, setHdMode] = useState<ImageEditorHdMode>("hd");
   const [hdKeepSize, setHdKeepSize] = useState(false);
+  const [colorGradeId, setColorGradeId] = useState<string | null>(null);
+  /** 本轮调色的原图。后续预设都从这张重做，不在上一次结果上叠加。 */
+  const [colorSourceUrl, setColorSourceUrl] = useState<string | null>(null);
+  const colorSourceRef = useRef<string | null>(null);
+  const colorSourceHistoryIdxRef = useRef<number | null>(null);
+  const [colorGroup, setColorGroup] = useState<ImageEditorColorGroup | null>(null);
+  const [colorPreviewCss, setColorPreviewCss] = useState<string | null>(null);
+  const colorAdjustSeq = useRef(0);
+  const colorAdjustBusy = useRef(false);
+  const pendingColorAdjust = useRef<{ adjust: ColorAdjust; label: string } | null>(null);
+  const lastColorAdjust = useRef<{ adjust: ColorAdjust; label: string } | null>(null);
+  const [recolorArmed, setRecolorArmed] = useState(false);
+  const [recolorBrush, setRecolorBrush] = useState(25);
+  const recolorStrokesRef = useRef<ColorAdjustStroke[]>([]);
+  const [recolorStrokeVersion, setRecolorStrokeVersion] = useState(0);
 
   const [brightness, setBrightness] = useState(100);
   const [contrast, setContrast] = useState(100);
@@ -349,6 +390,9 @@ export function ImageEditorStudio() {
       const drop = next.length - maxEntries;
       next = next.slice(drop);
       nextIdx -= drop;
+      if (colorSourceHistoryIdxRef.current != null) {
+        colorSourceHistoryIdxRef.current -= drop;
+      }
     }
     historyRef.current = next;
     historyIdxRef.current = nextIdx;
@@ -362,7 +406,13 @@ export function ImageEditorStudio() {
   }, [rememberStep]);
 
   const applyUrl = useCallback(
-    (url: string, w?: number, h?: number) => {
+    (url: string, w?: number, h?: number, opts?: { keepColorSource?: boolean }) => {
+      if (!opts?.keepColorSource) {
+        colorSourceRef.current = null;
+        colorSourceHistoryIdxRef.current = null;
+        setColorSourceUrl(null);
+        setColorGradeId(null);
+      }
       if (!keepCutoutRef.current) {
         setCutoutOpen(false);
         setCutoutResultUrl(null);
@@ -549,10 +599,12 @@ export function ImageEditorStudio() {
   const previewClipInRender = "none" as const;
 
   const activeFilterStyle =
-    tool === "color" || brightness !== 100 || contrast !== 100 || saturate !== 100 ? filterStyle : undefined;
+    brightness !== 100 || contrast !== 100 || saturate !== 100 ? filterStyle : undefined;
+  const stageFilterStyle = [activeFilterStyle, colorPreviewCss].filter(Boolean).join(" ") || undefined;
+  const colorFrameUrl = colorPreviewCss && colorSourceUrl ? colorSourceUrl : imageUrl;
 
   useEffect(() => {
-    if (!imageUrl) {
+    if (!colorFrameUrl) {
       setDisplayUrl(null);
       setBaseDisplayUrl(null);
       setCropPreviewUrl(null);
@@ -562,7 +614,7 @@ export function ImageEditorStudio() {
 
     let cancelled = false;
     const frame = requestAnimationFrame(() => {
-      void renderImageEditorFrame(imageUrl, {
+      void renderImageEditorFrame(colorFrameUrl, {
         canvasW,
         canvasH,
         rotateDeg,
@@ -578,7 +630,7 @@ export function ImageEditorStudio() {
           if (!cancelled) setDisplayUrl(url);
         })
         .catch(() => {
-          if (!cancelled) setDisplayUrl(imageUrl);
+          if (!cancelled) setDisplayUrl(colorFrameUrl);
         });
     });
     return () => {
@@ -586,7 +638,7 @@ export function ImageEditorStudio() {
       cancelAnimationFrame(frame);
     };
   }, [
-    imageUrl,
+    colorFrameUrl,
     canvasW,
     canvasH,
     rotateDeg,
@@ -978,6 +1030,10 @@ export function ImageEditorStudio() {
       cancelLabel: "取消",
     });
     if (!confirmed) return;
+    colorSourceRef.current = null;
+    colorSourceHistoryIdxRef.current = null;
+    setColorSourceUrl(null);
+    setColorGradeId(null);
     setImageUrl(null);
     setDisplayUrl(null);
     setBaseDisplayUrl(null);
@@ -1258,6 +1314,10 @@ export function ImageEditorStudio() {
         const outW = Math.max(1, naturalW);
         const outH = Math.max(1, naturalH);
         setCorrection(IMAGE_EDITOR_CORRECTION_DEFAULT);
+        colorSourceRef.current = null;
+        colorSourceHistoryIdxRef.current = null;
+        setColorSourceUrl(null);
+        setColorGradeId(null);
         setImageUrl(out);
         setDisplayUrl(out);
         naturalSrcRef.current = out;
@@ -1304,6 +1364,10 @@ export function ImageEditorStudio() {
           offsetY: frameOffset.y,
           filterStyle: activeFilterStyle,
         });
+        colorSourceRef.current = null;
+        colorSourceHistoryIdxRef.current = null;
+        setColorSourceUrl(null);
+        setColorGradeId(null);
         setImageUrl(out);
         setDisplayUrl(out);
         naturalSrcRef.current = out;
@@ -1366,6 +1430,10 @@ export function ImageEditorStudio() {
       if (shape !== "none") {
         setShapeMask("none");
       }
+      colorSourceRef.current = null;
+      colorSourceHistoryIdxRef.current = null;
+      setColorSourceUrl(null);
+      setColorGradeId(null);
       setImageUrl(out);
       setDisplayUrl(out);
       setCropPreviewUrl(null);
@@ -1419,7 +1487,7 @@ export function ImageEditorStudio() {
     if (!imageUrl) return;
     setBusy(true);
     try {
-      const dataUrl = await urlToDataUrl(imageUrl);
+      const dataUrl = await imageEditSource(imageUrl);
       const res = await submitImageProcessingEdit({
         mode: "bg-remove",
         model: imageEditorModel,
@@ -1448,7 +1516,7 @@ export function ImageEditorStudio() {
     }
     setBusy(true);
     try {
-      const dataUrl = await urlToDataUrl(imageUrl);
+      const dataUrl = await imageEditSource(imageUrl);
       const res = await submitImageProcessingEdit({
         mode: "enhancer",
         prompt: imageEditorHdPrompt(hdMode, hdKeepSize),
@@ -1471,6 +1539,117 @@ export function ImageEditorStudio() {
     }
   };
 
+  const lockColorSource = () => {
+    if (!imageUrl || colorSourceRef.current) return;
+    colorSourceRef.current = imageUrl;
+    colorSourceHistoryIdxRef.current = historyIdxRef.current;
+    setColorSourceUrl(imageUrl);
+  };
+
+  const restoreColorSource = () => {
+    setColorPreviewCss(null);
+    setColorGradeId(null);
+    const source = colorSourceRef.current;
+    if (source && source !== imageUrl) applyUrl(source, canvasW, canvasH, { keepColorSource: true });
+  };
+
+  const clearRecolorStrokes = () => {
+    recolorStrokesRef.current = [];
+    setRecolorStrokeVersion((value) => value + 1);
+    const last = lastColorAdjust.current;
+    if (last?.adjust.recolorSource && last.adjust.recolorTarget) {
+      void runColorAdjust({ ...last.adjust, protect: undefined }, last.label);
+    }
+  };
+
+  const runColorAdjust = async (adjust: ColorAdjust, label: string) => {
+    if (!imageUrl) {
+      await alert({ title: "无法调色", message: "请先打开一张图片。" });
+      return;
+    }
+    const payload: ColorAdjust = adjust.recolorSource
+      ? { ...adjust, protect: recolorStrokesRef.current.length > 0 ? recolorStrokesRef.current.slice(-80) : undefined }
+      : adjust;
+    lastColorAdjust.current = { adjust: payload, label };
+    if (colorAdjustBusy.current) {
+      pendingColorAdjust.current = { adjust: payload, label };
+      setColorPreviewCss(colorAdjustPreviewCss(payload));
+      return;
+    }
+    lockColorSource();
+    const source = colorSourceRef.current ?? imageUrl;
+    const seq = ++colorAdjustSeq.current;
+    colorAdjustBusy.current = true;
+    setColorPreviewCss(colorAdjustPreviewCss(payload));
+    setColorGradeId(null);
+    setColorRunning(true);
+    setColorProgress(8);
+    try {
+      const next = await submitImageEditorLocalGrade(source, "adjust", payload);
+      if (seq !== colorAdjustSeq.current) return;
+      setColorPreviewCss(null);
+      setBrightness(100);
+      setContrast(100);
+      setSaturate(100);
+      applyUrl(next, canvasW, canvasH, { keepColorSource: true });
+      setColorProgress(100);
+      toast({ title: `${label}完成`, variant: "success" });
+    } catch (e) {
+      if (seq !== colorAdjustSeq.current) return;
+      setColorPreviewCss(null);
+      await alert({
+        title: "调色失败",
+        message: e instanceof Error ? e.message : "请稍后重试",
+        variant: "error",
+      });
+    } finally {
+      if (seq === colorAdjustSeq.current) {
+        colorAdjustBusy.current = false;
+        setColorRunning(false);
+        const pending = pendingColorAdjust.current;
+        pendingColorAdjust.current = null;
+        if (pending) void runColorAdjust(pending.adjust, pending.label);
+      }
+    }
+  };
+
+  const runColorGrade = async (id: string) => {
+    const grade = imageEditorColorGrade(id);
+    if (!grade) return;
+    if (!imageUrl) {
+      await alert({ title: "无法调色", message: "请先打开一张图片。" });
+      return;
+    }
+    if (busy || colorRunning) return;
+    const source = colorSourceRef.current ?? imageUrl;
+    if (!colorSourceRef.current) {
+      colorSourceRef.current = source;
+      colorSourceHistoryIdxRef.current = historyIdxRef.current;
+      setColorSourceUrl(source);
+    }
+    setColorPreviewCss(null);
+    setColorGradeId(id);
+    setColorRunning(true);
+    setColorProgress(8);
+    try {
+      const next = await submitImageEditorLocalGrade(source, grade.id);
+      setBrightness(100);
+      setContrast(100);
+      setSaturate(100);
+      applyUrl(next, canvasW, canvasH, { keepColorSource: true });
+      setColorProgress(100);
+      toast({ title: `${grade.label}完成`, variant: "success" });
+    } catch (e) {
+      await alert({
+        title: "调色失败",
+        message: e instanceof Error ? e.message : "请稍后重试",
+        variant: "error",
+      });
+    } finally {
+      setColorRunning(false);
+    }
+  };
+
   useEffect(() => {
     if (!eraseRunning) return;
     setEraseProgress(8);
@@ -1479,6 +1658,14 @@ export function ImageEditorStudio() {
     }, 450);
     return () => window.clearInterval(timer);
   }, [eraseRunning]);
+
+  useEffect(() => {
+    if (!colorRunning) return;
+    const timer = window.setInterval(() => {
+      setColorProgress((value) => (value >= 92 ? value : value + Math.max(1, Math.round((92 - value) * 0.12))));
+    }, 450);
+    return () => window.clearInterval(timer);
+  }, [colorRunning]);
 
   useEffect(() => {
     if (!eraseNotice) return;
@@ -1509,10 +1696,7 @@ export function ImageEditorStudio() {
     setEraseNotice(null);
     setEraseRunning(true);
     try {
-      const sourceImageUrl =
-        imageUrl.startsWith("http://") || imageUrl.startsWith("https://") || imageUrl.startsWith("data:")
-          ? imageUrl
-          : await urlToDataUrl(imageUrl);
+      const sourceImageUrl = await imageEditSource(imageUrl);
       const erased = await eraseImageLayerRegion({ sourceImageUrl, maskDataUrl: mask });
       setEraseProgress(100);
       applyUrl(erased.imageUrl, canvasW, canvasH);
@@ -1540,7 +1724,7 @@ export function ImageEditorStudio() {
     setEraseTargets((prev) => ({ ...prev, [id]: true }));
     setEraseRunning(true);
     try {
-      const dataUrl = await urlToDataUrl(imageUrl);
+      const dataUrl = await imageEditSource(imageUrl);
       const res = await submitImageProcessingEdit({
         mode: "editor",
         prompt: `如果画面中有${item.prompt}，只去掉${item.prompt}，用周围画面自然补上，其余物体、构图和颜色都保持不变。如果画面中没有${item.prompt}，请原样返回，不要做任何修改。`,
@@ -1569,10 +1753,17 @@ export function ImageEditorStudio() {
   };
 
   const historyLoadRef = useRef(0);
-  const restoreHistoryEntry = (entry: HistoryEntry) => {
+  const restoreHistoryEntry = (entry: HistoryEntry, historyIdx: number) => {
     const token = ++historyLoadRef.current;
     naturalSrcRef.current = null;
     cropDraftRef.current = null;
+    const sourceIdx = colorSourceHistoryIdxRef.current;
+    if (sourceIdx != null && historyIdx < sourceIdx) {
+      colorSourceRef.current = null;
+      colorSourceHistoryIdxRef.current = null;
+      setColorSourceUrl(null);
+      setColorGradeId(null);
+    }
     setImageUrl(entry.url);
     setDisplayUrl(entry.url);
     setBaseDisplayUrl(null);
@@ -1674,7 +1865,7 @@ export function ImageEditorStudio() {
     const stack = historyRef.current;
     const idx = historyIdxRef.current;
     if (viewDirty && stack[idx]) {
-      restoreHistoryEntry(stack[idx]);
+      restoreHistoryEntry(stack[idx], idx);
       return;
     }
     if (idx <= 0) return;
@@ -1682,7 +1873,7 @@ export function ImageEditorStudio() {
     if (!entry) return;
     historyIdxRef.current = idx - 1;
     setHistoryIdx(idx - 1);
-    restoreHistoryEntry(entry);
+    restoreHistoryEntry(entry, idx - 1);
   };
 
   const redo = () => {
@@ -1695,7 +1886,7 @@ export function ImageEditorStudio() {
     if (!entry) return;
     historyIdxRef.current = idx + 1;
     setHistoryIdx(idx + 1);
-    restoreHistoryEntry(entry);
+    restoreHistoryEntry(entry, idx + 1);
   };
 
   const download = () => {
@@ -1934,16 +2125,33 @@ export function ImageEditorStudio() {
         );
       case "color":
         return (
-          <ToolPanelCard title="调色">
-          <div className="space-y-4">
-            <SliderField label="亮度" value={brightness} onChange={setBrightness} />
-            <SliderField label="对比度" value={contrast} onChange={setContrast} />
-            <SliderField label="饱和度" value={saturate} onChange={setSaturate} />
-            <EcomButtonPrimary type="button" className="w-full" disabled={!imageUrl || busy} onClick={() => void commitExport()}>
-              烘焙调色到图片
-            </EcomButtonPrimary>
-          </div>
-          </ToolPanelCard>
+          <ImageEditorColorPanel
+            imageUrl={colorSourceUrl ?? imageUrl}
+            selectedId={colorGradeId}
+            openGroup={colorGroup}
+            busy={colorRunning}
+            eraseArmed={recolorArmed}
+            eraseBrush={recolorBrush}
+            onOpenGroup={(group) => {
+              setColorGroup(group);
+              if (group !== "recolor") setRecolorArmed(false);
+            }}
+            onResetSelection={() => {
+              setColorGradeId(null);
+              setColorGroup(null);
+              setRecolorArmed(false);
+            }}
+            onPick={(id) => void runColorGrade(id)}
+            onAdjust={(adjust, label) => void runColorAdjust(adjust, label)}
+            onPreview={(css) => {
+              if (css) lockColorSource();
+              setColorPreviewCss(css);
+            }}
+            onRestore={restoreColorSource}
+            onEraseArm={setRecolorArmed}
+            onEraseBrush={setRecolorBrush}
+            onEraseClear={clearRecolorStrokes}
+          />
         );
       case "assets":
         return (
@@ -2063,20 +2271,20 @@ export function ImageEditorStudio() {
               "relative",
             )}
           >
-            {eraseRunning ? (
+            {eraseRunning || colorRunning ? (
               <div className="absolute left-4 right-4 top-3 z-[80]">
                 <div className="mb-1 flex items-center justify-between text-[11px] text-[var(--ie-muted)]">
-                  <span>正在消除</span>
-                  <span>{eraseProgress}%</span>
+                  <span>{eraseRunning ? "正在消除" : "正在调色"}</span>
+                  <span>{eraseRunning ? eraseProgress : colorProgress}%</span>
                 </div>
                 <div
                   className="ecom-upload-progress"
                   role="progressbar"
-                  aria-valuenow={eraseProgress}
+                  aria-valuenow={eraseRunning ? eraseProgress : colorProgress}
                   aria-valuemin={0}
                   aria-valuemax={100}
                 >
-                  <span style={{ width: `${eraseProgress}%` }} />
+                  <span style={{ width: `${eraseRunning ? eraseProgress : colorProgress}%` }} />
                 </div>
               </div>
             ) : eraseNotice ? (
@@ -2120,8 +2328,9 @@ export function ImageEditorStudio() {
               rotateDeg={rotateDeg}
               flipH={flipH}
               flipV={flipV}
-              filterStyle={activeFilterStyle}
+              filterStyle={stageFilterStyle}
               correctionCss={correctionOpen ? imageEditorCorrectionCss(correction) : ""}
+              compareUrl={colorSourceUrl && colorSourceUrl !== imageUrl ? colorSourceUrl : null}
               naturalWidth={naturalW}
               naturalHeight={naturalH}
               canvasWidth={canvasW}
@@ -2183,6 +2392,20 @@ export function ImageEditorStudio() {
                     imageWidth={naturalW || canvasW}
                     imageHeight={naturalH || canvasH}
                     onStrokeEnd={eraseTab === "manual" ? () => void runManualErase() : undefined}
+                  />
+                ) : tool === "color" && colorGroup === "recolor" && recolorArmed && imageUrl ? (
+                  <RecolorProtectLayer
+                    key={recolorStrokeVersion}
+                    brushSize={recolorBrush}
+                    onStroke={(stroke) => {
+                      recolorStrokesRef.current = [...recolorStrokesRef.current, stroke].slice(-80);
+                    }}
+                    onStrokeEnd={() => {
+                      const last = lastColorAdjust.current;
+                      if (last?.adjust.recolorSource && last.adjust.recolorTarget) {
+                        void runColorAdjust(last.adjust, last.label);
+                      }
+                    }}
                   />
                 ) : null
               }
@@ -2388,32 +2611,5 @@ function CorrectionRow({
         </span>
       </span>
     </div>
-  );
-}
-
-function SliderField({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: number;
-  onChange: (v: number) => void;
-}) {
-  return (
-    <label className="block space-y-1">
-      <div className="flex justify-between text-[11px]">
-        <span className="text-[var(--ie-muted)]">{label}</span>
-        <span className="text-[var(--ie-subtle)]">{value}%</span>
-      </div>
-      <input
-        type="range"
-        min={50}
-        max={150}
-        value={value}
-        className="w-full"
-        onChange={(e) => onChange(Number(e.target.value))}
-      />
-    </label>
   );
 }

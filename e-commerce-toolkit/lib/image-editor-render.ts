@@ -10,13 +10,15 @@ export type RenderImageEditorOptions = ImageEditorTransform & {
 };
 
 function loadImage(src: string): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error("图片加载失败"));
-    img.src = src;
-  });
+  const once = (cors: boolean) =>
+    new Promise<HTMLImageElement>((resolve, reject) => {
+      const img = new Image();
+      if (cors) img.crossOrigin = "anonymous";
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error("图片加载失败"));
+      img.src = src;
+    });
+  return once(true).catch(() => once(false));
 }
 
 export async function renderImageEditorFrame(

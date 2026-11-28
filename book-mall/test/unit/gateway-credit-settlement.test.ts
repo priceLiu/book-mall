@@ -67,4 +67,23 @@ describe("video billing units", () => {
       }),
     ).toBe(375);
   });
+
+  it("Seedream 按张计费，不把厂商 output_tokens 当成积分", () => {
+    const units = billableUnitCount("PER_IMAGE", {
+      images: 1,
+      totalTokens: 16384,
+      completionTokens: 16384,
+    });
+    expect(units).toBe(1);
+    expect(
+      computeChargeCredits({
+        snapshot: { listPriceYuan: 0.1794, creditsPerUnit: 5.98 },
+        units,
+        pricePerCreditYuan: DEFAULT_CREDIT_ANCHOR_YUAN,
+        totalTokens: 16384,
+        completionTokens: 16384,
+        unit: "PER_IMAGE",
+      }),
+    ).toBe(5.98);
+  });
 });

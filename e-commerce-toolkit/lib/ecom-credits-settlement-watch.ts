@@ -21,6 +21,25 @@ const DELAYS_MS = [400, 1500, 4000, 9000, 20000, 45000, 90000];
 
 export const ECOM_GATEWAY_LOG_HEADER = "x-ecom-gateway-log-id";
 
+/** 调色等非 Gateway 扣费：响应里带 creditsCharged + chargeId 时，走同一条「本次消耗」提示。 */
+export function creditsConsumedDetail(
+  data: Record<string, unknown>,
+): EcomCreditsSettlementDetail | null {
+  const credits = typeof data.creditsCharged === "number" && Number.isFinite(data.creditsCharged)
+    ? data.creditsCharged
+    : 0;
+  const chargeId = typeof data.chargeId === "string" ? data.chargeId.trim() : "";
+  if (!(credits > 0) || chargeId.length <= 8) return null;
+  return { logId: chargeId, phase: "consumed", credits };
+}
+
+export function announceEcomCreditsConsumed(data: Record<string, unknown>): void {
+  if (typeof window === "undefined") return;
+  const detail = creditsConsumedDetail(data);
+  if (!detail) return;
+  window.dispatchEvent(new CustomEvent(ECOM_CREDITS_SETTLEMENT_EVENT, { detail }));
+}
+
 export function collectEcomGatewayLogIds(data: Record<string, unknown>): string[] {
   const ids: string[] = [];
   const push = (value: unknown) => {

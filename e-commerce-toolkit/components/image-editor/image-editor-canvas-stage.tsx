@@ -60,6 +60,8 @@ type Props = {
   flipV?: boolean;
   filterStyle?: string;
   correctionCss?: string;
+  /** 按住对比时显示的原图。和当前图不同才切换。 */
+  compareUrl?: string | null;
   naturalWidth: number;
   naturalHeight: number;
   canvasWidth: number;
@@ -209,6 +211,7 @@ export function ImageEditorCanvasStage({
   flipV = false,
   filterStyle,
   correctionCss,
+  compareUrl,
   naturalWidth,
   naturalHeight,
   canvasWidth,
@@ -282,7 +285,7 @@ export function ImageEditorCanvasStage({
     e.stopPropagation();
     e.currentTarget.setPointerCapture(e.pointerId);
     clearCompareTimer();
-    compareTimer.current = window.setTimeout(() => setComparing(true), 180);
+    setComparing(true);
   };
 
   const endCompare = (e: ReactPointerEvent<HTMLButtonElement>) => {
@@ -497,6 +500,7 @@ export function ImageEditorCanvasStage({
   }, [canvasHeight, canvasWidth, frameLayout.width, resizePlace]);
 
   const backdrop = baseDisplayUrl ?? displayUrl ?? imageUrl;
+  const heldOriginal = comparing && compareUrl ? compareUrl : null;
   const showCropResult = frameInteract && !cropDragging && Boolean(cropPreviewUrl);
 
   const layerRows = useMemo(() => {
@@ -707,7 +711,7 @@ export function ImageEditorCanvasStage({
               <>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={imageUrl ?? backdrop ?? ""}
+                  src={heldOriginal ?? imageUrl ?? backdrop ?? ""}
                   alt=""
                   className="pointer-events-none absolute inset-0 h-full w-full object-contain"
                   style={composeFrameImageStyle(
@@ -740,7 +744,7 @@ export function ImageEditorCanvasStage({
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <div className={cn("absolute inset-0", resizeInteract && "overflow-hidden")}>
               <img
-                src={resizeInteract ? (imageUrl ?? backdrop) : backdrop}
+                src={heldOriginal ?? (resizeInteract ? (imageUrl ?? backdrop) : backdrop)}
                 alt="编辑底图"
                 className={cn(
                   "absolute",
@@ -901,7 +905,7 @@ export function ImageEditorCanvasStage({
                 <>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={displayUrl ?? imageUrl ?? ""}
+                    src={heldOriginal ?? displayUrl ?? imageUrl ?? ""}
                     alt="编辑预览"
                     className={cn(
                       "absolute inset-0 h-full w-full",
