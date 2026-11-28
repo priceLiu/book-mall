@@ -10,7 +10,7 @@ import {
   RotateCcw,
   RotateCw,
 } from "lucide-react";
-import { useEffect, useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 
 import { ImageEditorShapeGrid } from "@/components/image-editor/image-editor-shape-grid";
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
@@ -58,6 +58,8 @@ type Props = {
   shapeMask: ImageEditorShapeMaskId;
   onShapeMask: (id: ImageEditorShapeMaskId) => void;
   onRatioPreset: (w: number, h: number) => void;
+  sectionOpen: boolean;
+  onSectionOpenChange: (open: boolean) => void;
 };
 
 const TABS: Array<{ id: ImageEditorAdjustTab; label: string }> = [
@@ -67,11 +69,7 @@ const TABS: Array<{ id: ImageEditorAdjustTab; label: string }> = [
 ];
 
 export function ImageEditorAdjustPanel(props: Props) {
-  const [sectionOpen, setSectionOpen] = useState(true);
-
-  useEffect(() => {
-    if (props.correctionOpen) setSectionOpen(false);
-  }, [props.correctionOpen]);
+  const sectionOpen = props.sectionOpen;
 
   return (
     <div className="space-y-3">
@@ -81,10 +79,10 @@ export function ImageEditorAdjustPanel(props: Props) {
           className="flex w-full items-center justify-between px-3 py-2.5 text-left"
           onClick={() => {
             if (sectionOpen) {
-              setSectionOpen(false);
+              props.onSectionOpenChange(false);
               return;
             }
-            setSectionOpen(true);
+            props.onSectionOpenChange(true);
             props.onCloseCorrection();
           }}
         >

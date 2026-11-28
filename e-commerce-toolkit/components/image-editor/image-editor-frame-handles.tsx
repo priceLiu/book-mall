@@ -9,6 +9,14 @@ import {
 import type { ImageEditorFrameResizeHandleId } from "@/lib/image-editor-frame-resize";
 import { cn } from "@/lib/utils";
 
+export function imageEditorFrameHandleClass(id: ImageEditorFrameResizeHandleId): string {
+  return cn(
+    "pointer-events-auto absolute touch-none select-none rounded-sm border border-[var(--ie-cream)] bg-[var(--ie-border)] shadow-sm disabled:opacity-40",
+    id === "n" || id === "s" ? "h-4 w-10" : id === "e" || id === "w" ? "h-10 w-4" : "h-4 w-4",
+    HANDLE_POS[id],
+  );
+}
+
 const HANDLE_POS: Record<ImageEditorFrameResizeHandleId, string> = {
   nw: "left-0 top-0 -translate-x-1/2 -translate-y-1/2 cursor-nwse-resize",
   n: "left-1/2 top-0 -translate-x-1/2 -translate-y-1/2 cursor-ns-resize",
@@ -106,11 +114,7 @@ export function ImageEditorFrameHandles({
           disabled={disabled}
           aria-label={`裁切 ${id}`}
           style={{ touchAction: "none" }}
-          className={cn(
-            "pointer-events-auto absolute touch-none select-none rounded-sm border border-[var(--ie-cream)] bg-[var(--ie-border)] shadow-sm disabled:opacity-40",
-            id === "n" || id === "s" ? "h-4 w-10" : id === "e" || id === "w" ? "h-10 w-4" : "h-4 w-4",
-            HANDLE_POS[id],
-          )}
+          className={imageEditorFrameHandleClass(id)}
           onPointerDown={onHandleDown(id)}
         />
       ))}

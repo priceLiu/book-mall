@@ -35,6 +35,7 @@ import {
   writeImageEditorSession,
   type ImageEditorSessionSnapshot,
 } from "@/lib/image-editor-persist";
+import { placeImageInCanvas } from "@/lib/image-editor-frame-resize";
 import { exportImageEditorFrame, renderImageEditorCropRegion, renderImageEditorFrame } from "@/lib/image-editor-render";
 import { cropRectForRatio, fullImageCropRect, type ImageEditorCropRect } from "@/lib/image-editor-crop-rect";
 import { takeImageEditorImportUrl } from "@/lib/image-editor-session";
@@ -137,7 +138,51 @@ function loadImage(src: string): Promise<HTMLImageElement> {
   });
 }
 
-type HistoryEntry = { url: string; canvasW: number; canvasH: number };
+/** 从当前画面往回，最多保留 5 步。 */
+const IMAGE_EDITOR_UNDO_STEPS = 5;
+
+type HistoryEntry = {
+  url: string;
+  canvasW: number;
+  canvasH: number;
+  rotateDeg: number;
+  flipH: boolean;
+  flipV: boolean;
+  offsetX: number;
+  offsetY: number;
+  shapeMask: ImageEditorShapeMaskId;
+  crop: ImageEditorCropRect | null;
+  correction: ImageEditorCorrection;
+};
+
+function historyEntriesEqual(a: HistoryEntry, b: HistoryEntry): boolean {
+  const sameCrop = (p: ImageEditorCropRect | null, q: ImageEditorCropRect | null) => {
+    if (!p && !q) return true;
+    if (!p || !q) return false;
+    return (
+      Math.abs(p.x - q.x) < 1 &&
+      Math.abs(p.y - q.y) < 1 &&
+      Math.abs(p.w - q.w) < 1 &&
+      Math.abs(p.h - q.h) < 1
+    );
+  };
+  return (
+    a.url === b.url &&
+    a.canvasW === b.canvasW &&
+    a.canvasH === b.canvasH &&
+    a.rotateDeg === b.rotateDeg &&
+    a.flipH === b.flipH &&
+    a.flipV === b.flipV &&
+    a.offsetX === b.offsetX &&
+    a.offsetY === b.offsetY &&
+    a.shapeMask === b.shapeMask &&
+    sameCrop(a.crop, b.crop) &&
+    a.correction.vertical === b.correction.vertical &&
+    a.correction.horizontal === b.correction.horizontal &&
+    a.correction.center === b.correction.center &&
+    a.correction.rotate === b.correction.rotate
+  );
+}
 
 const DEFAULT_CANVAS = 2048;
 const CUTOUT_SUBJECT_IDS = new Set(["off", "portrait", "product", "icon", "apparel"]);
@@ -163,6 +208,21 @@ export function ImageEditorStudio() {
   const [assetOpen, setAssetOpen] = useState(false);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [historyIdx, setHistoryIdx] = useState(-1);
+  const historyIdxRef = useRef(-1);
+  const historyRef = useRef<HistoryEntry[]>([]);
+  const liveRef = useRef<HistoryEntry | null>(null);
+  const stepTimerRef = useRef(0);
+  const [adjustSectionOpen, setAdjustSectionOpen] = useState(true);
+  const [savedAt, setSavedAt] = useState<Date | null>(null);
+  const baselineRef = useRef<{
+    canvasW: number;
+    canvasH: number;
+    rotateDeg: number;
+    flipH: boolean;
+    flipV: boolean;
+    offsetX: number;
+    offsetY: number;
+  } | null>(null);
   const [modelsLoaded, setModelsLoaded] = useState(false);
   const [erasePrompt, setErasePrompt] = useState("移除画面中的干扰物体");
   const [eraseTab, setEraseTab] = useState<"manual" | "ai">("ai");
@@ -182,6 +242,9 @@ export function ImageEditorStudio() {
   const [contrast, setContrast] = useState(100);
   const [saturate, setSaturate] = useState(100);
   const [losslessResize, setLosslessResize] = useState(true);
+  const [frameOffset, setFrameOffset] = useState({ x: 0, y: 0 });
+  const frameOffsetRef = useRef(frameOffset);
+  frameOffsetRef.current = frameOffset;
   const [customPresets, setCustomPresets] = useState<ImageEditorPresetSize[]>([]);
   const [correctionOpen, setCorrectionOpen] = useState(false);
   const [correction, setCorrection] = useState<ImageEditorCorrection>(IMAGE_EDITOR_CORRECTION_DEFAULT);
@@ -192,14 +255,38 @@ export function ImageEditorStudio() {
   const [cropRect, setCropRect] = useState<ImageEditorCropRect | null>(null);
   const cropRectRef = useRef<ImageEditorCropRect | null>(null);
   const cropDraftRef = useRef<ImageEditorCropRect | null>(null);
+  /** 当前 naturalW/H 属于哪张图。换图后，旧尺寸不能再参与裁切框和底图绘制。 */
+  const naturalSrcRef = useRef<string | null>(null);
   cropRectRef.current = cropRect;
+  const cropAlignedUrlRef = useRef<string | null>(null);
+  liveRef.current = imageUrl
+    ? {
+        url: imageUrl,
+        canvasW,
+        canvasH,
+        rotateDeg,
+        flipH,
+        flipV,
+        offsetX: frameOffset.x,
+        offsetY: frameOffset.y,
+        shapeMask,
+        crop: cropRect,
+        correction,
+      }
+    : null;
   const hydratedRef = useRef(false);
   const keepCutoutRef = useRef(false);
   const persistImageUrlRef = useRef<string | null>(null);
   const [sessionPersistUrl, setSessionPersistUrl] = useState<string | null>(null);
-  const adjustDraftRef = useRef<{ w: number; h: number; rotateDeg: number; flipH: boolean; flipV: boolean } | null>(
-    null,
-  );
+  const adjustDraftRef = useRef<{
+    w: number;
+    h: number;
+    rotateDeg: number;
+    flipH: boolean;
+    flipV: boolean;
+    offsetX: number;
+    offsetY: number;
+  } | null>(null);
   const textStyleClipboardRef = useRef<ImageEditorTextStyleClipboard | null>(null);
   const shapeDraftRef = useRef<{
     w: number;
@@ -223,16 +310,44 @@ export function ImageEditorStudio() {
     [brightness, contrast, saturate],
   );
 
-  const pushHistory = useCallback(
-    (url: string, w: number, h: number) => {
-      setHistory((prev) => {
-        const trimmed = prev.slice(0, historyIdx + 1);
-        return [...trimmed, { url, canvasW: w, canvasH: h }];
-      });
-      setHistoryIdx((i) => i + 1);
-    },
-    [historyIdx],
-  );
+  const rememberStep = useCallback((patch?: Partial<HistoryEntry>) => {
+    window.clearTimeout(stepTimerRef.current);
+    const live = liveRef.current;
+    const url = patch?.url ?? live?.url;
+    if (!url) return;
+    const entry: HistoryEntry = {
+      url,
+      canvasW: patch?.canvasW ?? live?.canvasW ?? 0,
+      canvasH: patch?.canvasH ?? live?.canvasH ?? 0,
+      rotateDeg: patch?.rotateDeg ?? live?.rotateDeg ?? 0,
+      flipH: patch?.flipH ?? live?.flipH ?? false,
+      flipV: patch?.flipV ?? live?.flipV ?? false,
+      offsetX: patch?.offsetX ?? live?.offsetX ?? 0,
+      offsetY: patch?.offsetY ?? live?.offsetY ?? 0,
+      shapeMask: patch?.shapeMask ?? live?.shapeMask ?? "none",
+      crop: patch && Object.prototype.hasOwnProperty.call(patch, "crop") ? (patch.crop ?? null) : (live?.crop ?? null),
+      correction: patch?.correction ?? live?.correction ?? IMAGE_EDITOR_CORRECTION_DEFAULT,
+    };
+    const head = historyRef.current[historyIdxRef.current];
+    if (head && historyEntriesEqual(head, entry)) return;
+    let nextIdx = historyIdxRef.current + 1;
+    let next = [...historyRef.current.slice(0, nextIdx), entry];
+    const maxEntries = IMAGE_EDITOR_UNDO_STEPS + 1;
+    if (next.length > maxEntries) {
+      const drop = next.length - maxEntries;
+      next = next.slice(drop);
+      nextIdx -= drop;
+    }
+    historyRef.current = next;
+    historyIdxRef.current = nextIdx;
+    setHistory(next);
+    setHistoryIdx(nextIdx);
+  }, []);
+
+  const scheduleStep = useCallback(() => {
+    window.clearTimeout(stepTimerRef.current);
+    stepTimerRef.current = window.setTimeout(() => rememberStep(), 400);
+  }, [rememberStep]);
 
   const applyUrl = useCallback(
     (url: string, w?: number, h?: number) => {
@@ -243,16 +358,53 @@ export function ImageEditorStudio() {
       }
       setImageUrl(url);
       setDisplayUrl(url);
+      setFrameOffset({ x: 0, y: 0 });
+      setBaseDisplayUrl(null);
+      setCropPreviewUrl(null);
+      naturalSrcRef.current = null;
+      setNaturalW(0);
+      setNaturalH(0);
       void loadImage(url).then((img) => {
         const nw = img.naturalWidth;
         const nh = img.naturalHeight;
+        naturalSrcRef.current = url;
         setNaturalW(nw);
         setNaturalH(nh);
         const cw = w ?? nw;
         const ch = h ?? nh;
         setCanvasW(cw);
         setCanvasH(ch);
-        pushHistory(url, cw, ch);
+        baselineRef.current = {
+          canvasW: cw,
+          canvasH: ch,
+          rotateDeg: 0,
+          flipH: false,
+          flipV: false,
+          offsetX: 0,
+          offsetY: 0,
+        };
+        cropAlignedUrlRef.current = url;
+        const full = { x: 0, y: 0, w: nw, h: nh };
+        cropRectRef.current = full;
+        setCropRect(full);
+        setRotateDeg(0);
+        setFlipH(false);
+        setFlipV(false);
+        setShapeMask("none");
+        setCorrection(IMAGE_EDITOR_CORRECTION_DEFAULT);
+        rememberStep({
+          url,
+          canvasW: cw,
+          canvasH: ch,
+          rotateDeg: 0,
+          flipH: false,
+          flipV: false,
+          offsetX: 0,
+          offsetY: 0,
+          shapeMask: "none",
+          crop: { x: 0, y: 0, w: nw, h: nh },
+          correction: IMAGE_EDITOR_CORRECTION_DEFAULT,
+        });
       });
       void persistableImageUrl(url).then(({ url: persisted, omitted }) => {
         if (omitted) {
@@ -265,7 +417,7 @@ export function ImageEditorStudio() {
         setSessionPersistUrl(next);
       });
     },
-    [pushHistory],
+    [rememberStep],
   );
 
   useEffect(() => {
@@ -332,6 +484,10 @@ export function ImageEditorStudio() {
           snapCanvasOk ? snap.canvasW : undefined,
           snapCanvasOk ? snap.canvasH : undefined,
         );
+        setFrameOffset({
+          x: Number.isFinite(snap.frameOffsetX) ? snap.frameOffsetX! : 0,
+          y: Number.isFinite(snap.frameOffsetY) ? snap.frameOffsetY! : 0,
+        });
         keepCutoutRef.current = false;
       }
       return;
@@ -341,23 +497,28 @@ export function ImageEditorStudio() {
   }, [applyUrl, toast]);
 
   useEffect(() => {
-    if (tool === "adjust" && imageUrl && !adjustDraftRef.current) {
-      adjustDraftRef.current = {
-        w: canvasW,
-        h: canvasH,
-        rotateDeg,
-        flipH,
-        flipV,
-      };
+    if (tool !== "adjust") {
+      adjustDraftRef.current = null;
+      return;
     }
-    if (tool !== "adjust") adjustDraftRef.current = null;
-  }, [tool, imageUrl, canvasW, canvasH, rotateDeg, flipH, flipV]);
+    if (!imageUrl || naturalW < 1 || naturalH < 1 || adjustDraftRef.current) return;
+    adjustDraftRef.current = {
+      w: naturalW,
+      h: naturalH,
+      rotateDeg,
+      flipH,
+      flipV,
+      offsetX: frameOffsetRef.current.x,
+      offsetY: frameOffsetRef.current.y,
+    };
+  }, [tool, imageUrl, naturalW, naturalH, rotateDeg, flipH, flipV]);
 
   const shapeOverlay =
     tool === "adjust" && Boolean(imageUrl) && shapeMask !== "none";
 
   /** 比例裁剪与尺寸调整只在「裁剪/旋转/尺寸」展开时生效 */
-  const cropSectionActive = tool === "adjust" && Boolean(imageUrl) && !correctionOpen;
+  const cropSectionActive =
+    tool === "adjust" && Boolean(imageUrl) && adjustSectionOpen && !correctionOpen;
 
   const canvasCropInteract = cropSectionActive && adjustTab === "ratio";
 
@@ -394,8 +555,8 @@ export function ImageEditorStudio() {
         flipH,
         flipV,
         shapeMask: previewClipInRender,
-        fitInside: adjustTab === "resize" ? false : losslessResize,
-        stretch: adjustTab === "resize",
+        fitInside: losslessResize,
+        stretch: false,
         filterStyle: activeFilterStyle,
         previewMaxEdge: 1600,
       })
@@ -663,7 +824,7 @@ export function ImageEditorStudio() {
 
   /** 裁切交互：底图固定在原图档（仅旋转/滤镜），不随裁切框缩放 */
   useEffect(() => {
-    if (!imageUrl || !canvasFrameInteract || naturalW < 1) {
+    if (!imageUrl || !canvasFrameInteract || naturalW < 1 || naturalSrcRef.current !== imageUrl) {
       setBaseDisplayUrl(null);
       return;
     }
@@ -714,6 +875,23 @@ export function ImageEditorStudio() {
     }
   }, [canvasCropInteract, cropRect]);
 
+  useEffect(() => {
+    if (naturalW < 1 || naturalH < 1) return;
+    setFrameOffset((prev) => {
+      const next = placeImageInCanvas({
+        canvasW,
+        canvasH,
+        imageW: naturalW,
+        imageH: naturalH,
+        fitInside: losslessResize,
+        offsetX: prev.x,
+        offsetY: prev.y,
+      });
+      if (next.offsetX === prev.x && next.offsetY === prev.y) return prev;
+      return { x: next.offsetX, y: next.offsetY };
+    });
+  }, [canvasH, canvasW, losslessResize, naturalH, naturalW]);
+
   const cancelResizeEdit = useCallback(() => {
     const d = adjustDraftRef.current;
     if (!d) return;
@@ -722,6 +900,7 @@ export function ImageEditorStudio() {
     setRotateDeg(d.rotateDeg);
     setFlipH(d.flipH);
     setFlipV(d.flipV);
+    setFrameOffset({ x: d.offsetX ?? 0, y: d.offsetY ?? 0 });
   }, []);
 
   const cancelCropEdit = useCallback(() => {
@@ -768,11 +947,12 @@ export function ImageEditorStudio() {
   }, [adjustTab, imageUrl, shapeMask]);
 
   useEffect(() => {
-    if (naturalW > 0 && naturalH > 0) {
-      const next = fullImageCropRect(naturalW, naturalH);
-      setCropRect(next);
-      cropRectRef.current = next;
-    }
+    if (!imageUrl || naturalSrcRef.current !== imageUrl || naturalW < 1 || naturalH < 1) return;
+    if (cropAlignedUrlRef.current === imageUrl) return;
+    cropAlignedUrlRef.current = imageUrl;
+    const next = fullImageCropRect(naturalW, naturalH);
+    setCropRect(next);
+    cropRectRef.current = next;
   }, [imageUrl, naturalH, naturalW]);
 
   const clearImage = useCallback(async () => {
@@ -788,6 +968,7 @@ export function ImageEditorStudio() {
     setDisplayUrl(null);
     setBaseDisplayUrl(null);
     setCropPreviewUrl(null);
+    naturalSrcRef.current = null;
     setNaturalW(0);
     setNaturalH(0);
     setCanvasW(DEFAULT_CANVAS);
@@ -796,8 +977,13 @@ export function ImageEditorStudio() {
     setFlipH(false);
     setFlipV(false);
     setShapeMask("none");
+    setFrameOffset({ x: 0, y: 0 });
     setHistory([]);
+    historyRef.current = [];
+    historyIdxRef.current = -1;
     setHistoryIdx(-1);
+    window.clearTimeout(stepTimerRef.current);
+    baselineRef.current = null;
     adjustDraftRef.current = null;
     shapeDraftRef.current = null;
     setTextDoc(emptyImageEditorTextDocument(DEFAULT_CANVAS));
@@ -819,6 +1005,8 @@ export function ImageEditorStudio() {
       flipV: false,
       shapeMask: "none",
       losslessResize,
+      frameOffsetX: 0,
+      frameOffsetY: 0,
       lockAspect,
       correctionOpen,
       brightness,
@@ -863,6 +1051,8 @@ export function ImageEditorStudio() {
       flipV,
       shapeMask,
       losslessResize,
+      frameOffsetX: frameOffset.x,
+      frameOffsetY: frameOffset.y,
       lockAspect,
       correctionOpen,
       brightness,
@@ -882,7 +1072,10 @@ export function ImageEditorStudio() {
       cutoutSubject,
       cutoutResultUrl: sessionCutoutResultUrl(cutoutResultUrl),
     };
-    const t = window.setTimeout(() => writeImageEditorSession(snapshot), 500);
+    const t = window.setTimeout(() => {
+      writeImageEditorSession(snapshot);
+      setSavedAt(new Date());
+    }, 500);
     return () => window.clearTimeout(t);
   }, [
     tool,
@@ -894,6 +1087,7 @@ export function ImageEditorStudio() {
     flipV,
     shapeMask,
     losslessResize,
+    frameOffset,
     lockAspect,
     correctionOpen,
     brightness,
@@ -962,8 +1156,13 @@ export function ImageEditorStudio() {
       setCropRect(next);
       setLockAspect(true);
       bakeCropPreview(next);
+      rememberStep({
+        crop: next,
+        canvasW: Math.max(1, Math.round(next.w)),
+        canvasH: Math.max(1, Math.round(next.h)),
+      });
     },
-    [bakeCropPreview, naturalH, naturalW],
+    [bakeCropPreview, naturalH, naturalW, rememberStep],
   );
 
   const captureShapeDraft = useCallback(() => {
@@ -987,12 +1186,13 @@ export function ImageEditorStudio() {
     (id: ImageEditorShapeMaskId) => {
       captureShapeDraft();
       setShapeMask(id);
-      if (id !== "none" && naturalW > 0 && naturalH > 0 && (canvasW < 200 || canvasH < 200)) {
-        setCanvasW(naturalW);
-        setCanvasH(naturalH);
-      }
+      const nextW = id !== "none" && naturalW > 0 && naturalH > 0 && (canvasW < 200 || canvasH < 200) ? naturalW : canvasW;
+      const nextH = id !== "none" && naturalW > 0 && naturalH > 0 && (canvasW < 200 || canvasH < 200) ? naturalH : canvasH;
+      if (nextW !== canvasW) setCanvasW(nextW);
+      if (nextH !== canvasH) setCanvasH(nextH);
+      rememberStep({ shapeMask: id, canvasW: nextW, canvasH: nextH });
     },
-    [canvasH, canvasW, captureShapeDraft, naturalH, naturalW],
+    [canvasH, canvasW, captureShapeDraft, naturalH, naturalW, rememberStep],
   );
 
   const cancelShapeMaskEdit = useCallback(() => {
@@ -1016,6 +1216,7 @@ export function ImageEditorStudio() {
     } else {
       setCanvasW(next);
     }
+    scheduleStep();
   };
 
   const setTargetHeight = (h: number) => {
@@ -1027,6 +1228,7 @@ export function ImageEditorStudio() {
     } else {
       setCanvasH(next);
     }
+    scheduleStep();
   };
 
   const commitExport = async () => {
@@ -1044,9 +1246,31 @@ export function ImageEditorStudio() {
         setCorrection(IMAGE_EDITOR_CORRECTION_DEFAULT);
         setImageUrl(out);
         setDisplayUrl(out);
+        naturalSrcRef.current = out;
         persistImageUrlRef.current = out;
         setSessionPersistUrl(out);
-        pushHistory(out, outW, outH);
+        baselineRef.current = {
+          canvasW,
+          canvasH,
+          rotateDeg,
+          flipH,
+          flipV,
+          offsetX: frameOffset.x,
+          offsetY: frameOffset.y,
+        };
+        cropAlignedUrlRef.current = out;
+        rememberStep({
+          url: out,
+          canvasW,
+          canvasH,
+          rotateDeg,
+          flipH,
+          flipV,
+          offsetX: frameOffset.x,
+          offsetY: frameOffset.y,
+          correction: IMAGE_EDITOR_CORRECTION_DEFAULT,
+          crop: naturalW > 0 && naturalH > 0 ? { x: 0, y: 0, w: naturalW, h: naturalH } : null,
+        });
         toast({ title: "已应用", message: "图片校正已写入", variant: "success" });
         return;
       }
@@ -1060,28 +1284,56 @@ export function ImageEditorStudio() {
           flipH,
           flipV,
           shapeMask: shapeMask,
-          fitInside: false,
-          stretch: true,
+          fitInside: losslessResize,
+          stretch: false,
+          offsetX: frameOffset.x,
+          offsetY: frameOffset.y,
           filterStyle: activeFilterStyle,
         });
         setImageUrl(out);
         setDisplayUrl(out);
+        naturalSrcRef.current = out;
         setNaturalW(outW);
         setNaturalH(outH);
         setCanvasW(outW);
         setCanvasH(outH);
+        setFrameOffset({ x: 0, y: 0 });
         persistImageUrlRef.current = out;
         setSessionPersistUrl(out);
         setRotateDeg(0);
         setFlipH(false);
         setFlipV(false);
-        pushHistory(out, outW, outH);
+        baselineRef.current = {
+          canvasW: outW,
+          canvasH: outH,
+          rotateDeg: 0,
+          flipH: false,
+          flipV: false,
+          offsetX: 0,
+          offsetY: 0,
+        };
+        cropAlignedUrlRef.current = out;
+        rememberStep({
+          url: out,
+          canvasW: outW,
+          canvasH: outH,
+          rotateDeg: 0,
+          flipH: false,
+          flipV: false,
+          offsetX: 0,
+          offsetY: 0,
+          shapeMask: "none",
+          crop: { x: 0, y: 0, w: outW, h: outH },
+          correction: IMAGE_EDITOR_CORRECTION_DEFAULT,
+        });
         adjustDraftRef.current = {
           w: outW,
           h: outH,
           rotateDeg: 0,
           flipH: false,
           flipV: false,
+          offsetX: 0,
+          offsetY: 0,
         };
         if (shapeMask !== "none") setShapeMask("none");
         toast({ title: "已应用", message: "图片尺寸已更新", variant: "success" });
@@ -1102,6 +1354,8 @@ export function ImageEditorStudio() {
       }
       setImageUrl(out);
       setDisplayUrl(out);
+      setCropPreviewUrl(null);
+      naturalSrcRef.current = out;
       setNaturalW(outW);
       setNaturalH(outH);
       setCanvasW(outW);
@@ -1111,7 +1365,29 @@ export function ImageEditorStudio() {
       setRotateDeg(0);
       setFlipH(false);
       setFlipV(false);
-      pushHistory(out, outW, outH);
+      baselineRef.current = {
+        canvasW: outW,
+        canvasH: outH,
+        rotateDeg: 0,
+        flipH: false,
+        flipV: false,
+        offsetX: 0,
+        offsetY: 0,
+      };
+      cropAlignedUrlRef.current = out;
+      rememberStep({
+        url: out,
+        canvasW: outW,
+        canvasH: outH,
+        rotateDeg: 0,
+        flipH: false,
+        flipV: false,
+        offsetX: 0,
+        offsetY: 0,
+        shapeMask: "none",
+        crop: { x: 0, y: 0, w: outW, h: outH },
+        correction: IMAGE_EDITOR_CORRECTION_DEFAULT,
+      });
       cropDraftRef.current = null;
       toast({ title: "已应用", message: "画布修改已写入当前图", variant: "success" });
     } catch (e) {
@@ -1257,28 +1533,131 @@ export function ImageEditorStudio() {
     }
   };
 
-  const undo = () => {
-    if (historyIdx <= 0) return;
-    const next = historyIdx - 1;
-    const entry = history[next];
-    if (!entry) return;
-    setHistoryIdx(next);
+  const historyLoadRef = useRef(0);
+  const restoreHistoryEntry = (entry: HistoryEntry) => {
+    const token = ++historyLoadRef.current;
+    naturalSrcRef.current = null;
+    cropDraftRef.current = null;
     setImageUrl(entry.url);
     setDisplayUrl(entry.url);
+    setBaseDisplayUrl(null);
+    setCropPreviewUrl(null);
+    setNaturalW(0);
+    setNaturalH(0);
     setCanvasW(entry.canvasW);
     setCanvasH(entry.canvasH);
+    setRotateDeg(entry.rotateDeg);
+    setFlipH(entry.flipH);
+    setFlipV(entry.flipV);
+    setShapeMask(entry.shapeMask);
+    setCorrection(entry.correction);
+    setFrameOffset({ x: entry.offsetX, y: entry.offsetY });
+    cropAlignedUrlRef.current = entry.url;
+    if (entry.crop) {
+      cropRectRef.current = entry.crop;
+      setCropRect(entry.crop);
+    }
+    baselineRef.current = {
+      canvasW: entry.canvasW,
+      canvasH: entry.canvasH,
+      rotateDeg: entry.rotateDeg,
+      flipH: entry.flipH,
+      flipV: entry.flipV,
+      offsetX: entry.offsetX,
+      offsetY: entry.offsetY,
+    };
+    void loadImage(entry.url).then((img) => {
+      if (historyLoadRef.current !== token) return;
+      const nw = img.naturalWidth;
+      const nh = img.naturalHeight;
+      naturalSrcRef.current = entry.url;
+      setNaturalW(nw);
+      setNaturalH(nh);
+      if (!entry.crop) {
+        const next = fullImageCropRect(nw, nh);
+        cropRectRef.current = next;
+        setCropRect(next);
+      }
+    });
+  };
+
+  const historyHead = historyIdx >= 0 ? history[historyIdx] : undefined;
+  const viewDirty = Boolean(
+    imageUrl &&
+      historyHead &&
+      !historyEntriesEqual(historyHead, {
+        url: imageUrl,
+        canvasW,
+        canvasH,
+        rotateDeg,
+        flipH,
+        flipV,
+        offsetX: frameOffset.x,
+        offsetY: frameOffset.y,
+        shapeMask,
+        crop: cropRect,
+        correction,
+      }),
+  );
+
+  const revertUncommitted = () => {
+    window.clearTimeout(stepTimerRef.current);
+    setRotateDeg(0);
+    setFlipH(false);
+    setFlipV(false);
+    setFrameOffset({ x: 0, y: 0 });
+    setShapeMask("none");
+    setCorrection(IMAGE_EDITOR_CORRECTION_DEFAULT);
+    setCropPreviewUrl(null);
+    setBaseDisplayUrl(null);
+    if (imageUrl) setDisplayUrl(imageUrl);
+    if (naturalW > 0 && naturalH > 0) {
+      setCanvasW(naturalW);
+      setCanvasH(naturalH);
+      const next = fullImageCropRect(naturalW, naturalH);
+      cropRectRef.current = next;
+      setCropRect(next);
+      baselineRef.current = {
+        canvasW: naturalW,
+        canvasH: naturalH,
+        rotateDeg: 0,
+        flipH: false,
+        flipV: false,
+        offsetX: 0,
+        offsetY: 0,
+      };
+    }
+    adjustDraftRef.current = null;
+    cropDraftRef.current = null;
+  };
+
+  const undo = () => {
+    window.clearTimeout(stepTimerRef.current);
+    const stack = historyRef.current;
+    const idx = historyIdxRef.current;
+    if (viewDirty && stack[idx]) {
+      restoreHistoryEntry(stack[idx]);
+      return;
+    }
+    if (idx <= 0) return;
+    const entry = stack[idx - 1];
+    if (!entry) return;
+    historyIdxRef.current = idx - 1;
+    setHistoryIdx(idx - 1);
+    restoreHistoryEntry(entry);
   };
 
   const redo = () => {
-    if (historyIdx >= history.length - 1) return;
-    const next = historyIdx + 1;
-    const entry = history[next];
+    window.clearTimeout(stepTimerRef.current);
+    if (viewDirty) return;
+    const stack = historyRef.current;
+    const idx = historyIdxRef.current;
+    if (idx >= stack.length - 1) return;
+    const entry = stack[idx + 1];
     if (!entry) return;
-    setHistoryIdx(next);
-    setImageUrl(entry.url);
-    setDisplayUrl(entry.url);
-    setCanvasW(entry.canvasW);
-    setCanvasH(entry.canvasH);
+    historyIdxRef.current = idx + 1;
+    setHistoryIdx(idx + 1);
+    restoreHistoryEntry(entry);
   };
 
   const download = () => {
@@ -1348,12 +1727,16 @@ export function ImageEditorStudio() {
             onPreset={(w, h) => {
               setCanvasW(w);
               setCanvasH(h);
+              setFrameOffset({ x: 0, y: 0 });
+              rememberStep({ canvasW: w, canvasH: h, offsetX: 0, offsetY: 0 });
             }}
             onFreeCrop={() => {
               if (naturalW < 1 || naturalH < 1) return;
               if (adjustTab === "resize") {
                 setCanvasW(naturalW);
                 setCanvasH(naturalH);
+                setFrameOffset({ x: 0, y: 0 });
+                rememberStep({ canvasW: naturalW, canvasH: naturalH, offsetX: 0, offsetY: 0 });
                 return;
               }
               const next = fullImageCropRect(naturalW, naturalH);
@@ -1361,33 +1744,57 @@ export function ImageEditorStudio() {
               setCropRect(next);
               setCanvasW(naturalW);
               setCanvasH(naturalH);
+              rememberStep({ canvasW: naturalW, canvasH: naturalH, crop: next });
             }}
-            onRotateCw={() => setRotateDeg((d) => stepRotateDeg(d, 45))}
-            onRotateCcw={() => setRotateDeg((d) => stepRotateDeg(d, -45))}
-            onFlipH={() => setFlipH((v) => !v)}
-            onFlipV={() => setFlipV((v) => !v)}
+            onRotateCw={() => {
+              const next = stepRotateDeg(rotateDeg, 45);
+              setRotateDeg(next);
+              rememberStep({ rotateDeg: next });
+            }}
+            onRotateCcw={() => {
+              const next = stepRotateDeg(rotateDeg, -45);
+              setRotateDeg(next);
+              rememberStep({ rotateDeg: next });
+            }}
+            onFlipH={() => {
+              setFlipH((v) => !v);
+              rememberStep({ flipH: !flipH });
+            }}
+            onFlipV={() => {
+              setFlipV((v) => !v);
+              rememberStep({ flipV: !flipV });
+            }}
             onCancel={() => {
-              if (adjustTab === "shape") {
-                cancelShapeMaskEdit();
-                return;
-              }
-              if (adjustTab === "resize") {
-                cancelResizeEdit();
-                return;
-              }
-              cancelCropEdit();
+              revertUncommitted();
+              setAdjustSectionOpen(false);
+              setCorrectionOpen(false);
+            }}
+            sectionOpen={adjustSectionOpen}
+            onSectionOpenChange={(open) => {
+              setAdjustSectionOpen(open);
+              if (open) setCorrectionOpen(false);
             }}
             onApply={() => void commitExport()}
             busy={busy}
             hasImage={Boolean(imageUrl)}
             correctionOpen={correctionOpen}
-            onToggleCorrection={() => setCorrectionOpen((open) => !open)}
+            onToggleCorrection={() => {
+              if (correctionOpen) {
+                setCorrectionOpen(false);
+                return;
+              }
+              setAdjustSectionOpen(false);
+              setCorrectionOpen(true);
+            }}
             onCloseCorrection={() => setCorrectionOpen(false)}
             correctionPanel={
               <ImageCorrectionPanel
                 value={correction}
                 disabled={!imageUrl || busy}
-                onChange={setCorrection}
+                onChange={(next) => {
+                  setCorrection(next);
+                  scheduleStep();
+                }}
                 onReset={() => setCorrection(IMAGE_EDITOR_CORRECTION_DEFAULT)}
               />
             }
@@ -1550,8 +1957,13 @@ export function ImageEditorStudio() {
       <EcomWorkspaceLayout fullWidth contentClassName="min-h-0 !bg-[#f5efe6]">
       <div data-image-editor-theme className="flex h-full min-h-0 flex-col bg-[var(--ie-cream-deep)]">
         <ImageEditorHeader
-          canUndo={historyIdx > 0}
-          canRedo={historyIdx < history.length - 1 && history.length > 0}
+          canUndo={viewDirty || historyIdx > 0}
+          canRedo={!viewDirty && historyIdx < history.length - 1 && history.length > 0}
+          savedLabel={
+            savedAt
+              ? `${String(savedAt.getHours()).padStart(2, "0")}:${String(savedAt.getMinutes()).padStart(2, "0")} 已保存`
+              : null
+          }
           canDownload={Boolean(imageUrl)}
           onUndo={undo}
           onRedo={redo}
@@ -1646,6 +2058,21 @@ export function ImageEditorStudio() {
               lockAspect={lockAspect}
               shapeMask={previewShapeMask}
               fitInside={losslessResize}
+              frameOffsetX={frameOffset.x}
+              frameOffsetY={frameOffset.y}
+              onFrameOffset={(x, y) => {
+                const next = placeImageInCanvas({
+                  canvasW,
+                  canvasH,
+                  imageW: Math.max(1, naturalW),
+                  imageH: Math.max(1, naturalH),
+                  fitInside: losslessResize,
+                  offsetX: x,
+                  offsetY: y,
+                });
+                setFrameOffset({ x: next.offsetX, y: next.offsetY });
+                scheduleStep();
+              }}
               rotateDeg={rotateDeg}
               flipH={flipH}
               flipV={flipV}

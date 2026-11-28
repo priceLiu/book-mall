@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronDown, Download, PanelLeft, PanelRight, Redo2, Undo2, Upload } from "lucide-react";
+import { Check, ChevronDown, Cloud, Download, PanelLeft, PanelRight, Redo2, Undo2, Upload } from "lucide-react";
 import { useState } from "react";
 
 import { EcomButtonPrimary, EcomButtonSecondary } from "@/components/ui/ecom-button";
@@ -21,6 +21,8 @@ type Props = {
   panelsDisabled?: boolean;
   onToggleLeft: () => void;
   onToggleRight: () => void;
+  /** 自动保存完成后的时间文案，例如 10:49 已保存 */
+  savedLabel?: string | null;
 };
 
 export function ImageEditorHeader({
@@ -37,6 +39,7 @@ export function ImageEditorHeader({
   onToggleLeft,
   onToggleRight,
   panelsDisabled = false,
+  savedLabel,
 }: Props) {
   const [fileOpen, setFileOpen] = useState(false);
 
@@ -65,6 +68,16 @@ export function ImageEditorHeader({
       </div>
 
       <div className="min-w-2 flex-1" aria-hidden />
+
+      {savedLabel ? (
+        <span className="inline-flex shrink-0 items-center gap-1.5 text-[13px] text-[var(--ie-ink)]">
+          <span className="relative inline-flex h-4 w-4 items-center justify-center" aria-hidden>
+            <Cloud className="h-4 w-4" strokeWidth={1.75} />
+            <Check className="absolute h-2 w-2" strokeWidth={3} />
+          </span>
+          {savedLabel}
+        </span>
+      ) : null}
 
       <div className="relative">
         <button
@@ -173,6 +186,7 @@ function SideSwitchButton({
       aria-label={label}
       title={label}
       disabled={disabled}
+      onClick={onClick}
       className={cn(
         "inline-flex h-8 w-11 items-center justify-center transition-colors",
         disabled && "cursor-not-allowed opacity-40",

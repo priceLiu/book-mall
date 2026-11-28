@@ -1,3 +1,4 @@
+import { placeImageInCanvas } from "@/lib/image-editor-frame-resize";
 import { clipPathForImageEditorShapeMeet } from "@/lib/image-editor-shape-mask";
 import type { ImageEditorTransform } from "@/lib/image-editor-transform";
 
@@ -56,20 +57,25 @@ export async function renderImageEditorFrame(
     ctx.filter = opts.filterStyle;
   }
 
-  ctx.translate(outW / 2, outH / 2);
+  const iw = img.naturalWidth;
+  const ih = img.naturalHeight;
+  const placed = opts.stretch
+    ? { x: 0, y: 0, w: outW, h: outH }
+    : placeImageInCanvas({
+        canvasW: outW,
+        canvasH: outH,
+        imageW: iw,
+        imageH: ih,
+        fitInside: opts.fitInside,
+        offsetX: opts.offsetX,
+        offsetY: opts.offsetY,
+      });
+  ctx.translate(placed.x + placed.w / 2, placed.y + placed.h / 2);
   ctx.rotate((opts.rotateDeg * Math.PI) / 180);
   const scaleX = opts.flipH ? -1 : 1;
   const scaleY = opts.flipV ? -1 : 1;
   ctx.scale(scaleX, scaleY);
-
-  const iw = img.naturalWidth;
-  const ih = img.naturalHeight;
-  const scale = opts.fitInside
-    ? Math.min(outW / iw, outH / ih)
-    : Math.max(outW / iw, outH / ih);
-  const dw = opts.stretch ? outW : iw * scale;
-  const dh = opts.stretch ? outH : ih * scale;
-  ctx.drawImage(img, -dw / 2, -dh / 2, dw, dh);
+  ctx.drawImage(img, -placed.w / 2, -placed.h / 2, placed.w, placed.h);
   ctx.restore();
 
   return canvas.toDataURL("image/png");

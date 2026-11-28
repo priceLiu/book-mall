@@ -9,6 +9,9 @@ export type ImageEditorTransform = {
   shapeMask: ImageEditorShapeMaskId;
   fitInside: boolean;
   filterStyle?: string;
+  /** 相对居中的位移，画布像素。尺寸调整里拖动图片时使用。 */
+  offsetX?: number;
+  offsetY?: number;
 };
 
 export function normalizeRotateDeg(deg: number): number {

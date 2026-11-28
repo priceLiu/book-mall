@@ -7,12 +7,14 @@ import { Check, Hand, Hash, Layers, Minus, Plus, RotateCw, SquareSplitHorizontal
 import {
   ImageEditorFrameHandles,
   ImageEditorRectCropRuleGrid,
+  imageEditorFrameHandleClass,
 } from "@/components/image-editor/image-editor-frame-handles";
 import { ImageEditorShapeMaskChrome, ShapeMaskDimOverlay } from "@/components/image-editor/image-editor-shape-mask-workspace";
 import { EcomMediaGeneratingBusy } from "@/components/media/ecom-media-generating-busy";
 import {
   computeCanvasSizeFromHandleDrag,
   frameScaleFromElement,
+  placeImageInCanvas,
   type ImageEditorFrameResizeHandleId,
 } from "@/lib/image-editor-frame-resize";
 import {
@@ -65,6 +67,9 @@ type Props = {
   cropRect?: ImageEditorCropRect | null;
   onCropRect?: (rect: ImageEditorCropRect) => void;
   fitInside?: boolean;
+  frameOffsetX?: number;
+  frameOffsetY?: number;
+  onFrameOffset?: (x: number, y: number) => void;
   pasteReady?: boolean;
   dragOver?: boolean;
   dropZoneProps?: DropZoneProps;
@@ -211,6 +216,9 @@ export function ImageEditorCanvasStage({
   cropRect,
   onCropRect,
   fitInside = true,
+  frameOffsetX = 0,
+  frameOffsetY = 0,
+  onFrameOffset,
   pasteReady,
   dragOver,
   dropZoneProps,
@@ -343,8 +351,8 @@ export function ImageEditorCanvasStage({
   const savedShownRef = useRef<number | null>(null);
 
   const stageAspect =
-    resizeInteract && canvasWidth > 0 && canvasHeight > 0
-      ? canvasWidth / canvasHeight
+    resizeInteract && naturalWidth > 0 && naturalHeight > 0
+      ? naturalWidth / naturalHeight
       : frameInteract && naturalWidth > 0 && naturalHeight > 0
         ? naturalWidth / naturalHeight
         : canvasWidth > 0 && canvasHeight > 0
@@ -453,6 +461,41 @@ export function ImageEditorCanvasStage({
     return mapCropRectToStage(rect, naturalWidth, naturalHeight, stagePx.width, stagePx.height);
   }, [cropRect, frameInteract, naturalHeight, naturalWidth, stagePx.height, stagePx.width]);
 
+  const resizePlace = useMemo(() => {
+    if (!resizeInteract || naturalWidth < 1 || naturalHeight < 1 || canvasWidth < 1 || canvasHeight < 1) {
+      return null;
+    }
+    return placeImageInCanvas({
+      canvasW: canvasWidth,
+      canvasH: canvasHeight,
+      imageW: naturalWidth,
+      imageH: naturalHeight,
+      fitInside,
+      offsetX: frameOffsetX,
+      offsetY: frameOffsetY,
+    });
+  }, [
+    canvasHeight,
+    canvasWidth,
+    fitInside,
+    frameOffsetX,
+    frameOffsetY,
+    naturalHeight,
+    naturalWidth,
+    resizeInteract,
+  ]);
+
+  const resizeFrameBox = useMemo(() => {
+    if (!resizePlace || frameLayout.width < 1 || resizePlace.w < 1) return null;
+    const scale = frameLayout.width / resizePlace.w;
+    return {
+      left: -resizePlace.x * scale,
+      top: -resizePlace.y * scale,
+      width: canvasWidth * scale,
+      height: canvasHeight * scale,
+    };
+  }, [canvasHeight, canvasWidth, frameLayout.width, resizePlace]);
+
   const backdrop = baseDisplayUrl ?? displayUrl ?? imageUrl;
   const showCropResult = frameInteract && !cropDragging && Boolean(cropPreviewUrl);
 
@@ -536,6 +579,35 @@ export function ImageEditorCanvasStage({
       document.addEventListener("pointerup", end);
       document.addEventListener("pointercancel", end);
     };
+
+  const onMoveResizeDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (!onFrameOffset || busy) return;
+    if ((e.target as HTMLElement).closest("button")) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const frame = e.currentTarget.closest("[data-ie-shape-frame]");
+    const { sx, sy } = frameScaleFromElement(frame, canvasWidth, canvasHeight);
+    onCanvasDragActiveChange?.(true);
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const originX = frameOffsetX;
+    const originY = frameOffsetY;
+    const pointerId = e.pointerId;
+    const onMove = (ev: PointerEvent) => {
+      if (ev.pointerId !== pointerId) return;
+      onFrameOffset(originX - (ev.clientX - startX) * sx, originY - (ev.clientY - startY) * sy);
+    };
+    const end = (ev: PointerEvent) => {
+      if (ev.pointerId !== pointerId) return;
+      onCanvasDragActiveChange?.(false);
+      document.removeEventListener("pointermove", onMove);
+      document.removeEventListener("pointerup", end);
+      document.removeEventListener("pointercancel", end);
+    };
+    document.addEventListener("pointermove", onMove);
+    document.addEventListener("pointerup", end);
+    document.addEventListener("pointercancel", end);
+  };
 
   const onResizeRotateDown = (e: ReactPointerEvent<HTMLButtonElement>) => {
     if (!onShapeMaskRotateDeg || busy) return;
@@ -628,39 +700,71 @@ export function ImageEditorCanvasStage({
               style={pan.x || pan.y ? { transform: `translate(${pan.x}px, ${pan.y}px)` } : undefined}
             >
             <div
+              className="relative shrink-0"
+              style={{ width: frameLayout.width, height: frameLayout.height }}
+            >
+            {resizeInteract ? (
+              <>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={imageUrl ?? backdrop ?? ""}
+                  alt=""
+                  className="pointer-events-none absolute inset-0 h-full w-full object-contain"
+                  style={composeFrameImageStyle(
+                    `rotate(${rotateDeg}deg) scale(${flipH ? -1 : 1}, ${flipV ? -1 : 1})`,
+                    liveCorrection,
+                    comparing ? undefined : filterStyle,
+                  )}
+                  draggable={false}
+                />
+                <div className="pointer-events-none absolute inset-0 bg-[var(--ie-ink)]/45" />
+              </>
+            ) : null}
+            <div
               ref={frameRef}
               data-ie-shape-frame
               className={cn(
-                "relative shrink-0 overflow-visible",
+                "overflow-visible",
                 resizeInteract
-                  ? "bg-transparent"
-                  : "rounded-xl border border-[var(--ie-border-soft)] bg-[var(--ie-cream)] shadow-sm",
+                  ? "absolute bg-white ring-2 ring-[var(--ie-border)]/70"
+                  : "relative h-full w-full rounded-xl border border-[var(--ie-border-soft)] bg-[var(--ie-cream)] shadow-sm",
                 cropMode && !shapeMaskInteract && !resizeInteract && "ring-2 ring-[var(--ie-border)]/20",
               )}
-              style={{
-                width: frameLayout.width,
-                height: frameLayout.height,
-              }}
+              style={
+                resizeInteract
+                  ? (resizeFrameBox ?? { left: 0, top: 0, width: "100%", height: "100%" })
+                  : undefined
+              }
             >
               {/* 底图固定：拖拽裁切框时不动 */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
+              <div className={cn("absolute inset-0", resizeInteract && "overflow-hidden")}>
               <img
                 src={resizeInteract ? (imageUrl ?? backdrop) : backdrop}
                 alt="编辑底图"
                 className={cn(
-                  "absolute inset-0 h-full w-full",
-                  resizeInteract ? "object-fill" : "object-contain",
+                  "absolute",
+                  resizeInteract && resizePlace ? "max-w-none object-contain" : "inset-0 h-full w-full object-contain",
                   showCropResult && "opacity-0",
                 )}
-                style={composeFrameImageStyle(
-                  resizeInteract
-                    ? `rotate(${rotateDeg}deg) scale(${flipH ? -1 : 1}, ${flipV ? -1 : 1})`
-                    : "",
-                  liveCorrection,
-                  comparing ? undefined : filterStyle,
-                )}
+                style={
+                  resizeInteract && resizePlace
+                    ? {
+                        left: `${(resizePlace.x / canvasWidth) * 100}%`,
+                        top: `${(resizePlace.y / canvasHeight) * 100}%`,
+                        width: `${(resizePlace.w / canvasWidth) * 100}%`,
+                        height: `${(resizePlace.h / canvasHeight) * 100}%`,
+                        ...composeFrameImageStyle(
+                          `rotate(${rotateDeg}deg) scale(${flipH ? -1 : 1}, ${flipV ? -1 : 1})`,
+                          liveCorrection,
+                          comparing ? undefined : filterStyle,
+                        ),
+                      }
+                    : composeFrameImageStyle("", liveCorrection, comparing ? undefined : filterStyle)
+                }
                 draggable={false}
               />
+              </div>
 
               {frameInteract && cropBox && stagePx.width && stagePx.height ? (
                 <>
@@ -738,7 +842,7 @@ export function ImageEditorCanvasStage({
                     <img
                       src={cropPreviewUrl}
                       alt="裁切预览"
-                      className="pointer-events-none absolute inset-0 z-[12] h-full w-full rounded-lg object-fill"
+                      className="pointer-events-none absolute inset-0 z-[12] h-full w-full rounded-lg object-contain"
                       style={composeFrameImageStyle("", liveCorrection)}
                       draggable={false}
                     />
@@ -787,13 +891,11 @@ export function ImageEditorCanvasStage({
               ) : resizeInteract ? (
                 <>
                   {shapeMask !== "none" ? <ShapeMaskDimOverlay shapeMask={shapeMask} /> : null}
-                  <div className="pointer-events-none absolute inset-0 z-[18]" aria-hidden>
-                  <div className="absolute inset-y-0 left-1/3 w-px bg-white/75" />
-                  <div className="absolute inset-y-0 left-2/3 w-px bg-white/75" />
-                  <div className="absolute inset-x-0 top-1/3 h-px bg-white/75" />
-                  <div className="absolute inset-x-0 top-2/3 h-px bg-white/75" />
-                  <div className="absolute inset-0 border border-white/90" />
-                  </div>
+                  <ImageEditorRectCropRuleGrid />
+                  <div
+                    className="absolute inset-0 z-[19] cursor-move"
+                    onPointerDown={onMoveResizeDown}
+                  />
                 </>
               ) : (
                 <>
@@ -893,25 +995,14 @@ export function ImageEditorCanvasStage({
               {resizeInteract && onCanvasResize ? (
                 <div className="pointer-events-none absolute inset-0 z-[40]">
                   {(
-                    [
-                      ["nw", "left-0 top-0 -translate-x-1/2 -translate-y-1/2 cursor-nwse-resize"],
-                      ["n", "left-1/2 top-0 -translate-x-1/2 -translate-y-1/2 cursor-ns-resize"],
-                      ["ne", "right-0 top-0 translate-x-1/2 -translate-y-1/2 cursor-nesw-resize"],
-                      ["e", "right-0 top-1/2 translate-x-1/2 -translate-y-1/2 cursor-ew-resize"],
-                      ["se", "right-0 bottom-0 translate-x-1/2 translate-y-1/2 cursor-nwse-resize"],
-                      ["s", "left-1/2 bottom-0 -translate-x-1/2 translate-y-1/2 cursor-ns-resize"],
-                      ["sw", "left-0 bottom-0 -translate-x-1/2 translate-y-1/2 cursor-nesw-resize"],
-                      ["w", "left-0 top-1/2 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize"],
-                    ] as const
-                  ).map(([id, pos]) => (
+                    ["nw", "n", "ne", "e", "se", "s", "sw", "w"] as const
+                  ).map((id) => (
                     <button
                       key={id}
                       type="button"
                       aria-label={`调整尺寸 ${id}`}
-                      className={cn(
-                        "pointer-events-auto absolute h-2.5 w-2.5 rounded-[2px] border border-[var(--ie-border)] bg-[var(--ie-cream)] shadow-sm",
-                        pos,
-                      )}
+                      style={{ touchAction: "none" }}
+                      className={imageEditorFrameHandleClass(id)}
                       onPointerDown={onResizeHandleDown(id)}
                     />
                   ))}
@@ -953,6 +1044,7 @@ export function ImageEditorCanvasStage({
               {eraseOverlay}
 
               {busy ? <EcomMediaGeneratingBusy background="light" /> : null}
+            </div>
             </div>
             </div>
           </div>

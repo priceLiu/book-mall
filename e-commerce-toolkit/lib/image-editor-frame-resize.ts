@@ -1,5 +1,38 @@
 export type ImageEditorFrameResizeHandleId = "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw";
 
+/** 画布像素里的图片位置。offset 是相对居中的位移，正值向右、向下。 */
+export function placeImageInCanvas(opts: {
+  canvasW: number;
+  canvasH: number;
+  imageW: number;
+  imageH: number;
+  fitInside: boolean;
+  offsetX?: number;
+  offsetY?: number;
+}): { x: number; y: number; w: number; h: number; offsetX: number; offsetY: number } {
+  const canvasW = Math.max(1, opts.canvasW);
+  const canvasH = Math.max(1, opts.canvasH);
+  const imageW = Math.max(1, opts.imageW);
+  const imageH = Math.max(1, opts.imageH);
+  const scale = opts.fitInside
+    ? Math.min(canvasW / imageW, canvasH / imageH)
+    : Math.max(canvasW / imageW, canvasH / imageH);
+  const w = imageW * scale;
+  const h = imageH * scale;
+  const limitX = Math.max(0, Math.abs(canvasW - w) / 2);
+  const limitY = Math.max(0, Math.abs(canvasH - h) / 2);
+  const offsetX = Math.min(limitX, Math.max(-limitX, opts.offsetX ?? 0));
+  const offsetY = Math.min(limitY, Math.max(-limitY, opts.offsetY ?? 0));
+  return {
+    x: (canvasW - w) / 2 + offsetX,
+    y: (canvasH - h) / 2 + offsetY,
+    w,
+    h,
+    offsetX,
+    offsetY,
+  };
+}
+
 export function frameScaleFromElement(
   frame: Element | null,
   canvasWidth: number,

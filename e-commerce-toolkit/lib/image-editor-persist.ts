@@ -15,6 +15,8 @@ export type ImageEditorSessionSnapshot = {
   flipV: boolean;
   shapeMask: ImageEditorShapeMaskId;
   losslessResize: boolean;
+  frameOffsetX?: number;
+  frameOffsetY?: number;
   lockAspect: boolean;
   correctionOpen: boolean;
   brightness: number;
