@@ -8,6 +8,7 @@ import {
 } from "@/lib/billing/credit-account-service";
 import { resolveGenerationBillingOwnerRef } from "@/lib/billing/credit-pre-check";
 import { IMAGE_EDITOR_COLOR_GRADE_CREDITS } from "@/lib/ecom/image-editor-color-grade-credits";
+import { imageEditorFilterPromptLabel } from "@/lib/ecom/image-editor-filter-prompts";
 
 export type ImageEditorColorGradeCharge = {
   ref: AccountRef;
@@ -36,7 +37,7 @@ export async function chargeImageEditorColorGrade(input: {
     credits,
     actorUserId: input.userId,
     idempotencyKey: `ecom_color_grade:${input.chargeId}`,
-    description: `图片编辑调色 · ${input.gradeId}`,
+    description: `图片编辑调色 · ${imageEditorFilterPromptLabel(input.gradeId) ?? input.gradeId}`,
   });
   const ledgerId = res.ledger?.id?.trim() ?? "";
   if (!ledgerId) throw new Error("调色扣积分失败");

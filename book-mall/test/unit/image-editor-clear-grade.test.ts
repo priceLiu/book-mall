@@ -23,11 +23,30 @@ describe("image editor clear grade", () => {
     expect(IMAGE_EDITOR_COLOR_GRADE_CREDITS).toBe(0.5);
   });
 
+  it("grayscale and invert remap pixels", () => {
+    const gray = gradeNamedPixel("grayscale", 40, 120, 200);
+    expect(gray[0]).toBe(gray[1]);
+    expect(gray[1]).toBe(gray[2]);
+    const inverted = gradeNamedPixel("invert", 40, 120, 200);
+    expect(inverted[0]).toBe(215);
+    expect(inverted[1]).toBe(135);
+    expect(inverted[2]).toBe(55);
+  });
+
   it("vivid raises chroma of a muted red", () => {
     const [r, g, b] = gradeNamedPixel("vivid", 150, 100, 100);
     const before = 150 - 100;
     const after = Math.max(r, g, b) - Math.min(r, g, b);
     expect(after).toBeGreaterThan(before + 20);
+  });
+
+  it("resolves filter catalog recipes", () => {
+    const kodak = gradeNamedPixel("film-kodak", 100, 110, 120);
+    expect(kodak).toHaveLength(3);
+    const textureFilm = gradeNamedPixel("film", 200, 100, 100);
+    expect(textureFilm[0]).toBeGreaterThan(0);
+    const lomo = gradeNamedPixel("lomo-classic", 128, 128, 128);
+    expect(lomo).toHaveLength(3);
   });
 
   it("opens mid gray and keeps black black", () => {

@@ -4,6 +4,12 @@ import { Ban, ChevronLeft, ChevronRight, Eraser, Pipette, Plus, ShoppingBag, Spa
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 
 import type { ColorAdjust, ColorAdjustStroke } from "@/lib/image-editor-color-adjust";
+import {
+  filterSectionByKey,
+  IMAGE_EDITOR_FILTER_BASIC_QUICK,
+  IMAGE_EDITOR_FILTER_BASIC_SHEET_EXTRA,
+  IMAGE_EDITOR_FILTER_SECTIONS,
+} from "@/lib/image-editor-filter-catalog";
 import { cn } from "@/lib/utils";
 
 type GradePick = {
@@ -132,30 +138,23 @@ function sameRgb(a: [number, number, number] | undefined, b: [number, number, nu
   return !!a && a[0] === b[0] && a[1] === b[1] && a[2] === b[2];
 }
 
-const FILTER_BASE: GradePick[] = [
-  { id: "natural", label: "自然", preview: "contrast(1.06) saturate(0.88)" },
-  { id: "dehaze", label: "去雾", preview: "brightness(1.04) contrast(1.24) saturate(1.12)" },
-  { id: "sharpen", label: "锐化", preview: "contrast(1.18)" },
-  { id: "vivid", label: "智能绘色", preview: "contrast(1.12) saturate(1.65)" },
-  { id: "aqua", label: "碧波", preview: "hue-rotate(18deg) saturate(1.25) brightness(1.04)" },
-  { id: "hyper", label: "全彩", preview: "saturate(1.85) contrast(1.12)" },
+const FILTER_BASE: GradePick[] = IMAGE_EDITOR_FILTER_BASIC_QUICK.map((item) => ({
+  id: item.id,
+  label: item.label,
+  preview: item.preview,
+}));
+
+const FILTER_BASIC_EXTRA: GradePick[] = [
+  { id: "grayscale", label: "黑白色", preview: "grayscale(1)" },
+  ...IMAGE_EDITOR_FILTER_BASIC_SHEET_EXTRA.filter((item) => item.id !== "invert" && item.id !== "grayscale").map((item) => ({
+    id: item.id,
+    label: item.label,
+    preview: item.preview,
+  })),
+  { id: "invert", label: "反色", preview: "invert(1)" },
 ];
 
-const FILTER_BASE_MORE: GradePick[] = [
-  { id: "clear", label: "清透", preview: "brightness(1.14) contrast(1.04) saturate(0.88)" },
-  { id: "texture", label: "质感", preview: "contrast(1.16) saturate(1.08)" },
-  { id: "cream", label: "奶油", preview: "brightness(1.06) contrast(0.86) saturate(0.9) sepia(0.16)" },
-  { id: "film", label: "胶片", preview: "brightness(1.05) contrast(0.84) saturate(0.72) sepia(0.24)" },
-  { id: "cool-white", label: "冷白", preview: "contrast(1.12) saturate(0.9) hue-rotate(8deg)" },
-  { id: "muted", label: "低饱和", preview: "saturate(0.45) contrast(1.06)" },
-];
-
-const FILTER_NATURAL: GradePick[] = [
-  { id: "soft", label: "柔光", preview: "brightness(1.08) contrast(0.78) saturate(0.9)" },
-  { id: "warm-food", label: "暖食", preview: "sepia(0.18) saturate(1.2)" },
-  { id: "fade", label: "褪色", preview: "brightness(1.08) contrast(0.82) saturate(0.62) sepia(0.18)" },
-  { id: "warm", label: "暖白", preview: "sepia(0.12) brightness(1.04)" },
-];
+const FILTER_PREVIEW_COUNT = 6;
 
 const RECOLOR_PICKS: GradePick[] = [
   { id: "bg-light", label: "背景变浅", preview: "brightness(1.12) saturate(0.92)" },
@@ -432,7 +431,7 @@ export function ImageEditorColorGroupBody({
   const [advancedTab, setAdvancedTab] = useState<(typeof ADVANCED_TABS)[number]["id"]>("light");
   const [splitSide, setSplitSide] = useState<"highlight" | "shadow">("highlight");
   const [hslIndex, setHslIndex] = useState(0);
-  const [filterMore, setFilterMore] = useState(false);
+  const [filterSheetKey, setFilterSheetKey] = useState<string | null>(null);
   const [productMode, setProductMode] = useState<"cut" | "keep">("cut");
   const [productId, setProductId] = useState<string>("general");
   const [swatches, setSwatches] = useState<Array<[number, number, number]>>([]);
@@ -611,7 +610,70 @@ export function ImageEditorColorGroupBody({
   }
 
   if (group === "filter") {
-    const base = filterMore ? [...FILTER_BASE, ...FILTER_BASE_MORE] : FILTER_BASE;
+    const filterSheet = filterSheetKey && filterSheetKey !== "basic" ? filterSectionByKey(filterSheetKey) : null;
+    if (filterSheetKey === "basic") {
+      return (
+        <div className="space-y-2 px-3 pb-3">
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              aria-label="返回滤镜列表"
+              className="grid h-8 w-8 shrink-0 place-items-center rounded-md text-[var(--ie-ink)] hover:bg-[var(--ie-cream-muted)]"
+              onClick={() => setFilterSheetKey(null)}
+            >
+              <ChevronLeft className="h-5 w-5" aria-hidden />
+            </button>
+            <p className="text-[13px] font-medium text-[var(--ie-ink)]">基础</p>
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            <button
+              type="button"
+              disabled={disabled || !imageUrl}
+              className={cn(
+                "overflow-hidden rounded-lg border bg-white text-left disabled:opacity-50",
+                !selectedId ? "border-[var(--ie-ink)]" : "border-[var(--ie-border-soft)]",
+              )}
+              onClick={onRestore}
+            >
+              <span className="grid aspect-square place-items-center bg-[var(--ie-cream-muted)] text-[var(--ie-muted)]">
+                <Ban className="h-7 w-7" aria-hidden />
+              </span>
+              <span className="block truncate px-1 py-1 text-center text-[12px] text-[var(--ie-ink)]">无滤镜</span>
+            </button>
+            {FILTER_BASE.map((item) => (
+              <FilterTile key={item.id} item={item} imageUrl={imageUrl} selected={selectedId === item.id} disabled={disabled || !imageUrl} onPick={onPick} />
+            ))}
+            {FILTER_BASIC_EXTRA.map((item) => (
+              <FilterTile key={item.id} item={item} imageUrl={imageUrl} selected={selectedId === item.id} disabled={disabled || !imageUrl} onPick={onPick} />
+            ))}
+          </div>
+          <p className="py-2 text-center text-[12px] text-[var(--ie-muted)]">没有更多了</p>
+        </div>
+      );
+    }
+    if (filterSheet) {
+      return (
+        <div className="space-y-2 px-3 pb-3">
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              aria-label="返回滤镜列表"
+              className="grid h-8 w-8 shrink-0 place-items-center rounded-md text-[var(--ie-ink)] hover:bg-[var(--ie-cream-muted)]"
+              onClick={() => setFilterSheetKey(null)}
+            >
+              <ChevronLeft className="h-5 w-5" aria-hidden />
+            </button>
+            <p className="text-[13px] font-medium text-[var(--ie-ink)]">{filterSheet.label}</p>
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            {filterSheet.items.map((item) => (
+              <FilterTile key={item.id} item={item} imageUrl={imageUrl} selected={selectedId === item.id} disabled={disabled || !imageUrl} onPick={onPick} />
+            ))}
+          </div>
+          <p className="py-2 text-center text-[12px] text-[var(--ie-muted)]">没有更多了</p>
+        </div>
+      );
+    }
     return (
       <div className="space-y-3 px-3 pb-3">
         <div>
@@ -631,24 +693,35 @@ export function ImageEditorColorGroupBody({
         <div>
           <div className="mb-2 flex items-center justify-between">
             <p className="text-[13px] font-medium text-[var(--ie-ink)]">基础</p>
-            <button type="button" className="text-[12px] text-[var(--ie-muted)]" onClick={() => setFilterMore((open) => !open)}>
-              {filterMore ? "收起" : "查看更多 >"}
+            <button type="button" className="text-[12px] text-[var(--ie-muted)]" onClick={() => setFilterSheetKey("basic")}>
+              查看更多 &gt;
             </button>
           </div>
           <div className="grid grid-cols-3 gap-2">
-            {base.map((item) => (
+            {FILTER_BASE.map((item) => (
               <FilterTile key={item.id} item={item} imageUrl={imageUrl} selected={selectedId === item.id} disabled={disabled || !imageUrl} onPick={onPick} />
             ))}
           </div>
         </div>
-        <div>
-          <p className="mb-2 text-[13px] font-medium text-[var(--ie-ink)]">自然</p>
-          <div className="grid grid-cols-3 gap-2">
-            {FILTER_NATURAL.map((item) => (
-              <FilterTile key={item.id} item={item} imageUrl={imageUrl} selected={selectedId === item.id} disabled={disabled || !imageUrl} onPick={onPick} />
-            ))}
-          </div>
-        </div>
+        {IMAGE_EDITOR_FILTER_SECTIONS.map((section) => {
+          const preview = section.items.slice(0, FILTER_PREVIEW_COUNT);
+          return (
+            <div key={section.key}>
+              <div className="mb-2 flex items-center justify-between">
+                <p className="text-[13px] font-medium text-[var(--ie-ink)]">{section.label}</p>
+                <button type="button" className="text-[12px] text-[var(--ie-muted)]" onClick={() => setFilterSheetKey(section.key)}>
+                  查看更多 &gt;
+                </button>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {preview.map((item) => (
+                  <FilterTile key={item.id} item={item} imageUrl={imageUrl} selected={selectedId === item.id} disabled={disabled || !imageUrl} onPick={onPick} />
+                ))}
+              </div>
+            </div>
+          );
+        })}
+        <p className="pt-1 text-center text-[12px] text-[var(--ie-muted)]">查看更多工具 &gt;</p>
       </div>
     );
   }

@@ -1,5 +1,8 @@
 import sharp from "sharp";
 
+import { IMAGE_EDITOR_FILTER_RECIPES } from "@/lib/ecom/image-editor-filter-recipes";
+import { imageEditorFilterPrompt, imageEditorFilterPromptLabel } from "@/lib/ecom/image-editor-filter-prompts";
+
 const MAX_BYTES = 20 * 1024 * 1024;
 const MAX_EDGE = 4096;
 
@@ -110,7 +113,7 @@ export function gradeClearRgba(
   applyClearClarity(data, width, height);
 }
 
-type LocalRecipe = {
+export type LocalRecipe = {
   brightness?: number;
   contrast?: number;
   saturate?: number;
@@ -161,6 +164,7 @@ const LOCAL_GRADE_RECIPES: Record<string, LocalRecipe> = {
   fabric: { contrast: 1.12, saturate: 1.1, clarity: 0.6 },
   "metal-glass": { contrast: 1.22, saturate: 1.08, clarity: 0.4, highlightRoll: 0.15 },
   gift: { contrast: 1.1, saturate: 1.18, temperature: 0.06 },
+  ...IMAGE_EDITOR_FILTER_RECIPES,
 };
 
 function channel(n: number): number {
@@ -170,6 +174,13 @@ function channel(n: number): number {
 /** 调色预设的像素结果。清透走单独曲线，其余按配方，保证和原图能看出差别。 */
 export function gradeNamedPixel(id: string, r0: number, g0: number, b0: number): [number, number, number] {
   if (id === "clear") return gradeClearPixel(r0, g0, b0);
+  if (id === "grayscale") {
+    const l = 0.2126 * r0 + 0.7152 * g0 + 0.0722 * b0;
+    return [clampByte(l), clampByte(l), clampByte(l)];
+  }
+  if (id === "invert") {
+    return [clampByte(255 - r0), clampByte(255 - g0), clampByte(255 - b0)];
+  }
   const recipe = LOCAL_GRADE_RECIPES[id];
   if (!recipe) throw new Error("未知调色");
   let r = r0 / 255;
@@ -238,17 +249,27 @@ export function gradeNamedPixel(id: string, r0: number, g0: number, b0: number):
   return [clampByte(channel(r) * 255), clampByte(channel(g) * 255), clampByte(channel(b) * 255)];
 }
 
+/** 每个 gradeId 必须在提示词表中有对应条目，与前端所选滤镜一致。 */
+export function assertImageEditorGradePrompt(gradeId: string): void {
+  if (!imageEditorFilterPrompt(gradeId)) throw new Error(`未知调色：${gradeId}`);
+}
+
+export function imageEditorGradeDisplayLabel(gradeId: string): string {
+  return imageEditorFilterPromptLabel(gradeId) ?? gradeId;
+}
+
 export function gradeLocalRgba(
   data: Uint8Array | Uint8ClampedArray | Buffer,
   width: number,
   height: number,
   gradeId: string,
 ): void {
+  assertImageEditorGradePrompt(gradeId);
   if (gradeId === "clear") {
     gradeClearRgba(data, width, height);
     return;
   }
-  if (!LOCAL_GRADE_RECIPES[gradeId]) throw new Error("未知调色");
+  if (gradeId !== "grayscale" && gradeId !== "invert" && !LOCAL_GRADE_RECIPES[gradeId]) throw new Error("未知调色");
   const n = width * height;
   if (width < 1 || height < 1 || data.length < n * 4) {
     throw new Error("图片数据长度不足");

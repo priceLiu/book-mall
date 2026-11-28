@@ -6,6 +6,8 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ImageEditorColorGroupBody } from "@/components/image-editor/image-editor-color-controls";
 import type { ColorAdjust } from "@/lib/image-editor-color-adjust";
 import { colorAdjustIsNeutral, colorAdjustPreviewCss } from "@/lib/image-editor-color-adjust";
+import { imageEditorFilterGradeMeta } from "@/lib/image-editor-filter-catalog";
+import { imageEditorFilterPrompt, imageEditorFilterPromptLabel } from "@/lib/image-editor-filter-prompts";
 import { cn } from "@/lib/utils";
 
 const COLOR_LOCK =
@@ -176,6 +178,20 @@ export const IMAGE_EDITOR_COLOR_GRADES: ImageEditorColorGrade[] = [
     prompt: "",
   },
   {
+    id: "grayscale",
+    label: "黑白色",
+    group: "filter",
+    preview: "grayscale(1)",
+    prompt: "",
+  },
+  {
+    id: "invert",
+    label: "反色",
+    group: "filter",
+    preview: "invert(1)",
+    prompt: "",
+  },
+  {
     id: "soft",
     label: "柔光",
     group: "filter",
@@ -251,7 +267,23 @@ export const IMAGE_EDITOR_COLOR_GRADES: ImageEditorColorGrade[] = [
 ];
 
 export function imageEditorColorGrade(id: string): ImageEditorColorGrade | undefined {
-  return IMAGE_EDITOR_COLOR_GRADES.find((item) => item.id === id);
+  const preset = IMAGE_EDITOR_COLOR_GRADES.find((item) => item.id === id);
+  const generated = imageEditorFilterPrompt(id);
+  if (preset) {
+    const prompt = preset.prompt.trim() || generated || "";
+    return prompt === preset.prompt ? preset : { ...preset, prompt };
+  }
+  const filter = imageEditorFilterGradeMeta(id);
+  if (filter) return filter;
+  if (generated) {
+    return {
+      id,
+      label: imageEditorFilterPromptLabel(id) ?? id,
+      group: "filter",
+      prompt: generated,
+    };
+  }
+  return undefined;
 }
 
 const GROUPS: Array<{ id: Exclude<ImageEditorColorGroup, "preset">; label: string; icon: ReactNode }> = [
